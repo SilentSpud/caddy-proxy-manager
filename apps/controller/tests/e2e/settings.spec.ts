@@ -1,6 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
-import { goToSettingsSection, SETTINGS_SIDEBAR } from '../helpers/settings-nav';
+import {
+  goToSetting,
+  pageSave,
+  savePage,
+  saveSetting,
+  SETTINGS_SIDEBAR,
+} from '../helpers/settings-nav';
 import { waitForHydration } from '../helpers/hydration';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -25,7 +31,7 @@ async function openPaletteWithKeyboard(page: Page) {
 }
 
 /** Navigate to a specific settings section via the sidebar. */
-const goToSection = goToSettingsSection;
+const goToSection = goToSetting;
 
 // ─── Page load & layout ──────────────────────────────────────────────────────
 
@@ -38,34 +44,37 @@ test.describe('Settings - page load & layout', () => {
 
   test('settings page defaults to the General section', async ({ page }) => {
     await page.goto('/settings/general');
-    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
   });
 
   test('sidebar is visible and shows all group headers', async ({ page }) => {
     await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
     await expect(sidebar).toBeVisible();
-    await expect(sidebar.getByText('System')).toBeVisible();
-    await expect(sidebar.getByText('Networking')).toBeVisible();
-    await expect(sidebar.getByText('Security')).toBeVisible();
-    await expect(sidebar.getByText('Observability')).toBeVisible();
+    for (const group of ['System', 'Networking', 'Security', 'Observability']) {
+      // By the group's own element: `Observability` names a group and a page inside it, and a
+      // plain text match in the rail finds both.
+      await expect(sidebar.getByRole('group', { name: group })).toBeVisible();
+    }
   });
 
   test('sidebar shows settings navigation items', async ({ page }) => {
     await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
+    // The rail lists pages. What used to be a page of its own - ACME Server, DNS Resolvers -
+    // is a block on one of these, reachable from the list beside the page rather than the rail.
     const expectedItems = [
       'General',
-      'ACME Server',
-      'Default Response',
-      'DNS Providers',
-      'DNS Resolvers',
-      'Upstream DNS Pinning',
-      'Global Geoblocking',
-      'Authentik Defaults',
-      'OAuth Providers',
-      'Metrics & Monitoring',
-      'Access Logging',
+      'Responses',
+      'Caddy Build',
+      'Dashboard Host',
+      'Agent',
+      'DNS',
+      'Network',
+      'Authentication',
+      'Forward Auth',
+      'Geo-blocking',
+      'Observability',
     ];
     for (const name of expectedItems) {
       await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
@@ -86,15 +95,15 @@ test.describe('Settings - sidebar navigation', () => {
   test('clicking a nav item switches the detail pane', async ({ page }) => {
     await page.goto('/settings/general');
     // Default: General
-    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
 
     await page
       .locator(SETTINGS_SIDEBAR)
-      .getByRole('link', { name: 'ACME Server', exact: true })
+      .getByRole('link', { name: 'Responses', exact: true })
       .click();
-    await expect(page.getByRole('heading', { name: 'ACME Server' })).toBeVisible();
-    // The section it came from is gone, not merely scrolled off.
-    await expect(page.getByRole('heading', { name: 'General' })).not.toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Responses' })).toBeVisible();
+    // The page it came from is gone, not merely scrolled off.
+    await expect(page.getByRole('heading', { level: 1, name: 'General' })).not.toBeVisible();
   });
 
   test('breadcrumb shows correct group for each section', async ({ page }) => {
@@ -104,54 +113,60 @@ test.describe('Settings - sidebar navigation', () => {
     // General is under System
     await expect(breadcrumb.getByText('System')).toBeVisible();
 
-    // Navigate to DNS Providers under Networking
-    await page
-      .locator(SETTINGS_SIDEBAR)
-      .getByRole('link', { name: 'DNS Providers', exact: true })
-      .click();
+    // Navigate to DNS under Networking
+    await page.locator(SETTINGS_SIDEBAR).getByRole('link', { name: 'DNS', exact: true }).click();
     await expect(breadcrumb.getByText('Networking')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'DNS Providers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'DNS Providers' })).toBeVisible();
   });
 
   test('navigating through all sections renders correct headings', async ({ page }) => {
     await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
 
-    const sections = [
+    const pages = [
       'General',
-      'Default Response',
-      'DNS Providers',
-      'DNS Resolvers',
-      'Upstream DNS Pinning',
-      'Global Geoblocking',
-      'Authentik Defaults',
-      'OAuth Providers',
-      'Metrics & Monitoring',
-      'Access Logging',
+      'Responses',
+      'DNS',
+      'Network',
+      'Authentication',
+      'Forward Auth',
+      'Geo-blocking',
+      'Observability',
     ];
 
-    for (const name of sections) {
+    for (const name of pages) {
       await sidebar.getByRole('link', { name, exact: true }).click();
-      await expect(page.getByRole('heading', { name })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
     }
   });
 
-  test('only one section is visible at a time', async ({ page }) => {
+  test('a page shows its own blocks and no others', async ({ page }) => {
     await page.goto('/settings/general');
 
-    // On General, the ACME section must not be in the document at all. Every section's button now
-    // reads just "Save", so the section heading is what tells them apart.
-    await expect(page.getByRole('heading', { name: 'General', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'ACME Server', exact: true })).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(1);
+    // ACME Server is a block on General, so it is on this page - and Trusted Proxies, which is a
+    // block on Network, must not be in the document at all.
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'General', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'ACME Server', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Trusted Proxies', exact: true }),
+    ).not.toBeVisible();
+    // Nothing is unsaved, so the page offers nothing to save.
+    await expect(pageSave(page)).toHaveCount(0);
 
     await page
       .locator(SETTINGS_SIDEBAR)
-      .getByRole('link', { name: 'ACME Server', exact: true })
+      .getByRole('link', { name: 'Network', exact: true })
       .click();
-    await expect(page.getByRole('heading', { name: 'ACME Server', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'General', exact: true })).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(1);
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Trusted Proxies', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'ACME Server', exact: true }),
+    ).not.toBeVisible();
   });
 });
 
@@ -177,10 +192,10 @@ test.describe('Settings - Cmd-K palette', () => {
     await page.goto('/settings/general');
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('General')).toBeVisible();
-    await expect(dialog.getByText('Default Response')).toBeVisible();
-    await expect(dialog.getByText('DNS Providers')).toBeVisible();
-    await expect(dialog.getByText('Metrics & Monitoring')).toBeVisible();
+    await expect(dialog.getByText('General', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Responses', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('DNS', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Observability', { exact: true })).toBeVisible();
   });
 
   test('typing in the palette filters results', async ({ page }) => {
@@ -188,11 +203,12 @@ test.describe('Settings - Cmd-K palette', () => {
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     const input = dialog.getByPlaceholder(/search/i);
-    // "geob" is specific enough that cmdk's fuzzy matching cannot reach an unrelated item.
+    // "geob" is specific enough that cmdk's fuzzy matching cannot reach an unrelated item. It
+    // matches the page by the name of a block on it, which is one of the page's keywords.
     await input.fill('geob');
-    await expect(dialog.getByText('Global Geoblocking')).toBeVisible();
+    await expect(dialog.getByText('Geo-blocking', { exact: true })).toBeVisible();
     // Non-matching items should be hidden
-    await expect(dialog.getByText('Access Logging')).not.toBeVisible();
+    await expect(dialog.getByText('Observability', { exact: true })).not.toBeVisible();
   });
 
   test('selecting a palette result navigates to that section', async ({ page }) => {
@@ -201,11 +217,11 @@ test.describe('Settings - Cmd-K palette', () => {
     const dialog = page.getByRole('dialog');
     const input = dialog.getByPlaceholder(/search/i);
     await input.fill('logging');
-    await dialog.getByText('Access Logging').click();
+    await dialog.getByText('Observability', { exact: true }).click();
     // Palette should close
     await expect(dialog).not.toBeVisible();
-    // Detail pane should show logging section
-    await expect(page.getByRole('heading', { name: 'Access Logging' })).toBeVisible();
+    // Access Logging is a block on the page the palette found by that keyword.
+    await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
   });
 
   test('Escape closes the palette', async ({ page }) => {
@@ -233,24 +249,21 @@ test.describe('Settings - General', () => {
     await goToSection(page, 'General');
     await expect(page.locator('input[name="defaultDomain"]')).toBeVisible();
     await expect(page.locator('input[name="acmeEmail"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('fill primary domain and save', async ({ page }) => {
     await goToSection(page, 'General');
     const domainInput = page.locator('input[name="defaultDomain"]');
     await domainInput.fill('test.local');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled({
-      timeout: 10_000,
-    });
+    await savePage(page);
+    await expectStaged(page, 10_000);
   });
 
   test('primary domain persists after save and page reload', async ({ page }) => {
     await goToSection(page, 'General');
     const domainInput = page.locator('input[name="defaultDomain"]');
     await domainInput.fill('persist-test.local');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10_000);
 
     // Reload and navigate back
@@ -259,7 +272,7 @@ test.describe('Settings - General', () => {
 
     // Reset
     await page.locator('input[name="defaultDomain"]').fill('caddyproxymanager.com');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10_000);
   });
 
@@ -273,7 +286,7 @@ test.describe('Settings - General', () => {
     // the database and would hide exactly this.
     await goToSection(page, 'General');
     const domain = page.locator('input[name="defaultDomain"]');
-    const save = page.getByRole('button', { name: 'Save', exact: true });
+    const save = pageSave(page);
     const original = await domain.inputValue();
 
     await domain.fill('reset-check.local');
@@ -314,7 +327,6 @@ test.describe('Settings - Default Response', () => {
     await expect(page.locator('input[name="status"]')).toHaveValue('404');
     await expect(page.locator('textarea[name="body"]')).toBeVisible();
     await expect(page.locator('textarea[name="headers"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('saves and reloads a custom response through the settings form', async ({ page }) => {
@@ -323,11 +335,15 @@ test.describe('Settings - Default Response', () => {
     await behavior.click();
     await page.getByRole('option', { name: 'Custom HTTP response' }).click();
     await page.locator('input[name="status"]').fill('451');
-    await page.locator('textarea[name="body"]').fill('Unavailable for legal reasons');
+    // Unique to this run. The page only offers to save what has changed, and a value an earlier
+    // run staged and never applied is still what the form loads with - so a fixed string can be
+    // what is already there, leaving nothing to save.
+    const body = `Unavailable for legal reasons ${Date.now()}`;
+    await page.locator('textarea[name="body"]').fill(body);
     await page
       .locator('textarea[name="headers"]')
       .fill('Content-Type: text/plain; charset=utf-8\nX-Cpm-Ui: saved');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expect(page.getByText('Staged. Review and apply to send it to Caddy.')).toBeVisible({
       timeout: 10_000,
     });
@@ -336,16 +352,14 @@ test.describe('Settings - Default Response', () => {
     behavior = page.getByRole('combobox', { name: 'Behavior' });
     await expect(behavior).toContainText('Custom HTTP response');
     await expect(page.locator('input[name="status"]')).toHaveValue('451');
-    await expect(page.locator('textarea[name="body"]')).toHaveValue(
-      'Unavailable for legal reasons',
-    );
+    await expect(page.locator('textarea[name="body"]')).toHaveValue(body);
     await expect(page.locator('textarea[name="headers"]')).toHaveValue(
       'Content-Type: text/plain; charset=utf-8\nX-Cpm-Ui: saved',
     );
 
     await behavior.click();
     await page.getByRole('option', { name: 'Caddy native behavior' }).click();
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expect(page.getByText('Staged. Review and apply to send it to Caddy.')).toBeVisible({
       timeout: 10_000,
     });
@@ -356,7 +370,14 @@ test.describe('Settings - Default Response', () => {
 
 test.describe('Settings - ACME Server', () => {
   const API_SETTINGS_ACME = 'http://localhost:3000/api/v1/settings/acme';
-  const CUSTOM_DIR = 'https://ca.internal.example.com/acme/acme/directory';
+  /**
+   * A directory URL of this run's own.
+   *
+   * The reset below puts the applied setting back, but a staged change outlives it: the form
+   * loads what is staged, so a fixed URL can already be in the field and there is then nothing
+   * for the page to offer to save.
+   */
+  const directoryUrl = () => `https://ca.internal.example.com/acme/${Date.now()}/directory`;
 
   test.afterEach(async ({ page }) => {
     // Reset to the Let's Encrypt default so other runs start clean. The Origin header is required:
@@ -372,41 +393,43 @@ test.describe('Settings - ACME Server', () => {
     await goToSection(page, 'ACME Server');
     await expect(page.locator('input[name="caUrl"]')).toBeVisible();
     await expect(page.locator('textarea[name="caRootPem"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('saves a custom directory URL and persists it', async ({ page }) => {
+    const customDir = directoryUrl();
     await goToSection(page, 'ACME Server');
-    await page.locator('input[name="caUrl"]').fill(CUSTOM_DIR);
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await saveSetting(page, page.locator('input[name="caUrl"]'), customDir);
     await expectStaged(page, 10_000);
 
     await goToSection(page, 'ACME Server');
-    await expect(page.locator('input[name="caUrl"]')).toHaveValue(CUSTOM_DIR);
+    await expect(page.locator('input[name="caUrl"]')).toHaveValue(customDir);
   });
 
   test('rejects a non-HTTPS directory URL', async ({ page }) => {
     await goToSection(page, 'ACME Server');
-    await page.locator('input[name="caUrl"]').fill('http://ca.internal.example.com/directory');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await saveSetting(
+      page,
+      page.locator('input[name="caUrl"]'),
+      'http://ca.internal.example.com/directory',
+    );
     await expect(page.getByText(/must use HTTPS/i)).toBeVisible({ timeout: 10_000 });
   });
 
   test('UI save is reflected in the REST API once applied', async ({ page }) => {
+    const customDir = directoryUrl();
     await goToSection(page, 'ACME Server');
-    await page.locator('input[name="caUrl"]').fill(CUSTOM_DIR);
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await saveSetting(page, page.locator('input[name="caUrl"]'), customDir);
     await expectStaged(page, 10_000);
 
     // Staged, so the API still reports the applied value - which is the point of staging.
     const staged = await page.request.get(API_SETTINGS_ACME);
-    expect((await staged.json()).caUrl ?? '').not.toBe(CUSTOM_DIR);
+    expect((await staged.json()).caUrl ?? '').not.toBe(customDir);
 
     await applyStagedChanges(page);
 
     const res = await page.request.get(API_SETTINGS_ACME);
     const data = await res.json();
-    expect(data.caUrl).toBe(CUSTOM_DIR);
+    expect(data.caUrl).toBe(customDir);
   });
 });
 
@@ -426,6 +449,8 @@ test.describe('Settings - Dashboard Host', () => {
     const before = await hstsSubdomains.isChecked();
     await hstsSubdomains.click();
 
+    // Its own Save, not the page's bar: this form asks before it saves, so it opts out of the bar
+    // and keeps the button that opens that question.
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page, 10_000);
     await applyStagedChanges(page);
@@ -444,7 +469,7 @@ test.describe('Settings - Dashboard Host', () => {
 test.describe('Settings - DNS Providers', () => {
   test('shows provider selector and add form', async ({ page }) => {
     await goToSection(page, 'DNS Providers');
-    await expect(page.getByRole('heading', { name: 'DNS Providers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'DNS Providers' })).toBeVisible();
     // The provider picker itself, rather than any text matching /select/ - hidden option labels
     // and helper copy match that pattern too, and the first of them need not be visible.
     await expect(page.locator('form#dnsp-add-form button[aria-haspopup="listbox"]')).toBeVisible();
@@ -480,11 +505,10 @@ test.describe('Settings - DNS Providers', () => {
 test.describe('Settings - DNS Resolvers', () => {
   test('shows enable checkbox and resolver textareas', async ({ page }) => {
     await goToSection(page, 'DNS Resolvers');
-    await expect(page.getByRole('heading', { name: 'DNS Resolvers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'DNS Resolvers' })).toBeVisible();
     await expect(page.getByLabel('Enable custom DNS resolvers')).toBeVisible();
     await expect(page.locator('textarea[name="resolvers"]')).toBeVisible();
     await expect(page.locator('textarea[name="fallbacks"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('timeout field is visible', async ({ page }) => {
@@ -498,9 +522,10 @@ test.describe('Settings - DNS Resolvers', () => {
 test.describe('Settings - Upstream DNS Pinning', () => {
   test('shows enable checkbox and address family selector', async ({ page }) => {
     await goToSection(page, 'Upstream DNS Pinning');
-    await expect(page.getByRole('heading', { name: 'Upstream DNS Pinning' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Upstream DNS Pinning' }),
+    ).toBeVisible();
     await expect(page.getByLabel('Enable upstream DNS pinning')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('address family selector shows three options', async ({ page }) => {
@@ -520,7 +545,7 @@ test.describe('Settings - Upstream DNS Pinning', () => {
     // save in the mounted state resets to the same value and hides the bug entirely.
     await goToSection(page, 'Upstream DNS Pinning');
     const toggle = page.getByLabel('Enable upstream DNS pinning');
-    const save = page.getByRole('button', { name: 'Save', exact: true });
+    const save = pageSave(page);
 
     const initial = await toggle.isChecked();
     await toggle.click();
@@ -546,11 +571,10 @@ test.describe('Settings - Upstream DNS Pinning', () => {
 test.describe('Settings - Authentik Defaults', () => {
   test('shows outpost domain, upstream, and auth endpoint fields', async ({ page }) => {
     await goToSection(page, 'Authentik Defaults');
-    await expect(page.getByRole('heading', { name: 'Authentik Defaults' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Authentik Defaults' })).toBeVisible();
     await expect(page.locator('input[name="outpostDomain"]')).toBeVisible();
     await expect(page.locator('input[name="outpostUpstream"]')).toBeVisible();
     await expect(page.locator('input[name="authEndpoint"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('fields have appropriate placeholders', async ({ page }) => {
@@ -571,7 +595,7 @@ test.describe('Settings - Authentik Defaults', () => {
 test.describe('Settings - OAuth Providers', () => {
   test('section renders with Add Provider button', async ({ page }) => {
     await goToSection(page, 'OAuth Providers');
-    await expect(page.getByRole('heading', { name: 'OAuth Providers' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'OAuth Providers' })).toBeVisible();
     await expect(page.getByRole('button', { name: /add provider/i })).toBeVisible();
   });
 
@@ -648,10 +672,7 @@ test.describe('Settings - OAuth Providers', () => {
       expect(itemBody).not.toContain(secret);
       expect(itemBody).not.toContain('clientSecret');
 
-      await page
-        .locator(SETTINGS_SIDEBAR)
-        .getByRole('link', { name: 'OAuth Providers', exact: true })
-        .click();
+      await goToSection(page, 'OAuth Providers');
       // Scoping to the card meant guessing at its classes; the button's own accessible name
       // already carries the provider name, which the timestamp makes unique.
       await page.getByRole('button', { name: `Edit ${providerName}` }).click();
@@ -687,8 +708,7 @@ test.describe('Settings - OAuth Providers', () => {
 test.describe('Settings - Global Geoblocking', () => {
   test('section renders with save button', async ({ page }) => {
     await goToSection(page, 'Global Geoblocking');
-    await expect(page.getByRole('heading', { name: 'Global Geoblocking' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Global Geoblocking' })).toBeVisible();
   });
 });
 
@@ -697,10 +717,11 @@ test.describe('Settings - Global Geoblocking', () => {
 test.describe('Settings - Metrics & Monitoring', () => {
   test('shows enable checkbox and port field', async ({ page }) => {
     await goToSection(page, 'Metrics & Monitoring');
-    await expect(page.getByRole('heading', { name: 'Metrics & Monitoring' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Metrics & Monitoring' }),
+    ).toBeVisible();
     await expect(page.getByLabel('Enable metrics endpoint')).toBeVisible();
     await expect(page.locator('input[name="port"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('port field has default value 9090', async ({ page }) => {
@@ -710,7 +731,7 @@ test.describe('Settings - Metrics & Monitoring', () => {
 
   test('info callout mentions Docker network scrape endpoint', async ({ page }) => {
     await goToSection(page, 'Metrics & Monitoring');
-    await expect(page.getByText(/caddy-proxy-manager-caddy/i)).toBeVisible();
+    await expect(page.getByText(/Scrape http:\/\/caddy-proxy-manager-caddy/i)).toBeVisible();
   });
 });
 
@@ -719,9 +740,8 @@ test.describe('Settings - Metrics & Monitoring', () => {
 test.describe('Settings - Access Logging', () => {
   test('shows enable checkbox and format selector', async ({ page }) => {
     await goToSection(page, 'Access Logging');
-    await expect(page.getByRole('heading', { name: 'Access Logging' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
     await expect(page.getByLabel('Enable access logging')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('format selector has JSON and Console options', async ({ page }) => {
@@ -782,16 +802,18 @@ test.describe('Settings - cross-section navigation', () => {
 
     // Click General → verify heading → click Metrics → verify heading
     await sidebar.getByRole('link', { name: 'General', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
 
-    await sidebar.getByRole('link', { name: 'Metrics & Monitoring', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Metrics & Monitoring' })).toBeVisible();
+    await sidebar.getByRole('link', { name: 'Observability', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Metrics & Monitoring' }),
+    ).toBeVisible();
 
-    await sidebar.getByRole('link', { name: 'OAuth Providers', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'OAuth Providers' })).toBeVisible();
+    await sidebar.getByRole('link', { name: 'Authentication', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 2, name: 'OAuth Providers' })).toBeVisible();
 
     await sidebar.getByRole('link', { name: 'General', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
   });
 
   test('Cmd-K to navigate, then sidebar to navigate back', async ({ page }) => {
@@ -800,16 +822,16 @@ test.describe('Settings - cross-section navigation', () => {
     // Use Cmd-K to go to Access Logging
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
-    await dialog.getByPlaceholder(/search/i).fill('access');
-    await dialog.getByText('Access Logging').click();
-    await expect(page.getByRole('heading', { name: 'Access Logging' })).toBeVisible();
+    await dialog.getByPlaceholder(/search/i).fill('access logging');
+    await dialog.getByText('Observability', { exact: true }).click();
+    await expect(page.getByRole('heading', { level: 2, name: 'Access Logging' })).toBeVisible();
 
     // Then use sidebar to go to General
     await page
       .locator(SETTINGS_SIDEBAR)
       .getByRole('link', { name: 'General', exact: true })
       .click();
-    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
   });
 });
 
@@ -836,13 +858,25 @@ test.describe('Settings - mobile layout', () => {
     const tile = page.getByTestId(/^settings-tile-/).filter({ hasText: 'DNS Providers' });
     await expect(tile).toBeVisible();
     await tile.click();
-    await expect(page.getByRole('heading', { level: 1, name: 'DNS Providers' })).toBeVisible();
+    // The tile names a setting; the page it opens is the one that carries it.
+    await expect(page.getByRole('heading', { level: 1, name: 'DNS' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'DNS Providers' })).toBeVisible();
   });
 
   test('a section route renders its own section at mobile width', async ({ page }) => {
-    await page.goto('/settings/metrics');
+    await page.goto('/settings/observability');
+    await expect(page.getByRole('heading', { level: 1, name: 'Observability' })).toBeVisible();
     await expect(
-      page.getByRole('heading', { level: 1, name: 'Metrics & Monitoring' }),
+      page.getByRole('heading', { level: 2, name: 'Metrics & Monitoring' }),
+    ).toBeVisible();
+  });
+
+  /** The ids that used to be routes still are links people hold; they land on the block. */
+  test('a link to a setting that moved lands on the page that carries it', async ({ page }) => {
+    await page.goto('/settings/metrics');
+    await expect(page).toHaveURL(/\/settings\/observability#metrics$/);
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Metrics & Monitoring' }),
     ).toBeVisible();
   });
 
@@ -871,7 +905,7 @@ test.describe('Settings - form data round-trip via API', () => {
   test('general settings: UI save is reflected in API', async ({ page }) => {
     await goToSection(page, 'General');
     await page.locator('input[name="defaultDomain"]').fill('api-roundtrip.local');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10_000);
     await applyStagedChanges(page);
 
@@ -893,7 +927,7 @@ test.describe('Settings - form data round-trip via API', () => {
       await enableCheckbox.click();
     }
     await page.locator('input[name="port"]').fill('9191');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10_000);
     await applyStagedChanges(page);
 
@@ -919,7 +953,7 @@ test.describe('Settings - form data round-trip via API', () => {
     // Change format to console
     await page.getByRole('combobox', { name: 'Format' }).click();
     await page.getByRole('option', { name: /console/i }).click();
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10_000);
     await applyStagedChanges(page);
 
@@ -938,12 +972,13 @@ test.describe('Settings - form data round-trip via API', () => {
 // ─── Detail header ───────────────────────────────────────────────────────────
 
 test.describe('Settings - detail header', () => {
-  test('header shows the section title with no description under it', async ({ page }) => {
-    // Titles stand alone; a section's description lives in the command palette and on the
-    // Settings overview cards, not under its heading.
+  test('header shows the page title with no description under it', async ({ page }) => {
+    // The title stands alone in the header. Each block on the page describes itself under its
+    // own heading, which is where that text went - so this asks the header, not the page.
     await goToSection(page, 'General');
-    await expect(page.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
-    await expect(page.getByText('Primary domain and ACME contact email')).toHaveCount(0);
+    const header = page.getByTestId('settings-header');
+    await expect(header.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
+    await expect(header.getByText('Primary domain and ACME contact email')).toHaveCount(0);
   });
 
   test('header breadcrumb trail includes Settings prefix', async ({ page }) => {

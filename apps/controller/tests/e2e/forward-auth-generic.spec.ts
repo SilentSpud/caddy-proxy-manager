@@ -7,7 +7,7 @@
  * settings a form is easiest to lose, the API split and its bypass headers.
  */
 import { test, expect } from '@playwright/test';
-import { goToSettingsSection } from '../helpers/settings-nav';
+import { goToSetting } from '../helpers/settings-nav';
 import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
 import { waitForHydration } from '../helpers/hydration';
 
@@ -29,7 +29,7 @@ test.describe('Generic forward auth', () => {
     const original = (await originalResp.json()) as ForwardAuthSettings | null;
 
     try {
-      await goToSettingsSection(page, 'Forward Auth Defaults');
+      await goToSetting(page, 'Forward Auth Defaults');
 
       await page.locator('input[name="forwardAuthUpstream"]').fill(defaults.authUpstream);
       await page.locator('input[name="forwardAuthEndpoint"]').fill(defaults.authEndpoint);

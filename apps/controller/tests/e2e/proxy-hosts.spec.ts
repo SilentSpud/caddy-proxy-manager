@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { goToSettingsSection } from '../helpers/settings-nav';
+import { goToSetting } from '../helpers/settings-nav';
 import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
 import { waitForHydration } from '../helpers/hydration';
 
@@ -266,7 +266,7 @@ test.describe('Proxy Hosts', () => {
     const originalSettings = (await originalSettingsResp.json()) as Partial<typeof defaultSettings>;
 
     try {
-      await goToSettingsSection(page, 'Authentik Defaults');
+      await goToSetting(page, 'Authentik Defaults');
 
       await page.locator('input[name="outpostDomain"]').fill(defaultSettings.outpostDomain);
       await page.locator('input[name="outpostUpstream"]').fill(defaultSettings.outpostUpstream);

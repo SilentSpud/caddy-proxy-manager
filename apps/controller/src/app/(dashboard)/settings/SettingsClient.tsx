@@ -107,7 +107,15 @@ import {
 } from "./actions";
 
 import type { RepairAgentResult } from "./actions";
-import { findSettingsItem } from "./sections";
+import { findSettingsItem, SETTINGS_ITEMS, settingsBlockName } from "./sections";
+import {
+  FocusField,
+  OnThisPage,
+  PageSaveBar,
+  SettingsBlockShell,
+  SKIP_PAGE_SAVE,
+} from "./PageBlocks";
+import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -147,6 +155,7 @@ type Props = {
   /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
   hasFavicon: boolean;
   updates: UpdateStatus;
+  /** Registry settings this screen reports but cannot change, by the block that lists them. */
   analytics: AnalyticsView;
   geoip: GeoipView;
   /** Whether any agent is answering, and can therefore start or stop the optional containers. */
@@ -204,6 +213,8 @@ export default function SettingsClient({
   // useful, and every id here is also a real route. Route-derived rather than state - the rail
   // navigates now, so there is nothing for the page to remember.
   const active = findSettingsItem(initialSection) ? initialSection : "general";
+  // The page's own translator: the block headings in the list beside it come from the catalog.
+  const t = useTranslations("settings");
 
   // Form action states
   const [generalState, generalFormAction] = useActionState(updateGeneralSettingsAction, null);
@@ -255,171 +266,202 @@ export default function SettingsClient({
   );
   const [tailscaleState, tailscaleFormAction] = useActionState(updateTailscaleSettingsAction, null);
 
+  // Each block of this page, by the id the page registry lists it under. Built here rather than
+  // switched on, so a block cannot end up in the registry and nowhere on screen.
+  const blocks: Record<string, ReactNode> = {
+    general: (
+      <GeneralSection
+        general={general}
+        generalState={generalState}
+        generalFormAction={generalFormAction}
+      />
+    ),
+    acme: <AcmeSection acme={acme} acmeState={acmeState} acmeFormAction={acmeFormAction} />,
+    updates: (
+      <UpdatesSection
+        updates={updates}
+        updatesState={updatesState}
+        updatesFormAction={updatesFormAction}
+      />
+    ),
+    branding: (
+      <BrandingSection
+        hasFavicon={hasFavicon}
+        faviconState={faviconState}
+        faviconFormAction={faviconFormAction}
+      />
+    ),
+    avatars: (
+      <AvatarsSection
+        avatars={avatars}
+        avatarsState={avatarsState}
+        avatarsFormAction={avatarsFormAction}
+      />
+    ),
+    "default-response": (
+      <DefaultResponseSection
+        defaultResponse={defaultResponse}
+        defaultResponseState={defaultResponseState}
+        defaultResponseFormAction={defaultResponseFormAction}
+      />
+    ),
+    "error-pages": (
+      <ErrorPagesSection
+        globalErrorPages={globalErrorPages}
+        errorPagesState={errorPagesState}
+        errorPagesFormAction={errorPagesFormAction}
+      />
+    ),
+    "caddy-build": (
+      <CaddyBuildSection
+        caddyBuild={caddyBuild}
+        caddyBuildState={caddyBuildState}
+        caddyBuildFormAction={caddyBuildFormAction}
+        agents={agentBuildTargets}
+        agentBuildSelections={agentBuildSelections}
+      />
+    ),
+    dashboard: (
+      <DashboardHostSection
+        dashboard={dashboard}
+        options={dashboardOptions ?? null}
+        dashboardState={dashboardState}
+        dashboardFormAction={dashboardFormAction}
+      />
+    ),
+    agent: <AgentSection agents={agents} pairingHost={pairingHostFor(dashboard)} />,
+    "dns-providers": (
+      <DnsProvidersSection
+        dnsProvider={dnsProvider}
+        dnsProviderDefinitions={dnsProviderDefinitions}
+        dnsProviderState={dnsProviderState}
+        dnsProviderFormAction={dnsProviderFormAction}
+        selectedProvider={selectedProvider}
+        setSelectedProvider={setSelectedProvider}
+        configuredProviders={configuredProviders}
+      />
+    ),
+    "dns-resolvers": (
+      <DnsResolversSection dns={dns} dnsState={dnsState} dnsFormAction={dnsFormAction} />
+    ),
+    "upstream-dns": (
+      <UpstreamDnsSection
+        upstreamDnsResolution={upstreamDnsResolution}
+        upstreamDnsResolutionState={upstreamDnsResolutionState}
+        upstreamDnsResolutionFormAction={upstreamDnsResolutionFormAction}
+      />
+    ),
+    "trusted-proxies": (
+      <TrustedProxiesSection
+        trustedProxies={trustedProxies}
+        trustedProxiesState={trustedProxiesState}
+        trustedProxiesFormAction={trustedProxiesFormAction}
+      />
+    ),
+    tailscale: (
+      <TailscaleSection
+        tailscale={tailscale}
+        tailscaleState={tailscaleState}
+        tailscaleFormAction={tailscaleFormAction}
+      />
+    ),
+    oauth: (
+      <OAuthSection
+        oauthProviders={oauthProviders}
+        primaryProviderId={primaryProviderId}
+        localUsersDisabled={localUsersDisabled}
+        baseUrl={baseUrl}
+      />
+    ),
+    "password-policy": (
+      <PasswordPolicySection
+        passwordPolicy={passwordPolicy}
+        passwordPolicyState={passwordPolicyState}
+        passwordPolicyFormAction={passwordPolicyFormAction}
+      />
+    ),
+    authentik: (
+      <AuthentikSection
+        authentik={authentik}
+        authentikState={authentikState}
+        authentikFormAction={authentikFormAction}
+      />
+    ),
+    "forward-auth": (
+      <ForwardAuthSection
+        forwardAuth={forwardAuth}
+        forwardAuthState={forwardAuthState}
+        forwardAuthFormAction={forwardAuthFormAction}
+      />
+    ),
+    geoip: <GeoipSection geoip={geoip} geoipState={geoipState} geoipFormAction={geoipFormAction} />,
+    geoblock: (
+      <GeoBlockSection
+        globalGeoBlock={globalGeoBlock}
+        geoBlockState={geoBlockState}
+        geoBlockFormAction={geoBlockFormAction}
+      />
+    ),
+    analytics: (
+      <AnalyticsSection
+        analytics={analytics}
+        canManageServices={canManageServices}
+        analyticsState={analyticsState}
+        analyticsFormAction={analyticsFormAction}
+      />
+    ),
+    metrics: (
+      <MetricsSection
+        metrics={metrics}
+        metricsState={metricsState}
+        metricsFormAction={metricsFormAction}
+      />
+    ),
+    logging: (
+      <LoggingSection
+        logging={logging}
+        loggingState={loggingState}
+        loggingFormAction={loggingFormAction}
+      />
+    ),
+  };
+
+  const page = findSettingsItem(active) ?? SETTINGS_ITEMS[0];
+  // Fields already in the change set: saved, not applied. They are marked on load the same way a
+  // field typed into just now is, since neither has reached Caddy.
+  const stagedFields = staged.changes.flatMap((change) => change.fields);
+  // From three blocks up the page is longer than a screen, and the list beside it is how the
+  // operator gets to the one they came for. With two it would only name what is already visible.
+  const showAnchors = page.blocks.length >= 3;
+
   return (
-    <SettingsFrame sectionId={active} staged={staged}>
-      <VStack gap={4} maxWidth={768}>
-        {active === "general" && (
-          <GeneralSection
-            general={general}
-            generalState={generalState}
-            generalFormAction={generalFormAction}
+    <SettingsFrame sectionId={active} staged={staged} aside={showAnchors}>
+      <FocusField />
+      <HStack gap={5} align="start">
+        <VStack gap={5} maxWidth={768} style={{ flexGrow: 1, minWidth: 0 }}>
+          <PageSaveBar stagedFields={stagedFields}>
+            <VStack gap={5}>
+              {page.blocks.map((block) => (
+                <SettingsBlockShell
+                  key={block.id}
+                  block={block}
+                  showHeading={page.blocks.length > 1}
+                >
+                  {blocks[block.id]}
+                </SettingsBlockShell>
+              ))}
+            </VStack>
+          </PageSaveBar>
+        </VStack>
+        {showAnchors && (
+          <OnThisPage
+            anchors={page.blocks.map((block) => ({
+              id: block.id,
+              label: settingsBlockName(t, block.id),
+            }))}
           />
         )}
-        {active === "acme" && (
-          <AcmeSection acme={acme} acmeState={acmeState} acmeFormAction={acmeFormAction} />
-        )}
-        {active === "dashboard" && (
-          <DashboardHostSection
-            dashboard={dashboard}
-            options={dashboardOptions ?? null}
-            dashboardState={dashboardState}
-            dashboardFormAction={dashboardFormAction}
-          />
-        )}
-        {active === "default-response" && (
-          <DefaultResponseSection
-            defaultResponse={defaultResponse}
-            defaultResponseState={defaultResponseState}
-            defaultResponseFormAction={defaultResponseFormAction}
-          />
-        )}
-        {active === "dns-providers" && (
-          <DnsProvidersSection
-            dnsProvider={dnsProvider}
-            dnsProviderDefinitions={dnsProviderDefinitions}
-            dnsProviderState={dnsProviderState}
-            dnsProviderFormAction={dnsProviderFormAction}
-            selectedProvider={selectedProvider}
-            setSelectedProvider={setSelectedProvider}
-            configuredProviders={configuredProviders}
-          />
-        )}
-        {active === "dns-resolvers" && (
-          <DnsResolversSection dns={dns} dnsState={dnsState} dnsFormAction={dnsFormAction} />
-        )}
-        {active === "upstream-dns" && (
-          <UpstreamDnsSection
-            upstreamDnsResolution={upstreamDnsResolution}
-            upstreamDnsResolutionState={upstreamDnsResolutionState}
-            upstreamDnsResolutionFormAction={upstreamDnsResolutionFormAction}
-          />
-        )}
-        {active === "trusted-proxies" && (
-          <TrustedProxiesSection
-            trustedProxies={trustedProxies}
-            trustedProxiesState={trustedProxiesState}
-            trustedProxiesFormAction={trustedProxiesFormAction}
-          />
-        )}
-        {active === "tailscale" && (
-          <TailscaleSection
-            tailscale={tailscale}
-            tailscaleState={tailscaleState}
-            tailscaleFormAction={tailscaleFormAction}
-          />
-        )}
-        {active === "geoblock" && (
-          <GeoBlockSection
-            globalGeoBlock={globalGeoBlock}
-            geoBlockState={geoBlockState}
-            geoBlockFormAction={geoBlockFormAction}
-          />
-        )}
-        {active === "error-pages" && (
-          <ErrorPagesSection
-            globalErrorPages={globalErrorPages}
-            errorPagesState={errorPagesState}
-            errorPagesFormAction={errorPagesFormAction}
-          />
-        )}
-        {active === "authentik" && (
-          <AuthentikSection
-            authentik={authentik}
-            authentikState={authentikState}
-            authentikFormAction={authentikFormAction}
-          />
-        )}
-        {active === "forward-auth" && (
-          <ForwardAuthSection
-            forwardAuth={forwardAuth}
-            forwardAuthState={forwardAuthState}
-            forwardAuthFormAction={forwardAuthFormAction}
-          />
-        )}
-        {active === "oauth" && (
-          <OAuthSection
-            oauthProviders={oauthProviders}
-            primaryProviderId={primaryProviderId}
-            localUsersDisabled={localUsersDisabled}
-            baseUrl={baseUrl}
-          />
-        )}
-        {active === "password-policy" && (
-          <PasswordPolicySection
-            passwordPolicy={passwordPolicy}
-            passwordPolicyState={passwordPolicyState}
-            passwordPolicyFormAction={passwordPolicyFormAction}
-          />
-        )}
-        {active === "avatars" && (
-          <AvatarsSection
-            avatars={avatars}
-            avatarsState={avatarsState}
-            avatarsFormAction={avatarsFormAction}
-          />
-        )}
-        {active === "branding" && (
-          <BrandingSection
-            hasFavicon={hasFavicon}
-            faviconState={faviconState}
-            faviconFormAction={faviconFormAction}
-          />
-        )}
-        {active === "updates" && (
-          <UpdatesSection
-            updates={updates}
-            updatesState={updatesState}
-            updatesFormAction={updatesFormAction}
-          />
-        )}
-        {active === "caddy-build" && (
-          <CaddyBuildSection
-            caddyBuild={caddyBuild}
-            caddyBuildState={caddyBuildState}
-            caddyBuildFormAction={caddyBuildFormAction}
-            agents={agentBuildTargets}
-            agentBuildSelections={agentBuildSelections}
-          />
-        )}
-        {active === "agent" && (
-          <AgentSection agents={agents} pairingHost={pairingHostFor(dashboard)} />
-        )}
-        {active === "analytics" && (
-          <AnalyticsSection
-            analytics={analytics}
-            canManageServices={canManageServices}
-            analyticsState={analyticsState}
-            analyticsFormAction={analyticsFormAction}
-          />
-        )}
-        {active === "geoip" && (
-          <GeoipSection geoip={geoip} geoipState={geoipState} geoipFormAction={geoipFormAction} />
-        )}
-        {active === "metrics" && (
-          <MetricsSection
-            metrics={metrics}
-            metricsState={metricsState}
-            metricsFormAction={metricsFormAction}
-          />
-        )}
-        {active === "logging" && (
-          <LoggingSection
-            logging={logging}
-            loggingState={loggingState}
-            loggingFormAction={loggingFormAction}
-          />
-        )}
-      </VStack>
+      </HStack>
     </SettingsFrame>
   );
 }
@@ -465,7 +507,6 @@ function GeneralSection({
             value={acmeEmail}
             onChange={setAcmeEmail}
           />
-          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -614,8 +655,6 @@ function DefaultResponseSection({
             {mode === "abort" && (
               <WarnAlert title={t("abortResponseTitle")}>{t("abortResponseDescription")}</WarnAlert>
             )}
-
-            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -657,17 +696,18 @@ function AcmeSection({
             onChange={setCaUrl}
             placeholder="https://ca.internal.example.com/acme/acme/directory"
           />
-          <TextArea
-            label={t("caRootCertificatePem")}
-            isOptional
-            description={t("acmeRootCertificateHelp")}
-            htmlName="caRootPem"
-            value={caRootPem}
-            onChange={setCaRootPem}
-            placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
-            rows={6}
-          />
-          <SaveButton />
+          <EnvLabelledField label={t("caRootCertificatePem")} env={["ACME_CA_ROOT_DIR"]}>
+            <TextArea
+              label={t("caRootCertificatePem")}
+              isOptional
+              description={t("acmeRootCertificateHelp")}
+              htmlName="caRootPem"
+              value={caRootPem}
+              onChange={setCaRootPem}
+              placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
+              rows={6}
+            />
+          </EnvLabelledField>
         </VStack>
       </form>
     </FormCard>
@@ -941,7 +981,6 @@ function DnsResolversSection({
               placeholder="5s"
               width={160}
             />
-            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -998,7 +1037,6 @@ function UpstreamDnsSection({
               onChange={setFamily}
               width={280}
             />
-            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -1080,7 +1118,10 @@ function DashboardHostSection({
   return (
     <>
       <FormCard title={t("dashboardHostTitle")}>
-        <form id="dashboard-host-form" action={dashboardFormAction}>
+        {/* Kept off the page bar: when the change would cut the reader's own way in, the
+            button opens a confirmation and the dialog submits. A bar that submitted the form
+            directly would step over that question. */}
+        <form id="dashboard-host-form" action={dashboardFormAction} {...SKIP_PAGE_SAVE}>
           <VStack gap={3}>
             {dashboardState?.message && (
               <StatusAlert message={dashboardState.message} success={dashboardState.success} />
@@ -1092,15 +1133,17 @@ function DashboardHostSection({
               value={enabled}
               onChange={setEnabled}
             />
-            <TextInput
-              {...NO_SPELLCHECK}
-              label={t("dashboardDomainLabel")}
-              description={t("dashboardDomainHelp")}
-              htmlName="domain"
-              value={domain}
-              onChange={setDomain}
-              isRequired
-            />
+            <EnvLabelledField label={t("dashboardDomainLabel")} env={["DASHBOARD_DOMAIN"]}>
+              <TextInput
+                {...NO_SPELLCHECK}
+                label={t("dashboardDomainLabel")}
+                description={t("dashboardDomainHelp")}
+                htmlName="domain"
+                value={domain}
+                onChange={setDomain}
+                isRequired
+              />
+            </EnvLabelledField>
             <HStack gap={2} vAlign="end" wrap="wrap">
               <Button
                 variant="secondary"
@@ -1272,7 +1315,6 @@ function TrustedProxiesSection({
               value={defaultGeoblock}
               onChange={setDefaultGeoblock}
             />
-            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -1305,7 +1347,6 @@ function GeoBlockSection({
             initialValues={{ geoblock: globalGeoBlock ?? null, geoblock_mode: "merge" }}
             showModeSelector={false}
           />
-          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -1335,7 +1376,6 @@ function ErrorPagesSection({
             {t("globalErrorPagesHelp")}
           </Text>
           <ErrorPagesFields initialData={globalErrorPages?.rules ?? []} />
-          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -1391,18 +1431,20 @@ function TailscaleSection({
           <InfoAlert title={t("trustedProxiesInfoTitle")}>
             {t.rich("tailscaleUserspaceNote", { code: (chunks) => <Code>{chunks}</Code> })}
           </InfoAlert>
-          <TextInput
-            {...AUTOFILL_NEW_PASSWORD}
-            label={t("authKey")}
-            type="password"
-            isOptional
-            description={
-              tailscale.hasAuthKey ? t("tailscaleAuthKeyStored") : t("tailscaleAuthKeyHelp")
-            }
-            htmlName="tailscaleAuthKey"
-            value={authKey}
-            onChange={setAuthKey}
-          />
+          <EnvLabelledField label={t("authKey")} env={["TS_AUTHKEY"]}>
+            <TextInput
+              {...AUTOFILL_NEW_PASSWORD}
+              label={t("authKey")}
+              type="password"
+              isOptional
+              description={
+                tailscale.hasAuthKey ? t("tailscaleAuthKeyStored") : t("tailscaleAuthKeyHelp")
+              }
+              htmlName="tailscaleAuthKey"
+              value={authKey}
+              onChange={setAuthKey}
+            />
+          </EnvLabelledField>
           <TextInput
             {...AUTOFILL_OFF}
             label={t("defaultNodeName")}
@@ -1490,7 +1532,6 @@ function TailscaleSection({
               })}
             </WarnAlert>
           )}
-          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -1546,7 +1587,6 @@ function AuthentikSection({
             onChange={setAuthEndpoint}
             placeholder="/outpost.goauthentik.io/auth/caddy"
           />
-          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -1605,7 +1645,6 @@ function ForwardAuthSection({
             onChange={setAuthEndpoint}
             placeholder="/api/authz/forward-auth"
           />
-          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -1671,15 +1710,20 @@ function PasswordPolicySection({
               success={passwordPolicyState.success}
             />
           )}
-          <CheckboxInput
+          <EnvLabelledField
             label={t("legacyPasswordResetLabel")}
+            env={["AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH"]}
             description={t("legacyPasswordResetHelp")}
-            htmlName="requireChangeOnLegacyHash"
-            value={requireChange}
-            onChange={setRequireChange}
-            isDisabled={passwordPolicy.fromEnv}
-          />
-          <SaveButton isDisabled={passwordPolicy.fromEnv} />
+            layout="inline"
+          >
+            <CheckboxInput
+              label={t("legacyPasswordResetLabel")}
+              htmlName="requireChangeOnLegacyHash"
+              value={requireChange}
+              onChange={setRequireChange}
+              isDisabled={passwordPolicy.fromEnv}
+            />
+          </EnvLabelledField>
         </VStack>
       </form>
     </FormCard>
@@ -1712,15 +1756,20 @@ function AvatarsSection({
           {avatarsState?.message && (
             <StatusAlert message={avatarsState.message} success={avatarsState.success} />
           )}
-          <CheckboxInput
+          <EnvLabelledField
             label={t("gravatarLabel")}
+            env={["AVATAR_GRAVATAR"]}
             description={t("gravatarHelp")}
-            htmlName="gravatarEnabled"
-            value={gravatarEnabled}
-            onChange={setGravatarEnabled}
-            isDisabled={avatars.fromEnv}
-          />
-          <SaveButton isDisabled={avatars.fromEnv} />
+            layout="inline"
+          >
+            <CheckboxInput
+              label={t("gravatarLabel")}
+              htmlName="gravatarEnabled"
+              value={gravatarEnabled}
+              onChange={setGravatarEnabled}
+              isDisabled={avatars.fromEnv}
+            />
+          </EnvLabelledField>
         </VStack>
       </form>
     </FormCard>
@@ -1783,7 +1832,9 @@ function BrandingSection({
 
   return (
     <FormCard title={t("favicon")}>
-      <form action={faviconFormAction}>
+      {/* Its own buttons: one saves the chosen file and the other removes what is stored, which
+          is not something a single page-level Save could stand for. */}
+      <form action={faviconFormAction} {...SKIP_PAGE_SAVE}>
         <VStack gap={3}>
           {faviconState?.message && (
             <StatusAlert message={faviconState.message} success={faviconState.success} />
@@ -1896,24 +1947,32 @@ function UpdatesSection({
             </InfoAlert>
           )}
 
-          <CheckboxInput
+          <EnvLabelledField
             label={t("checkForUpdates")}
+            env={["UPDATE_CHECK_ENABLED"]}
             description={t("updateCheckHelp")}
-            htmlName="updateCheckEnabled"
-            value={enabled}
-            onChange={setEnabled}
-          />
+            layout="inline"
+          >
+            <CheckboxInput
+              label={t("checkForUpdates")}
+              htmlName="updateCheckEnabled"
+              value={enabled}
+              onChange={setEnabled}
+            />
+          </EnvLabelledField>
 
-          <TextInput
-            {...AUTOFILL_OFF}
-            label={t("imageRepository")}
-            description={t("imageRepositoryHelp")}
-            placeholder={t("imageRepositoryPlaceholder")}
-            htmlName="updateImageRepository"
-            value={repository}
-            onChange={setRepository}
-            isDisabled={!enabled}
-          />
+          <EnvLabelledField label={t("imageRepository")} env={["UPDATE_IMAGE_REPOSITORY"]}>
+            <TextInput
+              {...AUTOFILL_OFF}
+              label={t("imageRepository")}
+              description={t("imageRepositoryHelp")}
+              placeholder={t("imageRepositoryPlaceholder")}
+              htmlName="updateImageRepository"
+              value={repository}
+              onChange={setRepository}
+              isDisabled={!enabled}
+            />
+          </EnvLabelledField>
 
           {updates.enabled && updates.checkedAt ? (
             <UtcTooltip value={updates.checkedAt}>
@@ -1950,7 +2009,6 @@ function UpdatesSection({
                 }
               }}
             />
-            <SaveButton />
           </HStack>
         </VStack>
       </form>
@@ -2013,13 +2071,19 @@ function AnalyticsSection({
           {analyticsState?.message && (
             <StatusAlert message={analyticsState.message} success={analyticsState.success} />
           )}
-          <CheckboxInput
+          <EnvLabelledField
             label={t("collectAnalytics")}
+            env={["ANALYTICS_ENABLED"]}
             description={t("analyticsCollectionHelp")}
-            htmlName="analyticsEnabled"
-            value={enabled}
-            onChange={setEnabled}
-          />
+            layout="inline"
+          >
+            <CheckboxInput
+              label={t("collectAnalytics")}
+              htmlName="analyticsEnabled"
+              value={enabled}
+              onChange={setEnabled}
+            />
+          </EnvLabelledField>
           {canManageServices ? (
             <InfoAlert title={t("managedAnalyticsTitle")}>
               {t.rich("analyticsManagedNote", { code: (chunks) => <Code>{chunks}</Code> })}
@@ -2032,51 +2096,60 @@ function AnalyticsSection({
           {/* Tells the action a password already exists, so "enabled with an empty field" is a
               keep-what-is-stored rather than a misconfiguration to refuse. */}
           <input type="hidden" name="hasPassword" value={analytics.hasPassword ? "yes" : "no"} />
-          <TextInput
-            {...AUTOFILL_OFF}
-            label={t("clickhouseUrl")}
-            description={t("clickhouseUrlHelp")}
-            htmlName="clickhouseUrl"
-            value={url}
-            onChange={setUrl}
-          />
-          <TextInput
-            {...AUTOFILL_OFF}
-            label={t("clickhouseUser")}
-            htmlName="clickhouseUser"
-            value={user}
-            onChange={setUser}
-          />
-          <GeneratedPasswordField
-            label={t("clickhousePassword")}
-            isOptional={analytics.hasPassword}
-            description={
-              analytics.hasPassword
-                ? t("clickhousePasswordStored")
-                : t("clickhousePasswordRequired")
-            }
-            htmlName="clickhousePassword"
-            value={password}
-            onChange={setPassword}
-          />
-          <TextInput
-            {...AUTOFILL_OFF}
-            label={t("clickhouseDatabase")}
-            htmlName="clickhouseDb"
-            value={database}
-            onChange={setDatabase}
-          />
-          <NumberInput
-            label={t("retentionDays")}
-            description={t("analyticsRetentionHelp")}
-            htmlName="clickhouseRetentionDays"
-            value={retentionDays}
-            onChange={setRetentionDays}
-            isIntegerOnly
-            min={1}
-            max={3650}
-          />
-          <SaveButton />
+          <EnvLabelledField label={t("clickhouseUrl")} env={["CLICKHOUSE_URL"]}>
+            <TextInput
+              {...AUTOFILL_OFF}
+              label={t("clickhouseUrl")}
+              description={t("clickhouseUrlHelp")}
+              htmlName="clickhouseUrl"
+              value={url}
+              onChange={setUrl}
+            />
+          </EnvLabelledField>
+          <EnvLabelledField label={t("clickhouseUser")} env={["CLICKHOUSE_USER"]}>
+            <TextInput
+              {...AUTOFILL_OFF}
+              label={t("clickhouseUser")}
+              htmlName="clickhouseUser"
+              value={user}
+              onChange={setUser}
+            />
+          </EnvLabelledField>
+          <EnvLabelledField label={t("clickhousePassword")} env={["CLICKHOUSE_PASSWORD"]}>
+            <GeneratedPasswordField
+              label={t("clickhousePassword")}
+              isOptional={analytics.hasPassword}
+              description={
+                analytics.hasPassword
+                  ? t("clickhousePasswordStored")
+                  : t("clickhousePasswordRequired")
+              }
+              htmlName="clickhousePassword"
+              value={password}
+              onChange={setPassword}
+            />
+          </EnvLabelledField>
+          <EnvLabelledField label={t("clickhouseDatabase")} env={["CLICKHOUSE_DB"]}>
+            <TextInput
+              {...AUTOFILL_OFF}
+              label={t("clickhouseDatabase")}
+              htmlName="clickhouseDb"
+              value={database}
+              onChange={setDatabase}
+            />
+          </EnvLabelledField>
+          <EnvLabelledField label={t("retentionDays")} env={["CLICKHOUSE_RETENTION_DAYS"]}>
+            <NumberInput
+              label={t("retentionDays")}
+              description={t("analyticsRetentionHelp")}
+              htmlName="clickhouseRetentionDays"
+              value={retentionDays}
+              onChange={setRetentionDays}
+              isIntegerOnly
+              min={1}
+              max={3650}
+            />
+          </EnvLabelledField>
         </VStack>
       </form>
     </FormCard>
@@ -2175,13 +2248,19 @@ function GeoipSection({
           {geoipState?.message && (
             <StatusAlert message={geoipState.message} success={geoipState.success} />
           )}
-          <CheckboxInput
+          <EnvLabelledField
             label={t("useGeoip")}
+            env={["GEOIP_ENABLED"]}
             description={t("geoipHelp")}
-            htmlName="geoipEnabled"
-            value={enabled}
-            onChange={setEnabled}
-          />
+            layout="inline"
+          >
+            <CheckboxInput
+              label={t("useGeoip")}
+              htmlName="geoipEnabled"
+              value={enabled}
+              onChange={setEnabled}
+            />
+          </EnvLabelledField>
           <InfoAlert title={t("geoipDownloadsTitle")}>{t("geoipDownloadsDescription")}</InfoAlert>
           <Text size="sm" color="secondary">
             {geoip.installedEditions.length > 0
@@ -2190,38 +2269,43 @@ function GeoipSection({
           </Text>
           <GeoipUpdateCheckLine geoip={geoip} />
           <input type="hidden" name="hasLicenseKey" value={geoip.hasLicenseKey ? "yes" : "no"} />
-          <TextInput
-            {...AUTOFILL_OFF}
-            label={t("maxmindAccountId")}
-            isOptional
-            description={t("maxmindCredentialsHelp")}
-            htmlName="geoipAccountId"
-            value={accountId}
-            onChange={setAccountId}
-          />
-          <TextInput
-            {...AUTOFILL_NEW_PASSWORD}
-            label={t("maxmindLicenceKey")}
-            type="password"
-            isOptional
-            description={
-              geoip.hasLicenseKey ? t("maxmindLicenceKeyStored") : t("maxmindLicenceKeyHelp")
-            }
-            htmlName="geoipLicenseKey"
-            value={licenseKey}
-            onChange={setLicenseKey}
-          />
-          <NumberInput
-            label={t("geoipUpdateInterval")}
-            description={t("geoipUpdateIntervalHelp")}
-            htmlName="geoipUpdateIntervalHours"
-            value={intervalHours}
-            onChange={setIntervalHours}
-            isIntegerOnly
-            min={1}
-            max={168}
-          />
-          <SaveButton />
+          <EnvLabelledField label={t("maxmindAccountId")} env={["GEOIPUPDATE_ACCOUNT_ID"]}>
+            <TextInput
+              {...AUTOFILL_OFF}
+              label={t("maxmindAccountId")}
+              isOptional
+              description={t("maxmindCredentialsHelp")}
+              htmlName="geoipAccountId"
+              value={accountId}
+              onChange={setAccountId}
+            />
+          </EnvLabelledField>
+          <EnvLabelledField label={t("maxmindLicenceKey")} env={["GEOIPUPDATE_LICENSE_KEY"]}>
+            <TextInput
+              {...AUTOFILL_NEW_PASSWORD}
+              label={t("maxmindLicenceKey")}
+              type="password"
+              isOptional
+              description={
+                geoip.hasLicenseKey ? t("maxmindLicenceKeyStored") : t("maxmindLicenceKeyHelp")
+              }
+              htmlName="geoipLicenseKey"
+              value={licenseKey}
+              onChange={setLicenseKey}
+            />
+          </EnvLabelledField>
+          <EnvLabelledField label={t("geoipUpdateInterval")} env={["GEOIP_UPDATE_INTERVAL_HOURS"]}>
+            <NumberInput
+              label={t("geoipUpdateInterval")}
+              description={t("geoipUpdateIntervalHelp")}
+              htmlName="geoipUpdateIntervalHours"
+              value={intervalHours}
+              onChange={setIntervalHours}
+              isIntegerOnly
+              min={1}
+              max={168}
+            />
+          </EnvLabelledField>
         </VStack>
       </form>
     </FormCard>
@@ -2522,7 +2606,6 @@ function CaddyBuildSection({
           agents={agents ?? []}
           agentSelections={agentBuildSelections ?? {}}
         />
-        <SaveButton />
       </VStack>
     </form>
   );
@@ -2569,7 +2652,6 @@ function MetricsSection({
               max={65535}
               width={160}
             />
-            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -2622,7 +2704,6 @@ function LoggingSection({
               onChange={setFormat}
               width={280}
             />
-            <SaveButton />
           </VStack>
         </form>
       </FormCard>

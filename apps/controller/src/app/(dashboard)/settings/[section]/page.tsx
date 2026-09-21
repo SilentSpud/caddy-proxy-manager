@@ -1,5 +1,7 @@
 import { defaultDashboardSettings } from "@/src/lib/dashboard-host";
+import { redirect } from "next/navigation";
 import SettingsClient from "../SettingsClient";
+import { LEGACY_SECTION_PAGES } from "../sections";
 import {
   getGeneralSettings,
   getAcmeSettings,
@@ -65,6 +67,13 @@ export default async function SettingsSectionPage({
 }) {
   const session = await requireAdmin();
   const { section } = await params;
+
+  // `/settings/authentik` and the rest were pages of their own until these were merged. They are
+  // links in the docs and in whatever an operator bookmarked, so they land on the block itself
+  // rather than on the overview.
+  const legacy = LEGACY_SECTION_PAGES.get(section);
+  if (legacy) redirect(`/settings/${legacy.page}#${legacy.anchor}`);
+
   const userId = Number(session.user.id);
 
   // Every read below resolves against this operator's staged set, so a form shows what they have
@@ -73,6 +82,7 @@ export default async function SettingsSectionPage({
   const overlay = await stagedOverlay(userId);
   // The root translator, for the stored update-check and GeoIP failures this page shows.
   const tRoot = await getTranslations();
+  // Resolved here, inside the staged scope, so a pending edit to one of them reads as pending.
 
   // The agent and staging reads sit outside the staged scope on purpose - they are not settings -
   // but run alongside it: the scope is AsyncLocalStorage, so a sibling promise cannot see the

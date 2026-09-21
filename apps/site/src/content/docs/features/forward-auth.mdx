@@ -46,7 +46,7 @@ an app that understands "trusted proxy told me who this is" does not need its ow
 A host can instead be pointed at a forward-auth server you already run - [Authelia](https://www.authelia.com/),
 tinyauth, anything that answers a forward-auth subrequest. Pick the **Authelia** preset and the
 endpoint and identity headers are filled in; pick **Custom** and you supply them.
-**Settings → Forward Auth Defaults** sets what new hosts inherit.
+**Settings → Forward Auth → Forward Auth Defaults** sets what new hosts inherit.
 
 The identity headers the auth server returns are stripped from every inbound request before the
 upstream sees it, on protected and unprotected paths alike, so a caller cannot forge `Remote-User`
@@ -73,7 +73,7 @@ with a wrong value, so the upstream must reject it - list a header only if you k
 
 If you already run [Authentik](https://goauthentik.io/), CPM can point at its outpost instead of
 serving the portal itself, with configurable header forwarding and protected paths.
-**Settings → Authentik Defaults** sets what new hosts inherit, and each host can override it.
+**Settings → Forward Auth → Authentik Defaults** sets what new hosts inherit, and each host can override it.
 
 <Demo title="Pointing a host at an Authentik outpost" note="Blank fields fall back to the global defaults.">
   <AuthentikDemo client:visible />

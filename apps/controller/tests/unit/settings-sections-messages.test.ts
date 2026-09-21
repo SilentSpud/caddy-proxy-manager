@@ -9,8 +9,11 @@ import { describe, expect, it } from 'bun:test';
 import { createTranslator } from 'next-intl';
 import messages from '../../messages/en.json';
 import {
+  SETTINGS_BLOCKS,
   SETTINGS_GROUPS,
   SETTINGS_ITEMS,
+  settingsBlockDescription,
+  settingsBlockName,
   sectionMessageName,
   settingsGroupLabel,
   settingsSectionDescription,
@@ -26,6 +29,19 @@ describe('settings.sections messages', () => {
       ...(settingsSectionDescription(t, item) === item.desc ? [] : [`${item.id}.desc`]),
     ]);
     expect(mismatches).toEqual([]);
+  });
+
+  it('names and describes every block as sections.ts does', () => {
+    const mismatches = SETTINGS_BLOCKS.flatMap((block) => [
+      ...(settingsBlockName(t, block.id) === block.name ? [] : [`${block.id}.name`]),
+      ...(settingsBlockDescription(t, block.id) === block.desc ? [] : [`${block.id}.desc`]),
+    ]);
+    expect(mismatches).toEqual([]);
+  });
+
+  it('has no block entry for a block that no longer exists', () => {
+    const known = new Set(SETTINGS_BLOCKS.map((block) => sectionMessageName(block.id)));
+    expect(Object.keys(messages.settings.blocks).filter((name) => !known.has(name))).toEqual([]);
   });
 
   it('has no entry for a section that no longer exists', () => {

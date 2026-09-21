@@ -7,7 +7,7 @@
  * an image and served as a document.
  */
 import { test, expect, type Page } from '@playwright/test';
-import { goToSettingsSection } from '../helpers/settings-nav';
+import { goToSetting } from '../helpers/settings-nav';
 
 const FAVICON_URL = '/api/branding/favicon';
 
@@ -19,7 +19,7 @@ const PNG = Buffer.from(
 
 async function goToBranding(page: Page) {
   // Branding's own heading is "Favicon", not its nav label.
-  await goToSettingsSection(page, 'Branding', { expectHeading: 'Favicon' });
+  await goToSetting(page, 'Branding');
 }
 
 async function removeIfPresent(page: Page) {

@@ -44,7 +44,7 @@ answer with, so the connection is closed.
 
 ## Trusted proxies
 
-If CPM sits behind another proxy, the client address it sees is that proxy's. **Settings → Trusted
+If CPM sits behind another proxy, the client address it sees is that proxy's. **Settings → Network → Trusted
 Proxies** tells Caddy which addresses to trust and which header carries the real client IP, so geo
 rules match the visitor rather than your load balancer. The global list can seed the per-host
 geoblock trusted-proxy list, so the two cannot silently disagree.
@@ -57,7 +57,7 @@ geoblock trusted-proxy list, so the two cannot silently disagree.
 
 2. Generate a licence key with `GeoLite2-Country` and `GeoLite2-ASN` permissions.
 
-3. Open **Settings → GeoIP Databases**, tick **Use GeoIP**, and enter the account ID and key.
+3. Open **Settings → Geo-blocking → GeoIP Databases**, tick **Use GeoIP**, and enter the account ID and key.
 
 </Steps>
 

@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { clickSettingsSection, goToSettingsSection } from '../helpers/settings-nav';
+import { test, expect, type Page } from '@playwright/test';
+import { clickSettingsSection, goToSetting, savePage } from '../helpers/settings-nav';
 import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
 
 /** Empty geoblock config used to reset state between tests. */
@@ -34,6 +34,18 @@ const SAFE_ALLOW_CIDR_2 = '233.252.0.0/24'; // MCAST-TEST-NET
 
 const API_GEOBLOCK = 'http://localhost:3000/api/v1/settings/geoblock';
 const ORIGIN = 'http://localhost:3000';
+
+/**
+ * The geoblocking form.
+ *
+ * Found by a field only it has, and one that is always there: the tabs unmount the rules that
+ * are not showing, so a rule field would only find this form from one of its tabs. It used to be
+ * found as "the form with a Save button", which stopped telling one form from another when the
+ * page grew a single save bar for all of them.
+ */
+function geoblockForm(page: Page) {
+  return page.locator('form', { has: page.locator('[name="geoblockPresent"]') });
+}
 
 /**
  * Find the visible text input inside a TagInput component by its hidden input name.
@@ -71,7 +83,7 @@ test.describe('Geo Blocking - form persistence', () => {
 
   test.beforeEach(async ({ page }) => {
     await resetGeoblock(page);
-    await goToSettingsSection(page, 'Global Geoblocking');
+    await goToSetting(page, 'Global Geoblocking');
   });
 
   test.afterEach(async ({ page }) => {
@@ -83,9 +95,7 @@ test.describe('Geo Blocking - form persistence', () => {
    * submitted - saving on "Block Rules" wiped every allow rule. Uses RFC 5737 ranges.
    */
   test('saving block rules does not wipe allow rules', async ({ page }) => {
-    const geoSection = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    const geoSection = geoblockForm(page);
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -103,7 +113,7 @@ test.describe('Geo Blocking - form persistence', () => {
     await blockInput.press('Enter');
     await expect(geoSection.locator(`text=${SAFE_BLOCK_CIDR}`)).toBeVisible();
 
-    await geoSection.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10000);
 
     // A UI save stages; applying is what writes it through, and the API reports applied values.
@@ -121,10 +131,8 @@ test.describe('Geo Blocking - form persistence', () => {
     });
 
     await page.reload();
-    await clickSettingsSection(page, 'Global Geoblocking');
-    const fresh = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    await clickSettingsSection(page, 'Geo-blocking');
+    const fresh = geoblockForm(page);
 
     // The rule tabs only exist while geoblocking is enabled, so assert that the
     // enabled state survived the reload first - otherwise a persistence failure
@@ -143,9 +151,7 @@ test.describe('Geo Blocking - form persistence', () => {
    * CIDR also submitted the form - persisting a half-finished config and re-applying Caddy.
    */
   test('adding a rule with Enter does not submit the form', async ({ page }) => {
-    const geoSection = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    const geoSection = geoblockForm(page);
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -169,9 +175,7 @@ test.describe('Geo Blocking - form persistence', () => {
   });
 
   test('saving allow rules does not wipe block rules', async ({ page }) => {
-    const geoSection = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    const geoSection = geoblockForm(page);
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -189,14 +193,12 @@ test.describe('Geo Blocking - form persistence', () => {
     await allowInput.press('Enter');
     await expect(geoSection.locator(`text=${SAFE_ALLOW_CIDR_2}`)).toBeVisible();
 
-    await geoSection.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10000);
 
     await page.reload();
-    await clickSettingsSection(page, 'Global Geoblocking');
-    const fresh = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    await clickSettingsSection(page, 'Geo-blocking');
+    const fresh = geoblockForm(page);
 
     await fresh.getByRole('button', { name: /block rules/i }).click();
     await expect(fresh.locator(`text=${SAFE_BLOCK_CIDR_2}`)).toBeVisible({ timeout: 5000 });
@@ -210,9 +212,7 @@ test.describe('Geo Blocking - form persistence', () => {
    * trusted proxies, response status/body) were wiped when saving with it collapsed.
    */
   test('advanced settings survive save when accordion is collapsed', async ({ page }) => {
-    const geoSection = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    const geoSection = geoblockForm(page);
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -239,14 +239,12 @@ test.describe('Geo Blocking - form persistence', () => {
     await setAdvancedExpanded(false);
     await expect(redirectInput).toBeHidden();
 
-    await geoSection.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10000);
 
     await page.reload();
-    await clickSettingsSection(page, 'Global Geoblocking');
-    const fresh = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    await clickSettingsSection(page, 'Geo-blocking');
+    const fresh = geoblockForm(page);
     // Scope to the Collapsible trigger: the section also contains an
     // "Add to Trusted Proxies" button that a plain name match picks up.
     const freshTrigger = fresh
@@ -268,9 +266,7 @@ test.describe('Geo Blocking - form persistence', () => {
    * page reload.
    */
   test('form reflects saved values immediately without reload', async ({ page }) => {
-    const geoSection = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    const geoSection = geoblockForm(page);
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -290,7 +286,7 @@ test.describe('Geo Blocking - form persistence', () => {
     const statusInput = geoSection.locator('input[name="geoblockResponseStatus"]');
     await statusInput.fill('418');
 
-    await geoSection.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10000);
 
     // No page.reload() here - the visible form must already reflect the save.
@@ -306,9 +302,7 @@ test.describe('Geo Blocking - form persistence', () => {
    * This test does NOT save, so no Caddy config is affected.
    */
   test('LAN Only preset: values survive tab switching', async ({ page }) => {
-    const geoSection = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    const geoSection = geoblockForm(page);
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -335,16 +329,14 @@ test.describe('Geo Blocking - form persistence', () => {
    * minimise the window where 0.0.0.0/0 blocks all traffic.
    */
   test('LAN Only preset: values persist after save', async ({ page }) => {
-    const geoSection = page.locator('form', {
-      has: page.getByRole('button', { name: 'Save', exact: true }),
-    });
+    const geoSection = geoblockForm(page);
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
     }
 
     await geoSection.getByRole('button', { name: /lan only/i }).click();
-    await geoSection.getByRole('button', { name: 'Save', exact: true }).click();
+    await savePage(page);
     await expectStaged(page, 10000);
 
     await applyStagedChanges(page);

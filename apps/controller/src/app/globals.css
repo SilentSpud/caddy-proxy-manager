@@ -116,6 +116,32 @@
   }
 
   /**
+   * A field whose value has been typed but not saved yet.
+   *
+   * The settings page marks the label (see PageBlocks.tsx): the Save button used to turn the
+   * accent colour when its form was dirty, and with one bar for the whole page that cue had to
+   * move to the thing that changed. Pink is the app's accent, so this reads as the same signal.
+   * The colour is set on the label's descendants too, since the design system draws the text in
+   * its own element inside the <label>.
+   */
+  label[data-unsaved="true"],
+  label[data-unsaved="true"] * {
+    color: var(--color-text-pink);
+  }
+
+  /**
+   * And the control itself, so the change is visible from the field as well as from its name.
+   * The bordered element differs by control - an input draws its own box, a checkbox draws an
+   * indicator - so the field carries the mark and these reach whichever it turns out to be.
+   */
+  [data-unsaved-field="true"] input:not([type="hidden"]),
+  [data-unsaved-field="true"] textarea,
+  [data-unsaved-field="true"] select,
+  [data-unsaved-field="true"] .astryx-checkbox-indicator {
+    border-color: var(--color-border-pink);
+  }
+
+  /**
    * Visual masking for a secret in a multi-line field: a private key needs a <textarea>, since
    * <input type="password"> strips newlines on paste and corrupts PEM. Where -webkit-text-security
    * is unsupported the field degrades to plain text.

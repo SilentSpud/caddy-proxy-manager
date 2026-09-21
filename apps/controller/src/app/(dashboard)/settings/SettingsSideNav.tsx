@@ -55,7 +55,11 @@ export default function SettingsSideNav({
       {SETTINGS_GROUPS.map((group) => (
         <SideNavSection key={group.id} title={settingsGroupLabel(t, group)}>
           {group.items.map((item) => {
-            const isStaged = storageKeysForSection(item.id).some((key) => staged.has(key));
+            // Any block of the page: the keys are still recorded per block, which is also what
+            // the review sheet lists them by.
+            const isStaged = item.blocks.some((block) =>
+              storageKeysForSection(block.id).some((key) => staged.has(key)),
+            );
             return (
               <SideNavItem
                 key={item.id}

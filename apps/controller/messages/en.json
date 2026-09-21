@@ -802,7 +802,7 @@
     "wildcardDomainNeedsDnsProvider": "Wildcard domain \"{domain}\" requires a DNS provider for the ACME DNS-01 challenge. Configure a default DNS provider in settings, or assign a certificate to this host.",
     "upstreamProtocolInvalid": "Invalid upstream protocol \"{scheme}://\". Only http:// and https:// are allowed",
     "mtlsNoTrustMaterial": "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS.",
-    "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration - every proxy host would stop being updated, not just this one. Add an auth key in Settings → Tailscale first.",
+    "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration - every proxy host would stop being updated, not just this one. Add an auth key in Settings → Network → Tailscale first.",
     "customCaddyfileInvalid": "Custom Caddyfile: {error}",
     "agentNotReported": "Connected, but has not reported yet."
   },
@@ -1580,17 +1580,17 @@
     "tailnetOnly": "Tailnet only",
     "tailnetOnlyHelp": "Keep this host off the public :80/:443 listener entirely. Uncheck to publish it in both places.",
     "tailscale": "Tailscale",
-    "tailscaleAuthKeyMissingDescription": "Saving will be refused. The node cannot register without a key, and Caddy rejects a configuration whose listener will not come up - that would stop every proxy host from being updated, not just this one. Add a key in Settings → Tailscale first.",
+    "tailscaleAuthKeyMissingDescription": "Saving will be refused. The node cannot register without a key, and Caddy rejects a configuration whose listener will not come up - that would stop every proxy host from being updated, not just this one. Add a key in Settings → Network → Tailscale first.",
     "tailscaleAuthKeyMissingTitle": "No Tailscale auth key is stored",
     "tailscaleDescription": "Serve this host on your tailnet instead of, or as well as, the public internet",
-    "tailscaleDisabledDescription": "This host will not be served at all until Settings → Tailscale is enabled - it is dropped from the configuration rather than published publicly.",
+    "tailscaleDisabledDescription": "This host will not be served at all until Settings → Network → Tailscale is enabled - it is dropped from the configuration rather than published publicly.",
     "tailscaleDisabledTitle": "Tailscale is switched off in Settings",
     "tailscaleDomainRequirementDescription": "Routing is still by Host header, so a request to https://{node}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale - no ACME, no DNS provider.",
     "tailscaleDomainRequirementTitle": "Add the node's MagicDNS name to Domains",
     "tailscaleExcludedPathsHelp": "Paths that bypass the identity check while everything else stays gated. Ignored if Protected Paths is set.",
     "tailscaleForwardIdentityHelp": "Sets X-Tailscale-User, -Login, -Name, -Tailnet and -Profile-Picture on the proxied request. Any such header sent by the client is stripped first.",
     "tailscaleIdentityHelp": "Only devices signed in to your tailnet may reach this host, and the caller is identified by their tailnet login. Tagged devices are refused, since they have no user behind them.",
-    "tailscaleNodeHelp": "The tailnet machine this host is served on. Empty uses \"{node}\" from Settings → Tailscale. Several hosts can share one node.",
+    "tailscaleNodeHelp": "The tailnet machine this host is served on. Empty uses \"{node}\" from Settings → Network → Tailscale. Several hosts can share one node.",
     "tailscaleUpstreamNodeHelp": "Node to dial the upstreams through, for a backend that only exists on your tailnet. Upstream IP pinning and custom DNS resolvers do not apply - names are resolved by MagicDNS on the far side.",
     "tailscaleUpstreamNodeLabel": "Reach upstreams over the tailnet",
     "timeout": "Timeout",
@@ -1675,8 +1675,8 @@
       "ready": "GeoIP ready",
       "missing": "GeoIP missing",
       "partial": "GeoIP partial",
-      "offHelp": "GeoIP is switched off in Settings → GeoIP Databases - country, continent and ASN blocking will not work.",
-      "missingHelp": "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → GeoIP Databases.",
+      "offHelp": "GeoIP is switched off in Settings → Geo-blocking → GeoIP Databases - country, continent and ASN blocking will not work.",
+      "missingHelp": "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → Geo-blocking → GeoIP Databases.",
       "countryMissingHelp": "GeoLite2-Country database missing - country/continent blocking disabled",
       "asnMissingHelp": "GeoLite2-ASN database missing - ASN blocking disabled",
       "loadedHelp": "GeoLite2-Country and GeoLite2-ASN databases loaded"
@@ -2254,27 +2254,77 @@
     "sections": {
       "general": {
         "name": "General",
+        "desc": "Domain, ACME contact, updates, branding and avatars"
+      },
+      "responses": {
+        "name": "Responses",
+        "desc": "What Caddy answers for an unknown host, and when a host fails"
+      },
+      "caddyBuild": {
+        "name": "Caddy Build",
+        "desc": "Which plugins the Caddy image is compiled with"
+      },
+      "dashboard": {
+        "name": "Dashboard Host",
+        "desc": "Serve this dashboard through Caddy, on a domain of its own"
+      },
+      "agent": {
+        "name": "Agent",
+        "desc": "The service that recreates and rebuilds the Caddy container"
+      },
+      "dns": {
+        "name": "DNS",
+        "desc": "Provider credentials, challenge resolvers and upstream pinning"
+      },
+      "network": {
+        "name": "Network",
+        "desc": "Trusted proxies, and the tailnet hosts are served on"
+      },
+      "authentication": {
+        "name": "Authentication",
+        "desc": "How people sign in to this dashboard"
+      },
+      "forwardAuth": {
+        "name": "Forward Auth",
+        "desc": "Defaults a new proxy host inherits for an external authenticator"
+      },
+      "geo": {
+        "name": "Geo-blocking",
+        "desc": "Country lookups, and the default rules every host merges with"
+      },
+      "observability": {
+        "name": "Observability",
+        "desc": "Analytics collection, the metrics endpoint and the access log"
+      }
+    },
+    "blocks": {
+      "general": {
+        "name": "General",
         "desc": "Primary domain and ACME contact email"
       },
       "acme": {
         "name": "ACME Server",
         "desc": "Custom ACME directory URL for internal CAs"
       },
-      "defaultResponse": {
-        "name": "Default Response",
-        "desc": "Handle requests for unknown hosts and direct IP access"
-      },
-      "avatars": {
-        "name": "User Avatars",
-        "desc": "Gravatar fallback for users without an icon"
+      "updates": {
+        "name": "Updates",
+        "desc": "Whether to check the registry for a newer release, and which one"
       },
       "branding": {
         "name": "Branding",
         "desc": "The favicon browsers show for this instance"
       },
-      "updates": {
-        "name": "Updates",
-        "desc": "Whether to check the registry for a newer release, and which one"
+      "avatars": {
+        "name": "User Avatars",
+        "desc": "Gravatar fallback for users without an icon"
+      },
+      "defaultResponse": {
+        "name": "Default Response",
+        "desc": "Handle requests for unknown hosts and direct IP access"
+      },
+      "errorPages": {
+        "name": "Error Pages",
+        "desc": "Global custom error responses (fallback for all hosts)"
       },
       "caddyBuild": {
         "name": "Caddy Build",
@@ -2308,17 +2358,13 @@
         "name": "Tailscale",
         "desc": "Node defaults for hosts served on, or reached over, your tailnet"
       },
-      "geoip": {
-        "name": "GeoIP Databases",
-        "desc": "MaxMind subscription and whether country lookups run at all"
+      "oauth": {
+        "name": "OAuth Providers",
+        "desc": "OAuth/OIDC SSO providers"
       },
-      "geoblock": {
-        "name": "Global Geoblocking",
-        "desc": "Default geoblock rules across all hosts"
-      },
-      "errorPages": {
-        "name": "Error Pages",
-        "desc": "Global custom error responses (fallback for all hosts)"
+      "passwordPolicy": {
+        "name": "Password Policy",
+        "desc": "Migrate users off older password hashes"
       },
       "authentik": {
         "name": "Authentik Defaults",
@@ -2328,13 +2374,13 @@
         "name": "Forward Auth Defaults",
         "desc": "Defaults for hosts authenticating through an external auth server"
       },
-      "oauth": {
-        "name": "OAuth Providers",
-        "desc": "OAuth/OIDC SSO providers"
+      "geoip": {
+        "name": "GeoIP Databases",
+        "desc": "MaxMind subscription and whether country lookups run at all"
       },
-      "passwordPolicy": {
-        "name": "Password Policy",
-        "desc": "Migrate users off older password hashes"
+      "geoblock": {
+        "name": "Global Geoblocking",
+        "desc": "Default geoblock rules across all hosts"
       },
       "analytics": {
         "name": "Analytics",
@@ -2806,7 +2852,10 @@
       "caddyBuildSavedSnippetWarning": "{rebuild, select, yes {Caddy module selection saved. Rebuild Caddy to apply the change to the running container.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently."
     },
     "geoipEditionDownloadFailed": "{edition}: {reason}",
-    "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard Host first."
+    "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard Host first.",
+    "onThisPage": "On this page",
+    "pageUnsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
+    "pageDiscard": "Discard"
   },
   "setup": {
     "account": {
