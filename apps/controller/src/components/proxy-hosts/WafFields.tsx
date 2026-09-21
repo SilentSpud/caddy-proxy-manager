@@ -4,14 +4,13 @@ import { useId, useState } from "react";
 import { ClipboardCopy, ShieldOff } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Icon } from "@astryxdesign/core/Icon";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Field } from "@astryxdesign/core/Field";
-import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { WafHostConfig } from "@/lib/models/proxy-hosts";
@@ -163,7 +162,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
 
             <Divider />
 
-            <CheckboxInput
+            <Switch
               label={t("owaspCrsLabel")}
               description={t("owaspCrsHelp")}
               value={loadCrs}

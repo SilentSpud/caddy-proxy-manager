@@ -26,7 +26,7 @@ test.describe
       // Hand-written ids the astryx controls never emit; both expose a role and
       // an accessible name instead.
       const wafSwitch = page.getByRole('switch', { name: /enable waf globally/i });
-      const owaspCheckbox = page.getByRole('checkbox', { name: /load owasp core rule set/i });
+      const owaspCheckbox = page.getByRole('switch', { name: /load owasp core rule set/i });
 
       if (!(await wafSwitch.isChecked())) {
         await wafSwitch.click();

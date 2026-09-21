@@ -9,7 +9,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
-import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { useTranslations } from "next-intl";
 
@@ -116,14 +116,14 @@ export function TailscaleFields({
                 node: node || placeholderNode,
               })}
             />
-            <CheckboxInput
+            <Switch
               label={t("tailnetOnly")}
               description={t("tailnetOnlyHelp")}
               htmlName="tailscaleTailnetOnly"
               value={tailnetOnly}
               onChange={setTailnetOnly}
             />
-            <CheckboxInput
+            <Switch
               label={t("requireATailscaleIdentity")}
               description={t("tailscaleIdentityHelp")}
               htmlName="tailscaleAuth"
@@ -152,7 +152,7 @@ export function TailscaleFields({
                   rows={2}
                   description={t("tailscaleExcludedPathsHelp")}
                 />
-                <CheckboxInput
+                <Switch
                   label={t("forwardTheIdentityUpstream")}
                   description={t("tailscaleForwardIdentityHelp")}
                   htmlName="tailscaleForwardIdentity"

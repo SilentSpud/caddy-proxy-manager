@@ -115,7 +115,7 @@ test.describe('WAF', () => {
     // not emit; both expose a proper role and label, and their checked state is
     // real ARIA state rather than a data- attribute.
     const wafSwitch = page.getByRole('switch', { name: /enable waf globally/i });
-    const owaspCheckbox = page.getByRole('checkbox', { name: /load owasp core rule set/i });
+    const owaspCheckbox = page.getByRole('switch', { name: /load owasp core rule set/i });
 
     // Turn WAF on if not already
     if (!(await wafSwitch.isChecked())) {

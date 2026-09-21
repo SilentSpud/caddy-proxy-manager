@@ -284,7 +284,9 @@ test.describe('Proxy Hosts', () => {
 
       const dialog = page.getByRole('dialog');
       const authentikSection = dialog.locator('div:has(> input[name="authentikPresent"])');
-      const authentikSwitch = authentikSection.getByRole('switch');
+      const authentikSwitch = authentikSection.getByRole('switch', {
+        name: 'Enable Authentik forward auth',
+      });
       await expect(authentikSwitch).not.toBeChecked();
 
       await authentikSwitch.click();
@@ -360,7 +362,9 @@ test.describe('Proxy Hosts', () => {
       await expect(dialog).toBeVisible();
 
       const authentikSection = dialog.locator('div:has(> input[name="authentikPresent"])');
-      const authentikSwitch = authentikSection.getByRole('switch');
+      const authentikSwitch = authentikSection.getByRole('switch', {
+        name: 'Enable Authentik forward auth',
+      });
       await expect(authentikSwitch).not.toBeChecked();
       await authentikSwitch.click();
       await expect(authentikSwitch).toBeChecked();

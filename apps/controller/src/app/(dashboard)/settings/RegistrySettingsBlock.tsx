@@ -15,7 +15,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@astryxdesign/core/Badge";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { VStack } from "@astryxdesign/core/Stack";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -151,7 +151,7 @@ function BooleanField({
       layout="inline"
       badge={badge}
     >
-      <CheckboxInput
+      <Switch
         label={field.label}
         htmlName={field.key}
         value={value}

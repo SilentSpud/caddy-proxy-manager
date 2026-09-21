@@ -9,7 +9,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ForwardAuthSettings } from "@/lib/settings";
 import type { ForwardAuthProvider, ProxyHost } from "@/lib/models/proxy-hosts";
-import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { useTranslations } from "next-intl";
 
 /** Kept in step with DEFAULT_AUTHELIA_FORWARD_AUTH_* in the model, which is what actually stores them. */
@@ -174,7 +174,7 @@ export function ForwardAuthFields({
             />
 
             <VStack gap={1}>
-              <CheckboxInput
+              <Switch
                 label={t("forwardAuthApiSplitLabel")}
                 description={t("forwardAuthApiSplitHelp")}
                 htmlName="forwardAuthApiSplit"

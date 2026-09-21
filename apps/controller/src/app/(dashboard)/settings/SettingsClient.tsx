@@ -66,7 +66,7 @@ import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
 import OAuthProvidersSection from "./OAuthProvidersSection";
 import SettingsFrame from "./SettingsFrame";
 import type { StagedView } from "@/src/lib/settings/staged-view";
-import { CheckboxInput } from "@/src/components/ui/FormBooleanControls";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
 import type { AgentStatus } from "@cpm/shared";
@@ -970,7 +970,7 @@ function DnsResolversSection({
             {dnsState?.message && (
               <StatusAlert message={dnsState.message} success={dnsState.success} />
             )}
-            <CheckboxInput
+            <Switch
               label={t("enableCustomDnsResolvers")}
               htmlName="enabled"
               value={enabled}
@@ -1044,7 +1044,7 @@ function UpstreamDnsSection({
                 success={upstreamDnsResolutionState.success}
               />
             )}
-            <CheckboxInput
+            <Switch
               label={t("enableUpstreamDnsPinning")}
               description={t("dnsPinningHelp")}
               htmlName="enabled"
@@ -1149,7 +1149,7 @@ function DashboardHostSection({
             {dashboardState?.message && (
               <StatusAlert message={dashboardState.message} success={dashboardState.success} />
             )}
-            <CheckboxInput
+            <Switch
               label={t("dashboardEnabledLabel")}
               description={t("dashboardEnabledHelp")}
               htmlName="enabled"
@@ -1182,7 +1182,7 @@ function DashboardHostSection({
               </InfoAlert>
             )}
             {check && <DnsCheckResult check={check} />}
-            <CheckboxInput
+            <Switch
               label={t("dashboardTlsLabel")}
               description={t("dashboardTlsHelp")}
               htmlName="tls"
@@ -1324,14 +1324,14 @@ function TrustedProxiesSection({
               rows={2}
               placeholder={t("clientIpHeadersPlaceholder")}
             />
-            <CheckboxInput
+            <Switch
               label={t("enableStrictTrustedProxies")}
               description={t("strictTrustedProxiesHelp")}
               htmlName="strict"
               value={strict}
               onChange={setStrict}
             />
-            <CheckboxInput
+            <Switch
               label={t("defaultGeoblockTrustedProxies")}
               description={t("geoblockTrustedProxiesHelp")}
               htmlName="defaultGeoblock"
@@ -1442,7 +1442,7 @@ function TailscaleSection({
             </WarnAlert>
           )}
           <ModuleGated feature="tailscale">
-            <CheckboxInput
+            <Switch
               label={t("useTailscale")}
               description={t("tailscaleHelp")}
               htmlName="tailscaleEnabled"
@@ -1507,14 +1507,14 @@ function TailscaleSection({
             onChange={setStateDir}
             placeholder="/data/tailscale"
           />
-          <CheckboxInput
+          <Switch
             label={t("registerNodesAsEphemeral")}
             description={t("ephemeralNodesHelp")}
             htmlName="tailscaleEphemeral"
             value={ephemeral}
             onChange={setEphemeral}
           />
-          <CheckboxInput
+          <Switch
             label={t("tailscaleKeyValidationLabel")}
             description={t("tailscaleKeyValidationHelp")}
             htmlName="tailscaleValidateAuthKey"
@@ -1739,7 +1739,7 @@ function PasswordPolicySection({
             description={t("legacyPasswordResetHelp")}
             layout="inline"
           >
-            <CheckboxInput
+            <Switch
               label={t("legacyPasswordResetLabel")}
               htmlName="requireChangeOnLegacyHash"
               value={requireChange}
@@ -1785,7 +1785,7 @@ function AvatarsSection({
             description={t("gravatarHelp")}
             layout="inline"
           >
-            <CheckboxInput
+            <Switch
               label={t("gravatarLabel")}
               htmlName="gravatarEnabled"
               value={gravatarEnabled}
@@ -1976,7 +1976,7 @@ function UpdatesSection({
             description={t("updateCheckHelp")}
             layout="inline"
           >
-            <CheckboxInput
+            <Switch
               label={t("checkForUpdates")}
               htmlName="updateCheckEnabled"
               value={enabled}
@@ -2100,7 +2100,7 @@ function AnalyticsSection({
             description={t("analyticsCollectionHelp")}
             layout="inline"
           >
-            <CheckboxInput
+            <Switch
               label={t("collectAnalytics")}
               htmlName="analyticsEnabled"
               value={enabled}
@@ -2277,7 +2277,7 @@ function GeoipSection({
             description={t("geoipHelp")}
             layout="inline"
           >
-            <CheckboxInput
+            <Switch
               label={t("useGeoip")}
               htmlName="geoipEnabled"
               value={enabled}
@@ -2657,7 +2657,7 @@ function MetricsSection({
             {metricsState?.message && (
               <StatusAlert message={metricsState.message} success={metricsState.success} />
             )}
-            <CheckboxInput
+            <Switch
               label={t("enableMetricsEndpoint")}
               description={t("metricsEndpointHelp")}
               htmlName="enabled"
@@ -2709,7 +2709,7 @@ function LoggingSection({
             {loggingState?.message && (
               <StatusAlert message={loggingState.message} success={loggingState.success} />
             )}
-            <CheckboxInput
+            <Switch
               label={t("enableAccessLogging")}
               htmlName="enabled"
               value={enabled}

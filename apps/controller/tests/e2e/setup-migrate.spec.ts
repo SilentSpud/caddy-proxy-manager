@@ -210,7 +210,7 @@ test.describe('Migrating an existing installation', () => {
       { timeout: 15_000 },
     );
     // The legacy host forced HTTPS, and browsers that visited it are pinned to it.
-    await expect(page.getByRole('checkbox', { name: 'Serve it over HTTPS' })).toBeChecked();
+    await expect(page.getByRole('switch', { name: 'Serve it over HTTPS' })).toBeChecked();
     await expect(page.getByText('Proxy options')).toBeVisible();
 
     // Its only domain is the dashboard's now, so it is paused rather than left looking live.

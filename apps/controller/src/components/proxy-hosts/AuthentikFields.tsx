@@ -8,7 +8,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AuthentikSettings } from "@/lib/settings";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
-import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { useTranslations } from "next-intl";
 
 const AUTHENTIK_DEFAULT_HEADERS = [
@@ -173,7 +173,7 @@ export function AuthentikFields({
             />
 
             <VStack gap={1}>
-              <CheckboxInput
+              <Switch
                 label={t("authentikHostHeaderLabel")}
                 description={t("authentikHostHeaderHelp")}
                 htmlName="authentikSetHostHeader"

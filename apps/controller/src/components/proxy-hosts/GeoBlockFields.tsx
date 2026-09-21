@@ -25,7 +25,7 @@ import type { GeoBlockMode } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 import { regionName } from "@/lib/region-names";
 import { COUNTRY_CODES, flagEmoji } from "./countries";
-import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -563,7 +563,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                   helperText={t("trustedProxiesHelp")}
                 />
 
-                <CheckboxInput
+                <Switch
                   label={t("geoblockFailClosedLabel")}
                   description={t("geoblockFailClosedHelp")}
                   htmlName="geoblockFailClosed"

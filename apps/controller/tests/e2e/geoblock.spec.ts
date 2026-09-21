@@ -96,7 +96,7 @@ test.describe('Geo Blocking - form persistence', () => {
    */
   test('saving block rules does not wipe allow rules', async ({ page }) => {
     const geoSection = geoblockForm(page);
-    const enableSwitch = geoSection.getByRole('switch');
+    const enableSwitch = geoSection.getByRole('switch', { name: 'Enable geo blocking' });
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
     }
@@ -137,7 +137,7 @@ test.describe('Geo Blocking - form persistence', () => {
     // The rule tabs only exist while geoblocking is enabled, so assert that the
     // enabled state survived the reload first - otherwise a persistence failure
     // shows up as an opaque timeout hunting for a tab that was never rendered.
-    await expect(fresh.getByRole('switch')).toBeChecked();
+    await expect(fresh.getByRole('switch', { name: 'Enable geo blocking' })).toBeChecked();
 
     await fresh.getByRole('button', { name: /block rules/i }).click();
     await expect(fresh.locator(`text=${SAFE_BLOCK_CIDR}`)).toBeVisible({ timeout: 5000 });
@@ -152,7 +152,7 @@ test.describe('Geo Blocking - form persistence', () => {
    */
   test('adding a rule with Enter does not submit the form', async ({ page }) => {
     const geoSection = geoblockForm(page);
-    const enableSwitch = geoSection.getByRole('switch');
+    const enableSwitch = geoSection.getByRole('switch', { name: 'Enable geo blocking' });
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
     }
@@ -176,7 +176,7 @@ test.describe('Geo Blocking - form persistence', () => {
 
   test('saving allow rules does not wipe block rules', async ({ page }) => {
     const geoSection = geoblockForm(page);
-    const enableSwitch = geoSection.getByRole('switch');
+    const enableSwitch = geoSection.getByRole('switch', { name: 'Enable geo blocking' });
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
     }
@@ -213,7 +213,7 @@ test.describe('Geo Blocking - form persistence', () => {
    */
   test('advanced settings survive save when accordion is collapsed', async ({ page }) => {
     const geoSection = geoblockForm(page);
-    const enableSwitch = geoSection.getByRole('switch');
+    const enableSwitch = geoSection.getByRole('switch', { name: 'Enable geo blocking' });
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
     }
@@ -267,7 +267,7 @@ test.describe('Geo Blocking - form persistence', () => {
    */
   test('form reflects saved values immediately without reload', async ({ page }) => {
     const geoSection = geoblockForm(page);
-    const enableSwitch = geoSection.getByRole('switch');
+    const enableSwitch = geoSection.getByRole('switch', { name: 'Enable geo blocking' });
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
     }
@@ -303,7 +303,7 @@ test.describe('Geo Blocking - form persistence', () => {
    */
   test('LAN Only preset: values survive tab switching', async ({ page }) => {
     const geoSection = geoblockForm(page);
-    const enableSwitch = geoSection.getByRole('switch');
+    const enableSwitch = geoSection.getByRole('switch', { name: 'Enable geo blocking' });
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
     }
@@ -330,7 +330,7 @@ test.describe('Geo Blocking - form persistence', () => {
    */
   test('LAN Only preset: values persist after save', async ({ page }) => {
     const geoSection = geoblockForm(page);
-    const enableSwitch = geoSection.getByRole('switch');
+    const enableSwitch = geoSection.getByRole('switch', { name: 'Enable geo blocking' });
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
     }

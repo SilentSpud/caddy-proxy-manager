@@ -45,7 +45,7 @@ test.describe('Generic forward auth', () => {
 
       const dialog = page.getByRole('dialog');
       const section = dialog.locator('div:has(> input[name="forwardAuthPresent"])');
-      const toggle = section.getByRole('switch');
+      const toggle = section.getByRole('switch', { name: 'Enable forward auth' });
       await expect(toggle).not.toBeChecked();
       await toggle.click();
       await expect(toggle).toBeChecked();
@@ -83,9 +83,9 @@ test.describe('Generic forward auth', () => {
     await page.getByPlaceholder('10.0.0.5:8080').first().fill('localhost:9988');
 
     const section = dialog.locator('div:has(> input[name="forwardAuthPresent"])');
-    await section.getByRole('switch').click();
+    await section.getByRole('switch', { name: 'Enable forward auth' }).click();
     await dialog.locator('input[name="forwardAuthUpstream"]').fill('http://authelia:9091');
-    await dialog.getByRole('checkbox', { name: /answer non-browser callers with 401/i }).check();
+    await dialog.getByRole('switch', { name: /answer non-browser callers with 401/i }).click();
     await dialog
       .locator('input[name="forwardAuthApiBypassHeaders"]')
       .fill('X-Api-Key, Authorization');
