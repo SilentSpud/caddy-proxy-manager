@@ -1,7 +1,7 @@
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { isForwardAuthDomain, createRedirectIntent } from "@/src/lib/models/forward-auth";
-import { config } from "@/src/lib/config";
 import PortalLoginForm from "./PortalLoginForm";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -75,7 +75,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
       hasRedirect={!!redirectUri || !!existingRid}
       targetDomain={targetDomain}
       enabledProviders={enabledProviders}
-      localLoginEnabled={!config.auth.disableLocalUsers}
+      localLoginEnabled={!(await localUsersDisabled())}
       existingSession={
         session
           ? {

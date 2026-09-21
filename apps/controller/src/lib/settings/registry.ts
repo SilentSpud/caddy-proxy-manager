@@ -61,6 +61,16 @@ export type SettingDefinition<T extends SettingValue = SettingValue> = {
    * and the remaining fields only once it is on. At most one per group.
    */
   gate?: boolean;
+  /**
+   * The bounds `parse` enforces, for a form that would rather refuse a value than post it.
+   *
+   * Set by whichever constructor made the definition - a number has a range, text a length - and
+   * absent on the kinds that have neither. They are the same numbers `parse` checks against, so a
+   * control built from them cannot disagree with the validation behind it.
+   */
+  min?: number;
+  max?: number;
+  maxLength?: number;
   /** Read the environment variable's raw string. Throws through `parse` on a bad value. */
   fromEnv: (raw: string) => T;
   /** Validate a value from the API or the setup form. Throws `SettingValidationError`. */
@@ -179,7 +189,9 @@ export function stringSetting(
     }
     return trimmed;
   };
-  return { ...spec, key, parse, fromEnv: parse };
+  // maxLength resolved rather than as given: a field built from this gets the limit `parse` will
+  // actually hold it to, including the default one the spec left out.
+  return { ...spec, key, maxLength, parse, fromEnv: parse };
 }
 
 /**

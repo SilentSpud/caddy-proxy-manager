@@ -13,10 +13,19 @@
  *
  * A checkbox or switch sits beside its label rather than under it, which is where a reader looks
  * for the box, so those pass `layout="inline"`. The design system hides a field's description
- * along with its label, so an inline control hands its description here instead.
+ * along with its label, so a control that wants one visible hands it here instead of setting it
+ * on itself.
  */
 
-import { type ReactElement, cloneElement, useEffect, useId, useRef, useState } from "react";
+import {
+  type ReactElement,
+  type ReactNode,
+  cloneElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { EnvTokens } from "./EnvTokens";
@@ -32,13 +41,22 @@ export function EnvLabelledField({
   env,
   description,
   layout = "stacked",
+  badge,
   children,
 }: {
   /** The control's label, drawn here instead of by the control. */
   label: string;
   /** The variables that set this one field. */
   env: readonly string[];
-  /** Only for `inline`, where the control cannot draw its own. */
+  /** Something to say about this field beside its name, such as where its value came from. */
+  badge?: ReactNode;
+  /**
+   * The field's description, drawn here rather than by the control.
+   *
+   * Either layout: hiding a control's label hides its description with it, so a caller that wants
+   * one visible hands it over rather than passing it down. Omit it and the control keeps its own,
+   * which only a stacked one will show.
+   */
   description?: string;
   /** `stacked` puts the label above the control; `inline` puts the control first, on its left. */
   layout?: "stacked" | "inline";
@@ -59,6 +77,7 @@ export function EnvLabelledField({
         <Text type="label">{label}</Text>
       </label>
       <EnvTokens names={env} />
+      {badge}
     </HStack>
   );
   const control = cloneElement(children, { isLabelHidden: true, ref: controlRef });
@@ -100,6 +119,11 @@ export function EnvLabelledField({
   return (
     <VStack gap={1}>
       {labelLine}
+      {description && (
+        <Text size="xsm" color="secondary">
+          {description}
+        </Text>
+      )}
       {control}
     </VStack>
   );

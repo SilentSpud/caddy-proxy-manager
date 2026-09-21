@@ -805,6 +805,80 @@ async function updateFaviconActionUnlocked(
 }
 
 /**
+ * Save one block of registry settings.
+ *
+ * Generic over the block, because the fields are generated from the definitions rather than
+ * written out: the form posts each value under its setting key, and the block says which keys it
+ * is allowed to have posted. Anything else in the payload is ignored rather than refused - React
+ * posts its own bookkeeping fields through every form.
+ *
+ * `saveSettings` does the validating, and does it for the whole batch before writing any of it,
+ * so a form with one bad field leaves the rest as they were.
+ */
+async function updateRegistrySettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+
+    const block = String(formData.get("registryBlock") ?? "");
+    const [{ REGISTRY_BLOCK_KEYS }, { SETTINGS_BY_KEY, SettingValidationError }, { saveSettings }] =
+      await Promise.all([
+        import("./registry-fields"),
+        import("@/src/lib/settings/registry"),
+        import("@/src/lib/settings/resolve"),
+      ]);
+
+    const keys = REGISTRY_BLOCK_KEYS[block];
+    if (!keys) {
+      return { success: false, message: t("results.registryUnknownBlock") };
+    }
+
+    const values: Record<string, unknown> = {};
+    for (const key of keys) {
+      const definition = SETTINGS_BY_KEY.get(key);
+      if (!definition) continue;
+      const posted = formData.get(key);
+      // A checkbox posts nothing when it is clear, which is the whole of its answer. Every other
+      // kind absent means the field was not on this form, so it is left as it is.
+      if (typeof definition.default === "boolean") {
+        values[key] = posted === "on" || posted === "true";
+      } else if (typeof posted === "string") {
+        values[key] = posted;
+      }
+    }
+
+    try {
+      await saveSettings(values);
+    } catch (error) {
+      if (error instanceof SettingValidationError) {
+        const [tRoot, { settingValidationMessage }] = await Promise.all([
+          getTranslations(),
+          import("@/src/lib/settings/messages"),
+        ]);
+        return { success: false, message: settingValidationMessage(tRoot, error) };
+      }
+      throw error;
+    }
+
+    // The auth instance is built from these once and cached, so it has to be dropped or the
+    // policy that is live stays the one from before the save.
+    const { invalidateProviderCache } = await import("@/src/lib/auth-server");
+    invalidateProviderCache();
+
+    // "layout" scope: the application name and the sign-in policy are read by the root layout and
+    // the dashboard shell, not only by the form that just changed them.
+    revalidatePath("/", "layout");
+    return { success: true, message: t("results.registrySaved") };
+  } catch (error) {
+    console.error("Failed to save registry settings:", error);
+    return { success: false, message: await errorText(error, t("results.registryFailed")) };
+  }
+}
+
+/**
  * Save the update-check settings, then check straight away.
  *
  * The check runs inline here rather than being left to the background refresh: an operator who has
@@ -1909,6 +1983,11 @@ export const updateCaddyBuildSettingsAction = serializedSettingsAction(
 );
 export const updateFaviconAction = serializedSettingsAction(updateFaviconActionUnlocked);
 export const updateUpdateSettingsAction = stagedSettingsAction(updateUpdateSettingsActionUnlocked);
+// Not staged: these settings are the app's own - a name, a URL, who may sign in - and none of
+// them reaches a Caddy config, so there is nothing for "Review & apply" to apply.
+export const updateRegistrySettingsAction = serializedSettingsAction(
+  updateRegistrySettingsActionUnlocked,
+);
 export const checkForUpdatesAction = serializedSettingsAction(checkForUpdatesActionUnlocked);
 export const updateAnalyticsSettingsAction = serializedSettingsAction(
   updateAnalyticsSettingsActionUnlocked,

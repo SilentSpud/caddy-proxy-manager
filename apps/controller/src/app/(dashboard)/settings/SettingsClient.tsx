@@ -85,6 +85,7 @@ import {
   updateGeoipSettingsAction,
   updateAvatarSettingsAction,
   updateFaviconAction,
+  updateRegistrySettingsAction,
   updateUpdateSettingsAction,
   checkForUpdatesAction,
   updateGeoipDatabasesAction,
@@ -116,6 +117,7 @@ import {
   SKIP_PAGE_SAVE,
 } from "./PageBlocks";
 import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
+import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlock";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -156,6 +158,7 @@ type Props = {
   hasFavicon: boolean;
   updates: UpdateStatus;
   /** Registry settings this screen reports but cannot change, by the block that lists them. */
+  registry: Record<string, readonly RegistryField[]>;
   analytics: AnalyticsView;
   geoip: GeoipView;
   /** Whether any agent is answering, and can therefore start or stop the optional containers. */
@@ -203,6 +206,7 @@ export default function SettingsClient({
   tailscale,
   hasFavicon,
   updates,
+  registry,
   analytics,
   geoip,
   canManageServices,
@@ -241,6 +245,9 @@ export default function SettingsClient({
   const [avatarsState, avatarsFormAction] = useActionState(updateAvatarSettingsAction, null);
   const [faviconState, faviconFormAction] = useActionState(updateFaviconAction, null);
   const [updatesState, updatesFormAction] = useActionState(updateUpdateSettingsAction, null);
+  // One action for both, told apart by the block the form posts with its values.
+  const [instanceState, instanceFormAction] = useActionState(updateRegistrySettingsAction, null);
+  const [signInState, signInFormAction] = useActionState(updateRegistrySettingsAction, null);
   const [passwordPolicyState, passwordPolicyFormAction] = useActionState(
     updatePasswordPolicySettingsAction,
     null,
@@ -330,6 +337,22 @@ export default function SettingsClient({
       />
     ),
     agent: <AgentSection agents={agents} pairingHost={pairingHostFor(dashboard)} />,
+    instance: (
+      <RegistrySettingsBlock
+        block="instance"
+        fields={registry.instance ?? []}
+        state={instanceState}
+        formAction={instanceFormAction}
+      />
+    ),
+    "sign-in": (
+      <RegistrySettingsBlock
+        block="sign-in"
+        fields={registry["sign-in"] ?? []}
+        state={signInState}
+        formAction={signInFormAction}
+      />
+    ),
     "dns-providers": (
       <DnsProvidersSection
         dnsProvider={dnsProvider}

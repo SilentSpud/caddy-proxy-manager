@@ -1527,7 +1527,8 @@ mirrored name matches one of them, the user is added to it but never removed.
 
 ### OIDC-Only Mode
 
-Set `AUTH_DISABLE_LOCAL_USERS=true` to hand identity entirely to your IdP:
+Turn on **Settings -> Authentication -> Sign-in -> OIDC-only mode**, or set
+`AUTH_DISABLE_LOCAL_USERS=true`, to hand identity entirely to your IdP:
 
 - No bootstrap admin is created, and `ADMIN_USERNAME` / `ADMIN_PASSWORD` are no
   longer required at startup - even in production.
@@ -1536,8 +1537,9 @@ Set `AUTH_DISABLE_LOCAL_USERS=true` to hand identity entirely to your IdP:
 - Creating local users and setting or changing passwords is rejected in the UI and
   the REST API.
 - OAuth self-provisioning defaults to enabled, since the IdP is the only way an
-  account can come into existence. Set `AUTH_ALLOW_OAUTH_REGISTRATION=false` to
-  restrict sign-in to accounts that already exist.
+  account can come into existence. Clear **Allow OAuth registration**, or set
+  `AUTH_ALLOW_OAUTH_REGISTRATION=false`, to restrict sign-in to accounts that
+  already exist.
 
 ```bash
 AUTH_DISABLE_LOCAL_USERS=true

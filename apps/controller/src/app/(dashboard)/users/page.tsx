@@ -1,8 +1,8 @@
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import UsersClient from "./UsersClient";
 import { lastSessionByUser, listUsers, usersWithPassword } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
 import { requireAdmin } from "@/src/lib/auth";
-import { config } from "@/src/lib/config";
 import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import type { Metadata } from "next";
@@ -45,7 +45,7 @@ export default async function UsersPage() {
     <UsersClient
       users={safeUsers}
       groups={groups}
-      localUsersEnabled={!config.auth.disableLocalUsers}
+      localUsersEnabled={!(await localUsersDisabled())}
     />
   );
 }

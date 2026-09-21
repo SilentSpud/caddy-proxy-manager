@@ -1,8 +1,8 @@
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { verifyPassword } from "@/src/lib/password";
 import db from "@/src/lib/db";
-import { config } from "@/src/lib/config";
 import { getClientIp } from "@/src/lib/client-ip";
 import { isPublicOrigin } from "@/src/lib/public-url";
 import {
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     // Credential sign-in does not exist in OIDC-only mode; the portal falls
     // back to the provider buttons.
-    if (config.auth.disableLocalUsers) {
+    if (await localUsersDisabled()) {
       return NextResponse.json({ error: t("passwordSignInDisabled") }, { status: 403 });
     }
 

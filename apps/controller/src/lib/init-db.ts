@@ -1,5 +1,6 @@
 import { hashPassword, verifyPassword } from "./password";
 import db, { nowIso } from "./db";
+import { localUsersDisabled } from "./auth-policy";
 import { config } from "./config";
 import { users, accounts } from "./db/schema";
 import { and, eq, sql } from "drizzle-orm";
@@ -10,10 +11,8 @@ import { and, eq, sql } from "drizzle-orm";
 export async function ensureAdminUser(): Promise<void> {
   // OIDC-only mode: no local accounts, so no bootstrap admin to seed and no admin credentials to
   // require. Roles come from the IdP's groups.
-  if (config.auth.disableLocalUsers) {
-    console.log(
-      "Local user management is disabled (AUTH_DISABLE_LOCAL_USERS=true) - skipping admin user seed",
-    );
+  if (await localUsersDisabled()) {
+    console.log("Local user management is disabled - skipping admin user seed");
     return;
   }
 

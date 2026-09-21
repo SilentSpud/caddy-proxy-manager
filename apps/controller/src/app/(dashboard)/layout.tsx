@@ -1,6 +1,6 @@
+import { getAppName } from "@/src/lib/app-name";
 import type { ReactNode } from "react";
 import { requireUser } from "@/src/lib/auth";
-import { config } from "@/src/lib/config";
 import { isDemoMode } from "@/src/lib/demo-mode";
 import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
@@ -67,7 +67,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <DashboardLayoutClient
           user={session.user}
           avatar={avatar}
-          appName={config.appName}
+          appName={await getAppName()}
           demoMode={isDemoMode()}
           updateAvailable={updates.updateAvailable}
           stagedKeys={staged}

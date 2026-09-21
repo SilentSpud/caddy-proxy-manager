@@ -2314,6 +2314,10 @@
         "name": "Branding",
         "desc": "The favicon browsers show for this instance"
       },
+      "instance": {
+        "name": "Instance",
+        "desc": "Names this instance and the address it is reached at"
+      },
       "avatars": {
         "name": "User Avatars",
         "desc": "Gravatar fallback for users without an icon"
@@ -2361,6 +2365,10 @@
       "oauth": {
         "name": "OAuth Providers",
         "desc": "OAuth/OIDC SSO providers"
+      },
+      "signIn": {
+        "name": "Sign-in",
+        "desc": "Who may sign in or sign up, and how hard the door is to knock on"
       },
       "passwordPolicy": {
         "name": "Password Policy",
@@ -2849,11 +2857,15 @@
       "rebuildTriggered": "Rebuild triggered.",
       "stagedApplied": "Applied as revision #{revision}",
       "stagedAppliedReloadFailed": "Changes applied, but Caddy did not reload: {error}",
-      "caddyBuildSavedSnippetWarning": "{rebuild, select, yes {Caddy module selection saved. Rebuild Caddy to apply the change to the running container.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently."
+      "caddyBuildSavedSnippetWarning": "{rebuild, select, yes {Caddy module selection saved. Rebuild Caddy to apply the change to the running container.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently.",
+      "registrySaved": "Settings saved",
+      "registryFailed": "Could not save the settings",
+      "registryUnknownBlock": "Those settings do not belong to a settings block"
     },
     "geoipEditionDownloadFailed": "{edition}: {reason}",
     "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard Host first.",
     "onThisPage": "On this page",
+    "envOverride": "From the environment",
     "pageUnsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
     "pageDiscard": "Discard"
   },

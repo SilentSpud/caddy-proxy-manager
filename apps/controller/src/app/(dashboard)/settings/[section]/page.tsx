@@ -1,3 +1,4 @@
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { defaultDashboardSettings } from "@/src/lib/dashboard-host";
 import { redirect } from "next/navigation";
 import SettingsClient from "../SettingsClient";
@@ -36,6 +37,7 @@ import { config } from "@/src/lib/config";
 import { getPublicBaseUrl } from "@/src/lib/public-url";
 import { requireAdmin } from "@/src/lib/auth";
 import { stagedView } from "@/src/lib/settings/staged-view";
+import { registryFields } from "../registry-fields";
 import { stagedOverlay } from "@/src/lib/settings/staging";
 import { withStagedReads } from "@/src/lib/settings/staging-context";
 import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
@@ -83,6 +85,7 @@ export default async function SettingsSectionPage({
   // The root translator, for the stored update-check and GeoIP failures this page shows.
   const tRoot = await getTranslations();
   // Resolved here, inside the staged scope, so a pending edit to one of them reads as pending.
+  const registry = await registryFields(tRoot);
 
   // The agent and staging reads sit outside the staged scope on purpose - they are not settings -
   // but run alongside it: the scope is AsyncLocalStorage, so a sibling promise cannot see the
@@ -213,7 +216,7 @@ export default async function SettingsSectionPage({
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
       primaryProviderId={primaryProviderId}
-      localUsersDisabled={config.auth.disableLocalUsers}
+      localUsersDisabled={await localUsersDisabled()}
       avatars={{
         // The stored toggle only applies when AVATAR_GRAVATAR leaves the choice open.
         gravatarEnabled: config.avatars.gravatarFromEnv ?? avatarSettings?.gravatarEnabled ?? true,
@@ -249,6 +252,7 @@ export default async function SettingsSectionPage({
         ...updates,
         error: updates.error ? storedErrorMessage(tRoot, updates.error, updates.errorCode) : null,
       }}
+      registry={registry}
       analytics={analytics}
       geoip={geoip}
       // Starting or stopping the optional containers needs an agent to run compose. Without one the

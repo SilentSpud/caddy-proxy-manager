@@ -1,3 +1,4 @@
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { type NextRequest, NextResponse } from "next/server";
 import {
   auth,
@@ -10,7 +11,6 @@ import { getUserById, updateUserPassword } from "@/src/lib/models/user";
 import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
-import { config } from "@/src/lib/config";
 import { hashPassword, verifyPassword } from "@/src/lib/password";
 import { getTranslations } from "next-intl/server";
 import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     // No local passwords exist in OIDC-only mode - setting one would create a
     // credential path around the IdP.
-    if (config.auth.disableLocalUsers) {
+    if (await localUsersDisabled()) {
       return NextResponse.json(
         { error: t("auth.apiErrors.passwordManagementDisabled") },
         { status: 403 },

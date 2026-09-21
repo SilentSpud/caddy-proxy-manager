@@ -1,3 +1,4 @@
+import { authPolicy } from "./auth-policy";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { genericOAuth, username } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -54,7 +55,11 @@ async function isExplicitLinkCallback(): Promise<boolean> {
   }
 }
 
-export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
+export function mapOAuthProvider(
+  p: OAuthProvider,
+  /** From the stored policy. Defaults to the environment's answer, for callers outside a request. */
+  allowOauthRegistration = config.auth.allowOauthRegistration,
+): GenericOAuthConfig {
   // Two different questions reach better-auth's one "is this provider trusted" gate:
   //
   // - A sign-in claiming the CPM account with the same email. Ownership is asserted by the
@@ -80,7 +85,7 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
     pkce: true,
     // Security: an OAuth sign-in must not implicitly create an account unless OAuth
     // self-registration is on. Only first-time auto-provisioning is gated; linking still works.
-    disableImplicitSignUp: !config.auth.allowOauthRegistration,
+    disableImplicitSignUp: !allowOauthRegistration,
     mapProfileToUser: (profile) => mapEmailVerified(profile),
   };
   if (p.authorizationUrl) cfg.authorizationUrl = p.authorizationUrl;
@@ -200,7 +205,10 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }));
-    cachedProviders = providers.map(mapOAuthProvider);
+    const { allowOauthRegistration } = await authPolicy();
+    cachedProviders = providers.map((provider) =>
+      mapOAuthProvider(provider, allowOauthRegistration),
+    );
     cachedTrustedProviderIds = providers.filter((p) => p.autoLink).map((p) => p.id);
     providersLoadedSuccessfully = true;
   } catch (e) {
@@ -225,6 +233,9 @@ export function enforceSafeUserDefaults<T extends object>(
 
 // biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above - the return type depends on a plugin list only known at runtime
 async function createAuth(baseURL: string): Promise<any> {
+  // Resolved once per build of the instance. `getAuth` rebuilds when these change - see the
+  // note on invalidateProviderCache, which the settings action calls after saving them.
+  const policy = await authPolicy();
   const oauthConfigs = await loadProviders();
   const trustedProviderIds = [...cachedTrustedProviderIds];
 
@@ -245,7 +256,7 @@ async function createAuth(baseURL: string): Promise<any> {
     // Only trust the Host header when the operator explicitly opts in. baseURL already pins the
     // canonical origin; trustHost is needed only behind reverse proxies that rewrite Host
     // without setting X-Forwarded-Host.
-    trustHost: process.env.AUTH_TRUST_HOST === "true",
+    trustHost: policy.trustHost,
     // BASE_URL is trusted by Better Auth itself; this adds the stored Public URL, and the browser's
     // own address while setup is unfinished. See auth-trusted-origins.ts.
     trustedOrigins: extraTrustedOrigins,
@@ -259,11 +270,7 @@ async function createAuth(baseURL: string): Promise<any> {
         ipAddressHeaders: ["x-cpm-client-ip"],
       },
     } as Record<string, unknown>,
-    rateLimit: {
-      enabled: process.env.AUTH_RATE_LIMIT_ENABLED !== "false",
-      window: Number(process.env.AUTH_RATE_LIMIT_WINDOW ?? 60),
-      max: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 5),
-    },
+    rateLimit: policy.rateLimit,
     user: {
       modelName: "users",
       fields: {
@@ -300,8 +307,8 @@ async function createAuth(baseURL: string): Promise<any> {
     verification: { modelName: "verifications" },
     emailAndPassword: {
       // OIDC-only mode turns credential sign-in off entirely - there are no local accounts.
-      enabled: !config.auth.disableLocalUsers,
-      disableSignUp: !config.auth.allowSelfRegistration,
+      enabled: !policy.disableLocalUsers,
+      disableSignUp: !policy.allowSelfRegistration,
       minPasswordLength: MIN_PASSWORD_LENGTH,
       password: {
         async hash(password: string) {
@@ -328,7 +335,7 @@ async function createAuth(baseURL: string): Promise<any> {
           // federated user - see enforceSafeUserDefaults above. Operators who trust their IdP to
           // manage roles can opt out with AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true.
           before: async (user: Record<string, unknown>) => {
-            if (config.auth.allowOauthRoleFromClaims) {
+            if (policy.allowOauthRoleFromClaims) {
               return { data: user };
             }
             return { data: enforceSafeUserDefaults(user) };

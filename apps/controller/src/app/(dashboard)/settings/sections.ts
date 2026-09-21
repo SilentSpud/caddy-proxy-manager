@@ -102,6 +102,12 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           },
           { id: "branding", name: "Branding", desc: "The favicon browsers show for this instance" },
           {
+            id: "instance",
+            name: "Instance",
+            desc: "Names this instance and the address it is reached at",
+            envSearch: ["APP_NAME", "BASE_URL"],
+          },
+          {
             id: "avatars",
             name: "User Avatars",
             desc: "Gravatar fallback for users without an icon",
@@ -257,6 +263,24 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "OAUTH_OPERATOR_GROUP",
               "OAUTH_USER_GROUP",
               "OAUTH_VIEWER_GROUP",
+            ],
+          },
+          {
+            id: "sign-in",
+            name: "Sign-in",
+            desc: "Who may sign in or sign up, and how hard the door is to knock on",
+            envSearch: [
+              "AUTH_ALLOW_SELF_REGISTRATION",
+              "AUTH_ALLOW_OAUTH_REGISTRATION",
+              "AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS",
+              "AUTH_DISABLE_LOCAL_USERS",
+              "AUTH_TRUST_HOST",
+              "AUTH_RATE_LIMIT_ENABLED",
+              "AUTH_RATE_LIMIT_WINDOW",
+              "AUTH_RATE_LIMIT_MAX",
+              "LOGIN_MAX_ATTEMPTS",
+              "LOGIN_WINDOW_MS",
+              "LOGIN_BLOCK_MS",
             ],
           },
           {
