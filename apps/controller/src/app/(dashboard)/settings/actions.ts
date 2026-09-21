@@ -824,12 +824,15 @@ async function updateRegistrySettingsActionUnlocked(
     await requireAdmin();
 
     const block = String(formData.get("registryBlock") ?? "");
-    const [{ REGISTRY_BLOCK_KEYS }, { SETTINGS_BY_KEY, SettingValidationError }, { saveSettings }] =
-      await Promise.all([
-        import("./registry-fields"),
-        import("@/src/lib/settings/registry"),
-        import("@/src/lib/settings/resolve"),
-      ]);
+    const [
+      { REGISTRY_BLOCK_KEYS },
+      { SETTINGS_BY_KEY, SettingValidationError },
+      { isEnvOverridden, saveSettings },
+    ] = await Promise.all([
+      import("./registry-fields"),
+      import("@/src/lib/settings/registry"),
+      import("@/src/lib/settings/resolve"),
+    ]);
 
     const keys = REGISTRY_BLOCK_KEYS[block];
     if (!keys) {
@@ -840,6 +843,12 @@ async function updateRegistrySettingsActionUnlocked(
     for (const key of keys) {
       const definition = SETTINGS_BY_KEY.get(key);
       if (!definition) continue;
+      // A setting whose variable overrides it is drawn disabled, so it posts nothing - and for a
+      // checkbox "nothing" would otherwise be stored as false. Skipped rather than stored: what
+      // is written would be ignored while the variable is set and would take effect the moment
+      // it was removed, which is not what anyone asked for.
+      if (isEnvOverridden(definition)) continue;
+
       const posted = formData.get(key);
       // A checkbox posts nothing when it is clear, which is the whole of its answer. Every other
       // kind absent means the field was not on this form, so it is left as it is.

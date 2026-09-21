@@ -31,7 +31,7 @@ import {
   type SettingValue,
 } from "@/src/lib/settings/registry";
 import { settingDescription, settingLabel } from "@/src/lib/settings/messages";
-import { resolveSetting } from "@/src/lib/settings/resolve";
+import { isEnvOverridden, resolveSetting } from "@/src/lib/settings/resolve";
 import type { RegistryField } from "./RegistrySettingsBlock";
 
 /** Widened once: each definition has its own value type, and the union of those is not one. */
@@ -105,7 +105,14 @@ export async function registryFields(
     blocks[block] = await Promise.all(
       definitions.map(async (definition) => {
         const resolved = await resolveSetting(definition);
-        return { ...field(t, definition, resolved.value), source: resolved.source };
+        return {
+          ...field(t, definition, resolved.value),
+          source: resolved.source,
+          // Not just "came from the environment": this one cannot be changed here at all,
+          // because SETTINGS_ENV_OVERRIDE names its variable as one that overrides what is
+          // stored.
+          pinned: isEnvOverridden(definition),
+        };
       }),
     );
   }

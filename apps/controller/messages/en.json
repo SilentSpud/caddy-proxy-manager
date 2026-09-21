@@ -2866,6 +2866,8 @@
     "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard Host first.",
     "onThisPage": "On this page",
     "envOverride": "From the environment",
+    "envPinned": "Set by the environment",
+    "envPinnedHelp": "SETTINGS_ENV_OVERRIDE names {variable}, so the environment overrides what is saved here and this cannot be changed from Settings. Remove it from SETTINGS_ENV_OVERRIDE and restart to take the setting back.",
     "pageUnsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
     "pageDiscard": "Discard"
   },

@@ -280,10 +280,40 @@ Each field on the Settings page shows which layer its current value came from.
 A stored value that no longer validates - because a range was tightened, say - is ignored with a
 warning and falls through to the environment and the default, rather than taking the app down.
 
+#### Getting back in: `SETTINGS_ENV_OVERRIDE`
+
+Two settings can lock you out of the instance that holds them. **OIDC-only mode**
+(`AUTH_DISABLE_LOCAL_USERS`) saved on before OAuth works leaves nobody able to sign in, and a
+**Public URL** (`BASE_URL`) that no longer matches the registered redirect URI breaks the OAuth
+round trip that would let you back in. Neither can be corrected from a Settings page nobody can
+reach, and a stored value normally wins - so there would be nothing to do short of editing the
+database.
+
+`SETTINGS_ENV_OVERRIDE` names the variables that override a stored value instead of only filling
+in for a missing one:
+
+```bash
+SETTINGS_ENV_OVERRIDE=AUTH_DISABLE_LOCAL_USERS
+AUTH_DISABLE_LOCAL_USERS=false
+```
+
+Restart, and the instance resolves that setting from the variable whatever is saved. It takes a
+space or comma separated list, so `SETTINGS_ENV_OVERRIDE=BASE_URL,AUTH_DISABLE_LOCAL_USERS`
+covers both, and it works for any variable in the table below.
+
+Naming a variable here rather than having those two always prefer the environment is deliberate:
+`docker-compose.yml` passes `BASE_URL` and `AUTH_DISABLE_LOCAL_USERS` on every deployment,
+defaults included, so "the variable always wins" would mean neither setting could ever be changed
+from Settings at all.
+
+While a variable is listed, Settings draws that field greyed out and says so. Remove it from
+`SETTINGS_ENV_OVERRIDE` and restart to hand the setting back.
+
 ### Stored in the database
 
 Each of these is a field on **Settings** (and on the setup flow's final step). The variable named
-is still honoured as an override until a value is stored.
+is still honoured as an override until a value is stored, and `SETTINGS_ENV_OVERRIDE` above makes
+it win even then.
 
 | Setting | Variable | Default |
 | ------- | -------- | ------- |

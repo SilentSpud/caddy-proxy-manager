@@ -7,6 +7,9 @@
  * and behaviour is unchanged. Once a value is stored it wins, and the variable can be deleted from
  * the `.env`.
  *
+ * `SETTINGS_ENV_OVERRIDE` reverses that order for the variables it names - see
+ * `isEnvOverridden`. It is the way back from a saved value that locks the operator out.
+ *
  * Values are cached for the process. The settings table is small and read on nearly every request,
  * and a write goes through ./resolve.ts's own save path, which clears the cache - so the only way
  * to see a stale value is to write to the table directly.
@@ -101,6 +104,38 @@ function fromEnvironment(definition: SettingDefinition): SettingValue | undefine
   }
 }
 
+/**
+ * The variables `SETTINGS_ENV_OVERRIDE` names, which override a stored value rather than only
+ * filling in for a missing one.
+ *
+ * Opt-in per variable, and read at call time so a deployment can change it with a restart and a
+ * test can set it. A flag on the definition would not do: Compose passes `BASE_URL` and
+ * `AUTH_DISABLE_LOCAL_USERS` on every deployment, defaults and all, so "the variable always
+ * wins" would mean those settings could never be changed from Settings at all.
+ */
+function overriddenVariables(): Set<string> {
+  const raw = process.env.SETTINGS_ENV_OVERRIDE;
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(/[\s,]+/)
+      .map((name) => name.trim().toUpperCase())
+      .filter(Boolean),
+  );
+}
+
+/**
+ * Whether this setting's variable overrides what is stored.
+ *
+ * The escape hatch for a saved value that locks an operator out of their own instance: OIDC-only
+ * mode saved on before OAuth works, or a public URL that no longer matches the registered
+ * redirect URI. Neither can be corrected from a Settings page nobody can reach, and without this
+ * the only way back is to edit the database.
+ */
+export function isEnvOverridden(definition: SettingDefinition): boolean {
+  return overriddenVariables().has(definition.env) && process.env[definition.env] !== undefined;
+}
+
 /** Where a resolved value came from. The setup and migration pages show this to the operator. */
 export type SettingSource = "stored" | "environment" | "default";
 
@@ -112,10 +147,16 @@ export type ResolvedSetting<T extends SettingValue = SettingValue> = {
 export async function resolveSetting<T extends SettingValue>(
   definition: SettingDefinition<T>,
 ): Promise<ResolvedSetting<T>> {
+  const environment = fromEnvironment(definition);
+  // Named in SETTINGS_ENV_OVERRIDE: the variable is the operator's way back in, so it is read
+  // first and a stored value does not get a say while it is set.
+  if (environment !== undefined && isEnvOverridden(definition as SettingDefinition)) {
+    return { value: environment as T, source: "environment" };
+  }
+
   const stored = (await load()).get(definition.key);
   if (stored !== undefined) return { value: stored as T, source: "stored" };
 
-  const environment = fromEnvironment(definition);
   if (environment !== undefined) return { value: environment as T, source: "environment" };
 
   return { value: definition.default, source: "default" };

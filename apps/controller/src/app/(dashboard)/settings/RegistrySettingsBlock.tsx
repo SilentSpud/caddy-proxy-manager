@@ -32,6 +32,8 @@ export type RegistryField = {
   label: string;
   description: string;
   source?: "stored" | "environment" | "default";
+  /** The variable overrides what is stored, so this cannot be changed from here. */
+  pinned?: boolean;
 } & (
   | { kind: "text"; value: string; maxLength?: number; placeholder?: string }
   | { kind: "boolean"; value: boolean }
@@ -69,7 +71,16 @@ export function RegistrySettingsBlock({
         <VStack gap={3}>
           {state?.message && <StatusAlert message={state.message} success={state.success} />}
           {fields.map((field) => (
-            <FieldControl key={field.key} field={field} fromEnvironment={t("envOverride")} />
+            <FieldControl
+              key={field.key}
+              field={field}
+              badgeLabel={field.pinned ? t("envPinned") : t("envOverride")}
+              // In place of the description, not beside it: what the setting does is not what a
+              // reader needs while the control is greyed out and they wonder why.
+              description={
+                field.pinned ? t("envPinnedHelp", { variable: field.env }) : field.description
+              }
+            />
           ))}
         </VStack>
       </form>
@@ -106,52 +117,65 @@ function useFieldValue<T>(serverValue: T): [T, (next: T) => void] {
  */
 function FieldControl({
   field,
-  fromEnvironment,
+  badgeLabel,
+  description,
 }: {
   field: RegistryField;
-  fromEnvironment: string;
+  badgeLabel: string;
+  description: string;
 }) {
   // Where the value still comes from. Said only when it is the variable, since that is the one
   // case where what is on screen did not come from this form.
-  const badge =
-    field.source === "environment" ? <Badge variant="blue" label={fromEnvironment} /> : null;
+  const badge = field.source === "environment" ? <Badge variant="blue" label={badgeLabel} /> : null;
 
-  if (field.kind === "boolean") return <BooleanField field={field} badge={badge} />;
-  if (field.kind === "number") return <NumberField field={field} badge={badge} />;
-  return <TextField field={field} badge={badge} />;
+  if (field.kind === "boolean")
+    return <BooleanField field={field} badge={badge} description={description} />;
+  if (field.kind === "number")
+    return <NumberField field={field} badge={badge} description={description} />;
+  return <TextField field={field} badge={badge} description={description} />;
 }
 
-type Badged = { badge: ReactNode };
+type Badged = { badge: ReactNode; description: string };
 
-function BooleanField({ field, badge }: { field: RegistryField & { kind: "boolean" } } & Badged) {
+function BooleanField({
+  field,
+  badge,
+  description,
+}: { field: RegistryField & { kind: "boolean" } } & Badged) {
   const [value, setValue] = useFieldValue(field.value);
   return (
     <EnvLabelledField
       label={field.label}
       env={[field.env]}
-      description={field.description}
+      description={description}
       layout="inline"
       badge={badge}
     >
-      <CheckboxInput label={field.label} htmlName={field.key} value={value} onChange={setValue} />
+      <CheckboxInput
+        label={field.label}
+        htmlName={field.key}
+        value={value}
+        onChange={setValue}
+        isDisabled={field.pinned}
+      />
     </EnvLabelledField>
   );
 }
 
-function NumberField({ field, badge }: { field: RegistryField & { kind: "number" } } & Badged) {
+function NumberField({
+  field,
+  badge,
+  description,
+}: { field: RegistryField & { kind: "number" } } & Badged) {
   const [value, setValue] = useFieldValue(field.value);
   return (
-    <EnvLabelledField
-      label={field.label}
-      env={[field.env]}
-      description={field.description}
-      badge={badge}
-    >
+    <EnvLabelledField label={field.label} env={[field.env]} description={description} badge={badge}>
       <NumberInput
         label={field.label}
         htmlName={field.key}
         value={value}
         onChange={setValue}
+        isDisabled={field.pinned}
         isIntegerOnly
         min={field.min}
         max={field.max}
@@ -160,15 +184,14 @@ function NumberField({ field, badge }: { field: RegistryField & { kind: "number"
   );
 }
 
-function TextField({ field, badge }: { field: RegistryField & { kind: "text" } } & Badged) {
+function TextField({
+  field,
+  badge,
+  description,
+}: { field: RegistryField & { kind: "text" } } & Badged) {
   const [value, setValue] = useFieldValue(field.value);
   return (
-    <EnvLabelledField
-      label={field.label}
-      env={[field.env]}
-      description={field.description}
-      badge={badge}
-    >
+    <EnvLabelledField label={field.label} env={[field.env]} description={description} badge={badge}>
       <TextInput
         {...AUTOFILL_OFF}
         label={field.label}
@@ -176,6 +199,7 @@ function TextField({ field, badge }: { field: RegistryField & { kind: "text" } }
         htmlName={field.key}
         value={value}
         onChange={setValue}
+        isDisabled={field.pinned}
       />
     </EnvLabelledField>
   );
