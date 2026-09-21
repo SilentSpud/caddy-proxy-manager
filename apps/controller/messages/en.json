@@ -728,8 +728,18 @@
     "defaultResponseModeInvalid": "Default response mode must be caddy, respond, redirect, or abort",
     "defaultResponseSettingsNotObject": "Default response settings must be an object",
     "defaultResponseStatusInvalid": "Default response status must be an integer from 200 to 599",
+    "hostForwardAuthUpstreamRequired": "forwardAuth.authUpstream is required when forward auth is enabled",
+    "hostForwardAuthUpstreamInvalid": "forwardAuth.authUpstream must be an http or https URL, e.g. http://authelia:9091",
+    "hostForwardAuthEndpointRequired": "forwardAuth.authEndpoint is required when the provider is custom",
+    "hostForwardAuthProviderConflict": "A host can have one authenticator, and this one would have {providers}. Turn one of them off first.",
     "hostWafBodyLimitActionInvalid": "waf.request_body_limit_action must be Reject or ProcessPartial",
     "hostWafDirectiveBodyLimitOutOfRange": "waf.custom_directives has an out-of-range body limit: \"{directive}\" - the byte count must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
+    "hostWafDirectivesDropped": "waf.custom_directives has {count} line(s) that would be dropped and never sent to Caddy: {details}. Remove or rewrite them for them to take effect.",
+    "wafDirectiveDroppedInclude": "Include is not allowed (it would read arbitrary files from the container filesystem)",
+    "wafDirectiveDroppedRuleMutation": "rule-mutation and engine directives are not allowed (they can disable WAF protections or override rule actions)",
+    "wafDirectiveDroppedCtlRuleEngine": "ctl:ruleEngine is not allowed (it can conditionally disable the WAF)",
+    "wafDirectiveDroppedBodyLimit": "the body limit is out of range (the byte count must be an integer between {min} and {max} bytes)",
+    "wafDirectiveDroppedNotAllowed": "not an allowed directive - only SecRule, SecAction, SecMarker and SecDefaultAction are permitted",
     "hostWafInMemoryBodyLimitExceedsLimit": "waf.request_body_in_memory_limit must not exceed waf.request_body_limit",
     "hostWafInMemoryBodyLimitOutOfRange": "waf.request_body_in_memory_limit must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
     "hostWafRequestBodyLimitOutOfRange": "waf.request_body_limit must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
@@ -792,7 +802,7 @@
     "wildcardDomainNeedsDnsProvider": "Wildcard domain \"{domain}\" requires a DNS provider for the ACME DNS-01 challenge. Configure a default DNS provider in settings, or assign a certificate to this host.",
     "upstreamProtocolInvalid": "Invalid upstream protocol \"{scheme}://\". Only http:// and https:// are allowed",
     "mtlsNoTrustMaterial": "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS.",
-    "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration - every proxy host would stop being updated, not just this one. Add an auth key in Settings → Tailscale first.",
+    "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration - every proxy host would stop being updated, not just this one. Add an auth key in Settings → Network → Tailscale first.",
     "customCaddyfileInvalid": "Custom Caddyfile: {error}",
     "agentNotReported": "Connected, but has not reported yet."
   },
@@ -1354,6 +1364,7 @@
     "enableAuthentikForwardAuth": "Enable Authentik forward auth",
     "enableCpmForwardAuth": "Enable CPM forward auth",
     "enableCustomDnsResolvers": "Enable custom DNS resolvers",
+    "enableForwardAuth": "Enable forward auth",
     "enableGeoBlocking": "Enable geo blocking",
     "enableLoadBalancing": "Enable load balancing",
     "enableMtls": "Enable mTLS",
@@ -1382,9 +1393,21 @@
     "forbidden": "Forbidden",
     "forwardAuthAccessDeniedDescription": "No users or groups are selected, so forward auth will reject every request.",
     "forwardAuthAccessDeniedTitle": "Nobody can access this host",
+    "forwardAuth": "Forward Auth",
+    "forwardAuthApiSplitHelp": "A caller that did not ask for HTML - an API client, a WebSocket handshake - gets 401 instead of a redirect to the login page, which it cannot follow.",
+    "forwardAuthApiSplitLabel": "Answer non-browser callers with 401",
+    "forwardAuthBypassHeaders": "Bypass headers",
+    "forwardAuthBypassHeadersHelp": "A request carrying any of these headers skips forward auth entirely, leaving the upstream to check the credential itself. Comma-separated.",
+    "forwardAuthCopyHeadersHelp": "Headers taken from the auth server's answer and set on the request sent upstream. One per line. The same headers are stripped from every inbound request, so they cannot be forged.",
+    "forwardAuthDescription": "Authenticate through an external forward-auth server, such as Authelia",
     "forwardAuthExcludedPathsHelp": "Paths to exclude from authentication. These paths bypass forward auth while all other paths remain protected. Ignored if Protected Paths is set.",
     "forwardAuthGroupsEmptyDescription": "Create groups on the Groups page.",
+    "forwardAuthProvider": "Provider",
+    "forwardAuthProviderAuthelia": "Authelia",
+    "forwardAuthProviderCustom": "Custom",
     "forwardAuthProtectedPathsHelp": "Leave empty to protect the entire domain. Comma-separated paths to protect specific routes only.",
+    "forwardAuthUpstream": "Auth server URL",
+    "forwardAuthUpstreamHelp": "Where the auth server listens, as seen from Caddy, e.g. http://authelia:9091.",
     "forwardAuthSubjectsEmptyTitle": "No groups or users yet",
     "forwardTheIdentityUpstream": "Forward the identity upstream",
     "fromPath": "From Path",
@@ -1557,17 +1580,17 @@
     "tailnetOnly": "Tailnet only",
     "tailnetOnlyHelp": "Keep this host off the public :80/:443 listener entirely. Uncheck to publish it in both places.",
     "tailscale": "Tailscale",
-    "tailscaleAuthKeyMissingDescription": "Saving will be refused. The node cannot register without a key, and Caddy rejects a configuration whose listener will not come up - that would stop every proxy host from being updated, not just this one. Add a key in Settings → Tailscale first.",
+    "tailscaleAuthKeyMissingDescription": "Saving will be refused. The node cannot register without a key, and Caddy rejects a configuration whose listener will not come up - that would stop every proxy host from being updated, not just this one. Add a key in Settings → Network → Tailscale first.",
     "tailscaleAuthKeyMissingTitle": "No Tailscale auth key is stored",
     "tailscaleDescription": "Serve this host on your tailnet instead of, or as well as, the public internet",
-    "tailscaleDisabledDescription": "This host will not be served at all until Settings → Tailscale is enabled - it is dropped from the configuration rather than published publicly.",
+    "tailscaleDisabledDescription": "This host will not be served at all until Settings → Network → Tailscale is enabled - it is dropped from the configuration rather than published publicly.",
     "tailscaleDisabledTitle": "Tailscale is switched off in Settings",
     "tailscaleDomainRequirementDescription": "Routing is still by Host header, so a request to https://{node}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale - no ACME, no DNS provider.",
     "tailscaleDomainRequirementTitle": "Add the node's MagicDNS name to Domains",
     "tailscaleExcludedPathsHelp": "Paths that bypass the identity check while everything else stays gated. Ignored if Protected Paths is set.",
     "tailscaleForwardIdentityHelp": "Sets X-Tailscale-User, -Login, -Name, -Tailnet and -Profile-Picture on the proxied request. Any such header sent by the client is stripped first.",
     "tailscaleIdentityHelp": "Only devices signed in to your tailnet may reach this host, and the caller is identified by their tailnet login. Tagged devices are refused, since they have no user behind them.",
-    "tailscaleNodeHelp": "The tailnet machine this host is served on. Empty uses \"{node}\" from Settings → Tailscale. Several hosts can share one node.",
+    "tailscaleNodeHelp": "The tailnet machine this host is served on. Empty uses \"{node}\" from Settings → Network → Tailscale. Several hosts can share one node.",
     "tailscaleUpstreamNodeHelp": "Node to dial the upstreams through, for a backend that only exists on your tailnet. Upstream IP pinning and custom DNS resolvers do not apply - names are resolved by MagicDNS on the far side.",
     "tailscaleUpstreamNodeLabel": "Reach upstreams over the tailnet",
     "timeout": "Timeout",
@@ -1652,8 +1675,8 @@
       "ready": "GeoIP ready",
       "missing": "GeoIP missing",
       "partial": "GeoIP partial",
-      "offHelp": "GeoIP is switched off in Settings → GeoIP Databases - country, continent and ASN blocking will not work.",
-      "missingHelp": "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → GeoIP Databases.",
+      "offHelp": "GeoIP is switched off in Settings → Geo-blocking → GeoIP Databases - country, continent and ASN blocking will not work.",
+      "missingHelp": "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → Geo-blocking → GeoIP Databases.",
       "countryMissingHelp": "GeoLite2-Country database missing - country/continent blocking disabled",
       "asnMissingHelp": "GeoLite2-ASN database missing - ASN blocking disabled",
       "loadedHelp": "GeoLite2-Country and GeoLite2-ASN databases loaded"
@@ -1915,6 +1938,9 @@
     "notFound": "Not Found",
     "oauthAutoLinkHelp": "Signing in through this provider attaches to the existing user with the same email address. When off, users link it themselves from their profile.",
     "operatorGroups": "Operator groups",
+    "forwardAuthProvider": "Provider",
+    "forwardAuthProviderCustom": "Custom",
+    "forwardAuthUpstream": "Auth server URL",
     "outpostDomain": "Outpost domain",
     "outpostUpstream": "Outpost upstream",
     "overrideDiscoveredEndpoint": "Override discovered endpoint",
@@ -2228,27 +2254,81 @@
     "sections": {
       "general": {
         "name": "General",
+        "desc": "Domain, ACME contact, updates, branding and avatars"
+      },
+      "responses": {
+        "name": "Responses",
+        "desc": "What Caddy answers for an unknown host, and when a host fails"
+      },
+      "caddyBuild": {
+        "name": "Caddy Build",
+        "desc": "Which plugins the Caddy image is compiled with"
+      },
+      "dashboard": {
+        "name": "Dashboard Host",
+        "desc": "Serve this dashboard through Caddy, on a domain of its own"
+      },
+      "agent": {
+        "name": "Agent",
+        "desc": "The service that recreates and rebuilds the Caddy container"
+      },
+      "dns": {
+        "name": "DNS",
+        "desc": "Provider credentials, challenge resolvers and upstream pinning"
+      },
+      "network": {
+        "name": "Network",
+        "desc": "Trusted proxies, and the tailnet hosts are served on"
+      },
+      "authentication": {
+        "name": "Authentication",
+        "desc": "How people sign in to this dashboard"
+      },
+      "forwardAuth": {
+        "name": "Forward Auth",
+        "desc": "Defaults a new proxy host inherits for an external authenticator"
+      },
+      "geo": {
+        "name": "Geo-blocking",
+        "desc": "Country lookups, and the default rules every host merges with"
+      },
+      "observability": {
+        "name": "Observability",
+        "desc": "Analytics collection, the metrics endpoint and the access log"
+      }
+    },
+    "blocks": {
+      "general": {
+        "name": "General",
         "desc": "Primary domain and ACME contact email"
       },
       "acme": {
         "name": "ACME Server",
         "desc": "Custom ACME directory URL for internal CAs"
       },
-      "defaultResponse": {
-        "name": "Default Response",
-        "desc": "Handle requests for unknown hosts and direct IP access"
-      },
-      "avatars": {
-        "name": "User Avatars",
-        "desc": "Gravatar fallback for users without an icon"
+      "updates": {
+        "name": "Updates",
+        "desc": "Whether to check the registry for a newer release, and which one"
       },
       "branding": {
         "name": "Branding",
         "desc": "The favicon browsers show for this instance"
       },
-      "updates": {
-        "name": "Updates",
-        "desc": "Whether to check the registry for a newer release, and which one"
+      "instance": {
+        "name": "Instance",
+        "desc": "Names this instance and the address it is reached at"
+      },
+      "avatars": {
+        "name": "User Avatars",
+        "desc": "Gravatar fallback for users without an icon"
+      },
+      "defaultResponse": {
+        "name": "Default Response",
+        "desc": "Handle requests for unknown hosts and direct IP access"
+      },
+      "errorPages": {
+        "name": "Error Pages",
+        "desc": "Global custom error responses (fallback for all hosts)"
       },
       "caddyBuild": {
         "name": "Caddy Build",
@@ -2282,6 +2362,26 @@
         "name": "Tailscale",
         "desc": "Node defaults for hosts served on, or reached over, your tailnet"
       },
+      "oauth": {
+        "name": "OAuth Providers",
+        "desc": "OAuth/OIDC SSO providers"
+      },
+      "signIn": {
+        "name": "Sign-in",
+        "desc": "Who may sign in or sign up, and how hard the door is to knock on"
+      },
+      "passwordPolicy": {
+        "name": "Password Policy",
+        "desc": "Migrate users off older password hashes"
+      },
+      "authentik": {
+        "name": "Authentik Defaults",
+        "desc": "Forward-auth defaults for new proxy hosts"
+      },
+      "forwardAuth": {
+        "name": "Forward Auth Defaults",
+        "desc": "Defaults for hosts authenticating through an external auth server"
+      },
       "geoip": {
         "name": "GeoIP Databases",
         "desc": "MaxMind subscription and whether country lookups run at all"
@@ -2289,22 +2389,6 @@
       "geoblock": {
         "name": "Global Geoblocking",
         "desc": "Default geoblock rules across all hosts"
-      },
-      "errorPages": {
-        "name": "Error Pages",
-        "desc": "Global custom error responses (fallback for all hosts)"
-      },
-      "authentik": {
-        "name": "Authentik Defaults",
-        "desc": "Forward-auth defaults for new proxy hosts"
-      },
-      "oauth": {
-        "name": "OAuth Providers",
-        "desc": "OAuth/OIDC SSO providers"
-      },
-      "passwordPolicy": {
-        "name": "Password Policy",
-        "desc": "Migrate users off older password hashes"
       },
       "analytics": {
         "name": "Analytics",
@@ -2533,6 +2617,27 @@
             "description": "Password of the API user or sub-user."
           }
         }
+      },
+      "rfc2136": {
+        "description": "RFC 2136 dynamic DNS updates via a TSIG key (BIND 9 and compatible servers)",
+        "fields": {
+          "keyName": {
+            "label": "TSIG Key Name",
+            "description": "Name of the TSIG key as defined on the DNS server."
+          },
+          "keyAlg": {
+            "label": "TSIG Algorithm",
+            "description": "HMAC algorithm of the TSIG key, e.g. hmac-sha256, hmac-sha512 or hmac-md5."
+          },
+          "key": {
+            "label": "TSIG Key Secret",
+            "description": "The base64 shared secret from the key statement, or from `tsig-keygen`."
+          },
+          "server": {
+            "label": "DNS Server",
+            "description": "Authoritative server that accepts RFC 2136 dynamic updates, as host:port."
+          }
+        }
       }
     },
     "tailscaleModuleDisabledBody": "{reason} These settings still save, but no host is served on the tailnet until the module is compiled in.",
@@ -2646,6 +2751,7 @@
       "geoblock": "Geo-Block",
       "errorPages": "Error Pages",
       "authentik": "Authentik",
+      "forwardAuth": "Forward Auth",
       "passwordPolicy": "Password Policy",
       "metrics": "Metrics",
       "logging": "Logging",
@@ -2677,6 +2783,9 @@
       "dnsProviderSavedDefault": "{name} saved (default)",
       "dnsProviderFailed": "Failed to save DNS provider settings",
       "authentikRequired": "Outpost domain and upstream are required",
+      "forwardAuthRequired": "The auth server URL is required",
+      "forwardAuthSaved": "Forward auth defaults saved successfully",
+      "forwardAuthFailed": "Failed to save forward auth defaults",
       "authentikSaved": "Authentik defaults saved successfully",
       "authentikFailed": "Failed to save Authentik settings",
       "tailscaleKeyRejected": "Tailscale did not accept this key. {reason}",
@@ -2748,10 +2857,19 @@
       "rebuildTriggered": "Rebuild triggered.",
       "stagedApplied": "Applied as revision #{revision}",
       "stagedAppliedReloadFailed": "Changes applied, but Caddy did not reload: {error}",
-      "caddyBuildSavedSnippetWarning": "{rebuild, select, yes {Caddy module selection saved. Rebuild Caddy to apply the change to the running container.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently."
+      "caddyBuildSavedSnippetWarning": "{rebuild, select, yes {Caddy module selection saved. Rebuild Caddy to apply the change to the running container.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently.",
+      "registrySaved": "Settings saved",
+      "registryFailed": "Could not save the settings",
+      "registryUnknownBlock": "Those settings do not belong to a settings block"
     },
     "geoipEditionDownloadFailed": "{edition}: {reason}",
-    "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard Host first."
+    "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard Host first.",
+    "onThisPage": "On this page",
+    "envOverride": "From the environment",
+    "envPinned": "Set by the environment",
+    "envPinnedHelp": "SETTINGS_ENV_OVERRIDE names {variable}, so the environment overrides what is saved here and this cannot be changed from Settings. Remove it from SETTINGS_ENV_OVERRIDE and restart to take the setting back.",
+    "pageUnsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
+    "pageDiscard": "Discard"
   },
   "setup": {
     "account": {

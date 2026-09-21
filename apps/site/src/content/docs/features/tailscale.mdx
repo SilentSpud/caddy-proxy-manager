@@ -14,7 +14,7 @@ and no change to your compose file.
 
 ## Setting it up
 
-Turn it on in **Settings → Tailscale**. The one thing it needs is a reusable auth key from the
+Turn it on in **Settings → Network → Tailscale**. The one thing it needs is a reusable auth key from the
 Tailscale admin console. If you would rather not store the key in the database, put a Caddy
 placeholder in the field instead - `{env.TS_AUTHKEY}` is passed through untouched and resolved from
 the container's environment.

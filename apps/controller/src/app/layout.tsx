@@ -5,7 +5,7 @@ import { getLocale, getMessages, getTimeZone, getTranslations } from "next-intl/
 import { getLocaleDirection } from "@astryxdesign/core/i18n";
 import "./globals.css";
 import Providers from "./providers";
-import { config } from "@/src/lib/config";
+import { getAppName } from "@/src/lib/app-name";
 import { LOCALE_COOKIE, parsePreference } from "@/src/lib/locale";
 import { THEME_COOKIE, parseThemeMode, themeAttr, themeColor } from "@/src/lib/theme-mode";
 
@@ -23,11 +23,11 @@ export async function generateViewport(): Promise<Viewport> {
 // A generateMetadata, so the description follows the reader's locale. It stays in <head> only
 // because next.config.mjs sets `htmlLimitedBots` - see there for what vinext does without it.
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("common");
+  const [t, appName] = await Promise.all([getTranslations("common"), getAppName()]);
   return {
     title: {
-      default: config.appName,
-      template: `%s · ${config.appName}`,
+      default: appName,
+      template: `%s · ${appName}`,
     },
     description: t("metaDescription"),
     // Pointed at the route unconditionally rather than looked up here: this is the root layout, so

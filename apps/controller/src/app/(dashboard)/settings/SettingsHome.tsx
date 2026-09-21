@@ -18,6 +18,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import type { SectionHealth } from "@/src/lib/settings/health";
+import { settingsHref } from "./sections";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import SettingsFrame from "./SettingsFrame";
 
@@ -107,7 +108,7 @@ export default function SettingsHome({ sections, attention, staged }: Props) {
                           {section.detail}
                         </Text>
                       </VStack>
-                      <Link href={`/settings/${section.id}`} style={{ flexShrink: 0 }}>
+                      <Link href={settingsHref(section.id)} style={{ flexShrink: 0 }}>
                         <Text type="body" color="accent">
                           {t("homeConfigure")}
                         </Text>
@@ -156,7 +157,7 @@ function SectionTile({ section }: { section: SectionHealth }) {
   const t = useTranslations("settings");
   return (
     <Link
-      href={`/settings/${section.id}`}
+      href={settingsHref(section.id)}
       style={{ textDecoration: "none", color: "inherit", display: "block" }}
       data-testid={`settings-tile-${section.id}`}
       data-status={section.status}

@@ -1,9 +1,9 @@
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { requireUser, getCurrentSessionId } from "@/src/lib/auth";
 import { getUserById, listUserOAuthProviders } from "@/src/lib/models/user";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { listApiTokens } from "@/src/lib/models/api-tokens";
 import { listUserSessions } from "@/src/lib/models/sessions";
-import { config } from "@/src/lib/config";
 import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import ProfileClient from "./ProfileClient";
@@ -53,7 +53,7 @@ export default async function ProfilePage() {
       enabledProviders={enabledProviders}
       apiTokens={apiTokens}
       sessions={sessions}
-      localPasswordsEnabled={!config.auth.disableLocalUsers}
+      localPasswordsEnabled={!(await localUsersDisabled())}
       avatar={resolveAvatar(user, 160, { gravatar: gravatarEnabled })}
     />
   );

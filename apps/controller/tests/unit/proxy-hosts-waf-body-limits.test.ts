@@ -124,6 +124,18 @@ describe('per-host WAF body limits', () => {
     ).rejects.toThrow(/out-of-range body limit/);
   });
 
+  it('refuses a custom directive the allowlist would silently drop', async () => {
+    await expect(
+      createProxyHost(
+        hostInput(
+          { ...validWaf, custom_directives: 'SecRuleUpdateActionById 9001 "deny"' },
+          'dropped-directive',
+        ),
+        1,
+      ),
+    ).rejects.toThrow(/would be dropped and never sent to Caddy/);
+  });
+
   it('rejects an unknown over-limit action', async () => {
     await expect(
       createProxyHost(

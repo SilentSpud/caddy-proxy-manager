@@ -18,7 +18,7 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { DateTimeInput, type ISODateTimeString } from "@astryxdesign/core/DateTimeInput";
@@ -30,7 +30,6 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Field } from "@astryxdesign/core/Field";
-import { Switch } from "@astryxdesign/core/Switch";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { CodeEditor } from "@/components/ui/CodeEditor";
@@ -1495,7 +1494,7 @@ export default function WafEventsClient({
                   isDisabled={Boolean(wafModuleDisabledReason)}
                 />
               </ModuleGated>
-              <CheckboxInput
+              <Switch
                 label={t("owaspCrsLabel")}
                 description={t("owaspCrsHelp")}
                 value={wafLoadOwaspCrs}

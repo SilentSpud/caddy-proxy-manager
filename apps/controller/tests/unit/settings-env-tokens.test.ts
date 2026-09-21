@@ -3,8 +3,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 
 /**
- * The settings catalog shows each section's environment variables as tokens beside its name, and
- * feeds the same strings to the search. A token is only worth showing if it names a variable that
+ * The settings screens show environment variables as tokens - beside a block's heading when the
+ * variable governs the block, and under a field when it sets that one field - and feed the same
+ * strings to the search. A token is only worth showing if it names a variable that
  * exists: a typo or a variable that was renamed out from under it sends an operator looking for a
  * line that is not there, and the search silently stops matching what they type.
  *
@@ -16,6 +17,12 @@ import { describe, expect, it } from 'bun:test';
 // The navigation catalogue, which the sidebar and the section pane both render from.
 const settingsClient = readFileSync(
   join(process.cwd(), 'src/app/(dashboard)/settings/sections.ts'),
+  'utf8',
+);
+
+// The blocks themselves, where a variable that sets one field is named under that field.
+const settingsBlocks = readFileSync(
+  join(process.cwd(), 'src/app/(dashboard)/settings/SettingsClient.tsx'),
   'utf8',
 );
 
@@ -47,16 +54,28 @@ function tokensIn(field: 'env' | 'envSearch'): string[] {
   return names;
 }
 
+/** The variables named on a field's own label line, as `<EnvLabelledField env={[...]}>`. */
+function fieldTokens(): string[] {
+  const names: string[] = [];
+  for (const use of settingsBlocks.matchAll(/<EnvLabelledField[^>]*?env=\{\[([^\]]*)\]\}/g)) {
+    for (const quoted of use[1].matchAll(/"([^"]+)"/g)) names.push(quoted[1]);
+  }
+  return names;
+}
+
 describe('settings environment tokens', () => {
   it('finds tokens to check', () => {
     // Guards the regexes above: a catalog refactor that renames the fields would otherwise leave
     // this file asserting nothing at all, quietly.
-    expect(tokensIn('env').length).toBeGreaterThan(15);
+    expect([...tokensIn('env'), ...fieldTokens()].length).toBeGreaterThan(15);
     expect(tokensIn('envSearch').length).toBeGreaterThan(0);
+    // Both shapes are in use, so a refactor that drops one fails here rather than going quiet.
+    expect(tokensIn('env').length).toBeGreaterThan(0);
+    expect(fieldTokens().length).toBeGreaterThan(0);
   });
 
   it('names only variables the deployment documents', () => {
-    const unknown = [...tokensIn('env'), ...tokensIn('envSearch')]
+    const unknown = [...tokensIn('env'), ...tokensIn('envSearch'), ...fieldTokens()]
       .filter((name) => !isWildcard(name))
       .filter((name) => !documented.has(name) && !FOREIGN.has(name));
 
@@ -73,6 +92,13 @@ describe('settings environment tokens', () => {
 
     expect(names.length).toBeGreaterThan(15);
     expect(names.filter((name) => !documented.has(name))).toEqual([]);
+  });
+
+  it('shows a variable in one place, not two', () => {
+    // A variable named under its field must not also sit beside the heading: the heading is for
+    // what governs the whole block, and saying it twice reads as two different settings.
+    const heading = new Set(tokensIn('env'));
+    expect(fieldTokens().filter((name) => heading.has(name))).toEqual([]);
   });
 
   it('backs every wildcard token with the members it stands for', () => {

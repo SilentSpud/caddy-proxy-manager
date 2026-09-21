@@ -375,6 +375,46 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
       },
     ],
   },
+  {
+    name: "rfc2136",
+    displayName: "RFC2136 (BIND / TSIG)",
+    description: "RFC 2136 dynamic DNS updates via a TSIG key (BIND 9 and compatible servers)",
+    docsUrl: "https://github.com/caddy-dns/rfc2136",
+    modulePath: "github.com/caddy-dns/rfc2136",
+    fields: [
+      {
+        key: "key_name",
+        label: "TSIG Key Name",
+        type: "string",
+        required: true,
+        placeholder: "my-transfer-key",
+        description: "Name of the TSIG key as defined on the DNS server.",
+      },
+      {
+        key: "key_alg",
+        label: "TSIG Algorithm",
+        type: "string",
+        required: true,
+        placeholder: "hmac-sha256",
+        description: "HMAC algorithm of the TSIG key, e.g. hmac-sha256, hmac-sha512 or hmac-md5.",
+      },
+      {
+        key: "key",
+        label: "TSIG Key Secret",
+        type: "password",
+        required: true,
+        description: "The base64 shared secret from the key statement, or from `tsig-keygen`.",
+      },
+      {
+        key: "server",
+        label: "DNS Server",
+        type: "string",
+        required: true,
+        placeholder: "1.2.3.4:53",
+        description: "Authoritative server that accepts RFC 2136 dynamic updates, as host:port.",
+      },
+    ],
+  },
 ];
 
 /**

@@ -20,9 +20,11 @@ import { Text } from "@astryxdesign/core/Text";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { useFormatter, useTranslations } from "next-intl";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { DiffLine } from "@/src/lib/settings/config-diff";
 import type { RevisionRow } from "@/src/lib/settings/apply";
+import { settingsHref } from "./sections";
 import { sectionForStorageKey, stagedChangeLabel } from "@/src/lib/settings/section-keys";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { applyStagedSettingsAction, discardStagedSettingsAction } from "./actions";
@@ -149,10 +151,34 @@ function ReviewSheet({
             {view.changes.map((change) => (
               <HStack key={change.key} gap={2} vAlign="start">
                 <VStack gap={0} style={{ flexGrow: 1, minWidth: 0 }}>
-                  <Text type="label">{stagedChangeLabel(t, change)}</Text>
-                  <Text type="supporting" color="secondary">
-                    {change.key}
-                  </Text>
+                  {/* The block it came from, as a way back to it: reviewing a change set and
+                      wanting another look at one of them is the same click either way. */}
+                  {change.sectionId ? (
+                    <Link href={settingsHref(change.sectionId)} onClick={onClose}>
+                      {stagedChangeLabel(t, change)}
+                    </Link>
+                  ) : (
+                    <Text type="label">{stagedChangeLabel(t, change)}</Text>
+                  )}
+                  {change.fields.length > 0 ? (
+                    // One link per field: the review sheet is where an operator asks "what did I
+                    // change", and the answer should be able to take them back to the control.
+                    <HStack gap={2} wrap="wrap">
+                      {change.fields.map((field) => (
+                        <Link
+                          key={field}
+                          href={`${settingsHref(change.sectionId ?? "")}?field=${encodeURIComponent(field)}`}
+                          onClick={onClose}
+                        >
+                          <Text type="supporting">{field}</Text>
+                        </Link>
+                      ))}
+                    </HStack>
+                  ) : (
+                    <Text type="supporting" color="secondary">
+                      {change.key}
+                    </Text>
+                  )}
                 </VStack>
                 <Button
                   variant="ghost"

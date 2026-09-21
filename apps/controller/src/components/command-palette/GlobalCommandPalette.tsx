@@ -28,6 +28,7 @@ import {
   SETTINGS_ITEMS,
   groupForSection,
   settingsGroupLabel,
+  settingsBlockName,
   settingsSectionDescription,
   settingsSectionName,
 } from "@/src/app/(dashboard)/settings/sections";
@@ -148,8 +149,13 @@ export function GlobalCommandPaletteProvider({
                 desc: settingsSectionDescription(tSettings, item),
                 keywords: [
                   group ? settingsGroupLabel(tSettings, group) : "",
-                  ...(item.env ?? []),
-                  ...(item.envSearch ?? []),
+                  // Every block's variables, and every block's name: a page is now found by
+                  // anything it carries, not only by what it is called.
+                  ...item.blocks.flatMap((block) => [
+                    settingsBlockName(tSettings, block.id),
+                    ...(block.env ?? []),
+                    ...(block.envSearch ?? []),
+                  ]),
                 ],
                 icon: item.icon,
               },

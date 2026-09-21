@@ -307,6 +307,7 @@ export default function OAuthProvidersSection({
 
       {providers.map((provider) => {
         const isFromEnv = provider.source === "env";
+        const isPrimary = primaryId === provider.id;
         return (
           <Card key={provider.id} padding={3}>
             <VStack gap={2}>
@@ -323,7 +324,7 @@ export default function OAuthProvidersSection({
                   {provider.roleMappingEnabled && <Badge label={t("groupRoles")} />}
                   {provider.syncGroups && <Badge label={t("groupSync")} />}
                   {!provider.enabled && <Badge variant="warning" label={t("disabled")} />}
-                  {primaryId === provider.id && provider.enabled && (
+                  {isPrimary && provider.enabled && (
                     <Badge variant="pink" label={t("primaryProvider")} />
                   )}
                 </HStack>
@@ -336,10 +337,17 @@ export default function OAuthProvidersSection({
                   <IconButton
                     variant="secondary"
                     size="sm"
-                    label={primaryId === provider.id ? t("clearPrimary") : t("makePrimary")}
-                    icon={<Star />}
+                    label={isPrimary ? t("clearPrimary") : t("makePrimary")}
+                    // Filled and pink once it is the primary, so the row says which provider that
+                    // is from the button that sets it - the same pink the badge beside it uses.
+                    icon={
+                      <Star
+                        fill={isPrimary ? "currentColor" : "none"}
+                        style={isPrimary ? { color: "var(--color-text-pink)" } : undefined}
+                      />
+                    }
                     isDisabled={!provider.enabled}
-                    tooltip={primaryId === provider.id ? t("clearPrimary") : t("makePrimary")}
+                    tooltip={isPrimary ? t("clearPrimary") : t("makePrimary")}
                     onClick={() => handleSetPrimary(provider)}
                   />
                   <IconButton

@@ -27,6 +27,7 @@ import {
   saveGeneralSettings,
   saveAcmeSettings,
   saveAuthentikSettings,
+  saveForwardAuthSettings,
   saveMetricsSettings,
   saveLoggingSettings,
   saveDnsSettings,
@@ -496,6 +497,43 @@ async function updateAuthentikSettingsActionUnlocked(
 }
 
 /**
+ * Defaults a new host's forward-auth block is prefilled from. Nothing is applied from here: the
+ * host carries its own block, and this only saves the operator typing one address per host.
+ */
+async function updateForwardAuthSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const providerRaw = String(formData.get("forwardAuthProvider") ?? "").trim();
+    const provider = providerRaw === "custom" ? "custom" : "authelia";
+    const authUpstream = String(formData.get("forwardAuthUpstream") ?? "").trim();
+    const authEndpoint = String(formData.get("forwardAuthEndpoint") ?? "").trim();
+
+    if (!authUpstream) {
+      return { success: false, message: t("results.forwardAuthRequired") };
+    }
+
+    await saveForwardAuthSettings({
+      provider,
+      authUpstream,
+      authEndpoint: authEndpoint.length > 0 ? authEndpoint : undefined,
+    });
+
+    revalidatePath("/settings");
+    return { success: true, message: t("results.forwardAuthSaved") };
+  } catch (error) {
+    console.error("Failed to save forward auth settings:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.forwardAuthFailed")),
+    };
+  }
+}
+
+/**
  * Tailscale node defaults.
  *
  * An empty secret field means "keep the stored one", for both the auth key and the API access
@@ -763,6 +801,89 @@ async function updateFaviconActionUnlocked(
       success: false,
       message: await errorText(error, t("results.faviconFailed")),
     };
+  }
+}
+
+/**
+ * Save one block of registry settings.
+ *
+ * Generic over the block, because the fields are generated from the definitions rather than
+ * written out: the form posts each value under its setting key, and the block says which keys it
+ * is allowed to have posted. Anything else in the payload is ignored rather than refused - React
+ * posts its own bookkeeping fields through every form.
+ *
+ * `saveSettings` does the validating, and does it for the whole batch before writing any of it,
+ * so a form with one bad field leaves the rest as they were.
+ */
+async function updateRegistrySettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+
+    const block = String(formData.get("registryBlock") ?? "");
+    const [
+      { REGISTRY_BLOCK_KEYS },
+      { SETTINGS_BY_KEY, SettingValidationError },
+      { isEnvOverridden, saveSettings },
+    ] = await Promise.all([
+      import("./registry-fields"),
+      import("@/src/lib/settings/registry"),
+      import("@/src/lib/settings/resolve"),
+    ]);
+
+    const keys = REGISTRY_BLOCK_KEYS[block];
+    if (!keys) {
+      return { success: false, message: t("results.registryUnknownBlock") };
+    }
+
+    const values: Record<string, unknown> = {};
+    for (const key of keys) {
+      const definition = SETTINGS_BY_KEY.get(key);
+      if (!definition) continue;
+      // A setting whose variable overrides it is drawn disabled, so it posts nothing - and for a
+      // checkbox "nothing" would otherwise be stored as false. Skipped rather than stored: what
+      // is written would be ignored while the variable is set and would take effect the moment
+      // it was removed, which is not what anyone asked for.
+      if (isEnvOverridden(definition)) continue;
+
+      const posted = formData.get(key);
+      // A checkbox posts nothing when it is clear, which is the whole of its answer. Every other
+      // kind absent means the field was not on this form, so it is left as it is.
+      if (typeof definition.default === "boolean") {
+        values[key] = posted === "on" || posted === "true";
+      } else if (typeof posted === "string") {
+        values[key] = posted;
+      }
+    }
+
+    try {
+      await saveSettings(values);
+    } catch (error) {
+      if (error instanceof SettingValidationError) {
+        const [tRoot, { settingValidationMessage }] = await Promise.all([
+          getTranslations(),
+          import("@/src/lib/settings/messages"),
+        ]);
+        return { success: false, message: settingValidationMessage(tRoot, error) };
+      }
+      throw error;
+    }
+
+    // The auth instance is built from these once and cached, so it has to be dropped or the
+    // policy that is live stays the one from before the save.
+    const { invalidateProviderCache } = await import("@/src/lib/auth-server");
+    invalidateProviderCache();
+
+    // "layout" scope: the application name and the sign-in policy are read by the root layout and
+    // the dashboard shell, not only by the form that just changed them.
+    revalidatePath("/", "layout");
+    return { success: true, message: t("results.registrySaved") };
+  } catch (error) {
+    console.error("Failed to save registry settings:", error);
+    return { success: false, message: await errorText(error, t("results.registryFailed")) };
   }
 }
 
@@ -1824,6 +1945,9 @@ export const updateDnsProviderSettingsAction = stagedSettingsAction(
 export const updateAuthentikSettingsAction = stagedSettingsAction(
   updateAuthentikSettingsActionUnlocked,
 );
+export const updateForwardAuthSettingsAction = stagedSettingsAction(
+  updateForwardAuthSettingsActionUnlocked,
+);
 export const updateMetricsSettingsAction = stagedSettingsAction(
   updateMetricsSettingsActionUnlocked,
 );
@@ -1868,6 +1992,11 @@ export const updateCaddyBuildSettingsAction = serializedSettingsAction(
 );
 export const updateFaviconAction = serializedSettingsAction(updateFaviconActionUnlocked);
 export const updateUpdateSettingsAction = stagedSettingsAction(updateUpdateSettingsActionUnlocked);
+// Not staged: these settings are the app's own - a name, a URL, who may sign in - and none of
+// them reaches a Caddy config, so there is nothing for "Review & apply" to apply.
+export const updateRegistrySettingsAction = serializedSettingsAction(
+  updateRegistrySettingsActionUnlocked,
+);
 export const checkForUpdatesAction = serializedSettingsAction(checkForUpdatesActionUnlocked);
 export const updateAnalyticsSettingsAction = serializedSettingsAction(
   updateAnalyticsSettingsActionUnlocked,

@@ -8,7 +8,12 @@ import { getTrafficByProxyHost } from "@/src/lib/analytics-db";
 import { listCertificates } from "@/src/lib/models/certificates";
 import { listCaCertificates } from "@/src/lib/models/ca-certificates";
 import { listAccessLists } from "@/src/lib/models/access-lists";
-import { getAuthentikSettings, getGeneralSettings, getTailscaleSettings } from "@/src/lib/settings";
+import {
+  getAuthentikSettings,
+  getForwardAuthSettings,
+  getGeneralSettings,
+  getTailscaleSettings,
+} from "@/src/lib/settings";
 import { listMtlsRoles } from "@/src/lib/models/mtls-roles";
 import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-certificates";
 import { listUsers } from "@/src/lib/models/user";
@@ -70,6 +75,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     caCertificates,
     accessLists,
     authentikDefaults,
+    forwardAuthDefaults,
     tailscaleSettings,
     generalSettings,
     agents,
@@ -86,6 +92,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     listCaCertificates(),
     listAccessLists(),
     getAuthentikSettings(),
+    getForwardAuthSettings(),
     getTailscaleSettings(),
     getGeneralSettings(),
     listAgentOptions().catch(() => []),
@@ -145,6 +152,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       caCertificates={caCertificates}
       accessLists={accessLists}
       authentikDefaults={authentikDefaults}
+      forwardAuthDefaults={forwardAuthDefaults}
       // Prefills the domains field of a new host. Empty when setup has not run, which is the
       // same as having no default: the field simply starts blank.
       defaultDomain={generalSettings?.defaultDomain ?? ""}

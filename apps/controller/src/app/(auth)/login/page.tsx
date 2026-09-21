@@ -1,7 +1,8 @@
+import { localUsersDisabled } from "@/src/lib/auth-policy";
+import { getAppName } from "@/src/lib/app-name";
 import { redirect } from "next/navigation";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
-import { config } from "@/src/lib/config";
 import LoginClient from "@/src/components/auth/LoginClient";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
@@ -33,8 +34,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <LoginClient
       enabledProviders={enabledProviders}
-      localLoginEnabled={!config.auth.disableLocalUsers}
-      appName={config.appName}
+      localLoginEnabled={!(await localUsersDisabled())}
+      appName={await getAppName()}
       initialError={oauthError}
     />
   );

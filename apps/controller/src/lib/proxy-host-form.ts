@@ -5,7 +5,9 @@
  * the dashboard host in Settings renders the same fields - so it has to read them the same way.
  */
 import {
+  type ForwardAuthProvider,
   type ProxyHostAuthentikInput,
+  type ProxyHostForwardAuthInput,
   type ProxyHostInput,
   type LoadBalancerInput,
   type LoadBalancingPolicy,
@@ -118,6 +120,59 @@ export function parseAuthentikConfig(formData: FormData): ProxyHostAuthentikInpu
   }
   if (setHostHeader !== undefined) {
     result.setOutpostHostHeader = setHostHeader;
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
+ * The host's generic forward-auth block.
+ *
+ * Every field is read only when the form rendered it, the way the Authentik and Tailscale parsers
+ * do: a dialog that hides the advanced options must not clear what is stored behind them.
+ */
+export function parseForwardAuthConfig(formData: FormData): ProxyHostForwardAuthInput | undefined {
+  if (!formData.has("forwardAuthPresent")) {
+    return undefined;
+  }
+
+  const enabledValue = formData.has("forwardAuthEnabledPresent")
+    ? parseCheckbox(formData.get("forwardAuthEnabled"))
+    : undefined;
+  const provider = parseOptionalText(formData.get("forwardAuthProvider"));
+  const authUpstream = parseOptionalText(formData.get("forwardAuthUpstream"));
+  const authEndpoint = parseOptionalText(formData.get("forwardAuthEndpoint"));
+  const copyHeaders = parseCsv(formData.get("forwardAuthCopyHeaders"));
+  const trustedProxies = parseCsv(formData.get("forwardAuthTrustedProxies"));
+  const apiBypassHeaders = parseCsv(formData.get("forwardAuthApiBypassHeaders"));
+  const protectedPaths = parseCsv(formData.get("forwardAuthProtectedPaths"));
+  const excludedPaths = parseCsv(formData.get("forwardAuthExcludedPaths"));
+  const apiSplit = formData.has("forwardAuthApiSplitPresent")
+    ? parseCheckbox(formData.get("forwardAuthApiSplit"))
+    : undefined;
+
+  const result: ProxyHostForwardAuthInput = {};
+  if (enabledValue !== undefined) result.enabled = enabledValue;
+  // An unknown string is passed through rather than dropped: the model decides what a provider
+  // may be, and silently ignoring it here would store a host under the wrong preset.
+  if (provider !== null) result.provider = provider as ForwardAuthProvider;
+  if (authUpstream !== null) result.authUpstream = authUpstream;
+  if (authEndpoint !== null) result.authEndpoint = authEndpoint;
+  if (copyHeaders.length > 0 || formData.has("forwardAuthCopyHeaders")) {
+    result.copyHeaders = copyHeaders;
+  }
+  if (trustedProxies.length > 0 || formData.has("forwardAuthTrustedProxies")) {
+    result.trustedProxies = trustedProxies;
+  }
+  if (apiSplit !== undefined) result.apiSplit = apiSplit;
+  if (apiBypassHeaders.length > 0 || formData.has("forwardAuthApiBypassHeaders")) {
+    result.apiBypassHeaders = apiBypassHeaders;
+  }
+  if (protectedPaths.length > 0 || formData.has("forwardAuthProtectedPaths")) {
+    result.protectedPaths = protectedPaths;
+  }
+  if (excludedPaths.length > 0 || formData.has("forwardAuthExcludedPaths")) {
+    result.excludedPaths = excludedPaths;
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
@@ -728,6 +783,7 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
       ? parseOptionalText(formData.get("customCaddyfile"))
       : undefined,
     authentik: parseAuthentikConfig(formData),
+    forwardAuth: parseForwardAuthConfig(formData),
     cpmForwardAuth: parseCpmForwardAuthConfig(formData),
     tailscale: parseTailscaleConfig(formData),
     loadBalancer: parseLoadBalancerConfig(formData),

@@ -143,7 +143,7 @@ describe('a rogue agent', () => {
     const restarted = await startFakeAgent({ caddyAdmin: configured });
     const steady = await startFakeAgent({ caddyAdmin: configured });
     const settled = (agent: FakeAgent) =>
-      getMonitorState()[agent.agentId]?.lastConfigId === 'configured' &&
+      getMonitorState()[agent.agentId]?.lastConfigId !== null &&
       !getMonitorState()[agent.agentId]?.reapplyPending;
 
     // The first sighting re-applies each Caddy once; let that settle before the restart.
@@ -152,12 +152,34 @@ describe('a rogue agent', () => {
     const steadyLoads = loadsOn(steady).length;
     const restartedLoads = loadsOn(restarted).length;
 
-    // An empty config reads as "Caddy restarted", which is what triggers a re-apply.
-    restarted.state.caddyAdmin = { status: 200, text: '{}' };
+    // Serving anything but the config it was given reads as "Caddy restarted", which is what
+    // triggers a re-apply - here the default Caddyfile's own non-empty http app.
+    restarted.state.caddyAdmin = {
+      status: 200,
+      text: '{"apps":{"http":{"servers":{"srv0":{"listen":[":80"]}}}}}',
+    };
     await checkCaddyHealth(0);
     await waitFor(() => loadsOn(restarted).length > restartedLoads);
 
     expect(loadsOn(steady)).toHaveLength(steadyLoads);
+  });
+
+  it('leaves a Caddy alone while it still serves the config it was given', async () => {
+    const agent = await startFakeAgent({
+      caddyAdmin: { status: 200, text: '{"apps":{"http":{"servers":{}}}}' },
+    });
+
+    await checkCaddyHealth(0);
+    await waitFor(
+      () =>
+        getMonitorState()[agent.agentId]?.lastConfigId !== null &&
+        !getMonitorState()[agent.agentId]?.reapplyPending,
+    );
+    const loads = loadsOn(agent).length;
+
+    await checkCaddyHealth(0);
+    await checkCaddyHealth(0);
+    expect(loadsOn(agent)).toHaveLength(loads);
   });
 
   it('re-applies each Caddy once when the monitor first sees it', async () => {

@@ -8,6 +8,8 @@ import {
   buildWafHandler,
   buildWafHandlerEntry,
   CORAZA_MAX_BODY_LIMIT,
+  droppedWafDirectiveDetails,
+  filterCustomDirectives,
   findInvalidBodyLimitDirective,
   parseBodyLimitMib,
   resolveEffectiveWaf,
@@ -571,6 +573,70 @@ describe('findInvalidBodyLimitDirective', () => {
     ).toBeNull();
     expect(findInvalidBodyLimitDirective('')).toBeNull();
     expect(findInvalidBodyLimitDirective(undefined)).toBeNull();
+  });
+});
+
+// A dropped line used to vanish without a word, which is how "SecRuleUpdateActionById does
+// nothing" reads as a CPM bug rather than a refused directive (upstream discussion #146).
+describe('filterCustomDirectives', () => {
+  it('keeps allowed directives, comments and blank lines', () => {
+    const raw = [
+      '# raise the ceiling',
+      '',
+      'SecRule ARGS "@contains evil" "id:9001,deny"',
+      'SecAction "id:9002,pass,nolog"',
+      'SecMarker END_CHECKS',
+      'SecDefaultAction "phase:1,log,auditlog,pass"',
+      'SecRequestBodyLimit 536870912',
+      'SecRequestBodyLimitAction ProcessPartial',
+    ].join('\n');
+
+    const { kept, dropped } = filterCustomDirectives(raw);
+
+    expect(dropped).toEqual([]);
+    expect(kept.join('\n')).toBe(raw);
+  });
+
+  it('names each dropped line and why it went', () => {
+    const { kept, dropped } = filterCustomDirectives(
+      [
+        'Include /etc/passwd',
+        'SecRuleUpdateActionById 9001 "deny"',
+        'SecRuleEngine Off',
+        'SecRequestBodyLimit 10737418240',
+        'SecRequestBodyAccess Off',
+        'SecRule ARGS "@rx x" "id:9003,ctl:ruleEngine=Off"',
+        'SecRule ARGS "@contains evil" "id:9004,deny"',
+      ].join('\n'),
+    );
+
+    expect(kept).toEqual(['SecRule ARGS "@contains evil" "id:9004,deny"']);
+    expect(dropped).toEqual([
+      { line: 'Include /etc/passwd', reason: 'wafDirectiveDroppedInclude' },
+      { line: 'SecRuleUpdateActionById 9001 "deny"', reason: 'wafDirectiveDroppedRuleMutation' },
+      { line: 'SecRuleEngine Off', reason: 'wafDirectiveDroppedRuleMutation' },
+      { line: 'SecRequestBodyLimit 10737418240', reason: 'wafDirectiveDroppedBodyLimit' },
+      { line: 'SecRequestBodyAccess Off', reason: 'wafDirectiveDroppedNotAllowed' },
+      {
+        line: 'SecRule ARGS "@rx x" "id:9003,ctl:ruleEngine=Off"',
+        reason: 'wafDirectiveDroppedCtlRuleEngine',
+      },
+    ]);
+  });
+
+  it('reads nothing out of blank input', () => {
+    expect(filterCustomDirectives('')).toEqual({ kept: [], dropped: [] });
+    expect(filterCustomDirectives('   ')).toEqual({ kept: [], dropped: [] });
+    expect(filterCustomDirectives(undefined)).toEqual({ kept: [], dropped: [] });
+  });
+
+  it('renders each reason as a sentence naming the line', () => {
+    const { dropped } = filterCustomDirectives('Include /etc/passwd');
+    expect(droppedWafDirectiveDetails(dropped)).toEqual([
+      '"Include /etc/passwd" - Include is not allowed (it would read arbitrary files from the container filesystem)',
+    ]);
+    const outOfRange = filterCustomDirectives('SecRequestBodyLimit 10737418240').dropped;
+    expect(droppedWafDirectiveDetails(outOfRange)[0]).toContain('between 1024 and 1073741824');
   });
 });
 

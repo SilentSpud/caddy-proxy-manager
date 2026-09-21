@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { Resolver } from "node:dns/promises";
 import { buildDashboardHostRow } from "./dashboard-host";
@@ -169,6 +170,25 @@ const DEFAULT_AUTHENTIK_HEADERS = [
 
 const DEFAULT_AUTHENTIK_TRUSTED_PROXIES = ["private_ranges"];
 
+/**
+ * The Authelia preset for the generic forward-auth provider. Mirrored in models/proxy-hosts.ts,
+ * which is where a stored block gets them; this file reads the stored blob, never the model.
+ */
+const DEFAULT_AUTHELIA_FORWARD_AUTH_ENDPOINT = "/api/authz/forward-auth";
+const DEFAULT_AUTHELIA_FORWARD_AUTH_HEADERS = [
+  "Remote-User",
+  "Remote-Groups",
+  "Remote-Email",
+  "Remote-Name",
+  "Remote-IP",
+];
+
+/**
+ * An RFC 7230 header name. Copy and bypass header names are interpolated into Caddy placeholders
+ * and into matcher keys, so nothing free-form may reach them.
+ */
+const HEADER_NAME_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
 export type ProxyHostRow = {
   id: number;
   name: string;
@@ -204,6 +224,20 @@ type CpmForwardAuthMeta = {
   excluded_paths?: string[];
 };
 
+/** Mirror of the model's ForwardAuthMeta for an auth server this app does not run itself. */
+type ForwardAuthMeta = {
+  enabled?: boolean;
+  provider?: string;
+  auth_upstream?: string;
+  auth_endpoint?: string;
+  copy_headers?: string[];
+  trusted_proxies?: string[];
+  api_split?: boolean;
+  api_bypass_headers?: string[];
+  protected_paths?: string[];
+  excluded_paths?: string[];
+};
+
 /** Mirror of the model's TailscaleMeta; this file reads the stored blob, never the model. */
 type TailscaleMeta = {
   serve?: boolean;
@@ -231,6 +265,7 @@ type ProxyHostMeta = {
   custom_caddyfile?: string;
   authentik?: ProxyHostAuthentikMeta;
   cpm_forward_auth?: CpmForwardAuthMeta;
+  forward_auth?: ForwardAuthMeta;
   tailscale?: TailscaleMeta;
   load_balancer?: LoadBalancerMeta;
   dns_resolver?: DnsResolverMeta;
@@ -276,6 +311,22 @@ type AuthentikRouteConfig = {
   copyHeaders: string[];
   trustedProxies: string[];
   setOutpostHostHeader: boolean;
+  protectedPaths: string[] | null;
+  excludedPaths: string[] | null;
+};
+
+type ForwardAuthRouteConfig = {
+  provider: "authelia" | "custom";
+  /** host:port the auth subrequest dials, taken from the auth server's URL. */
+  dialAddress: string;
+  /** URI the auth subrequest is rewritten to. May carry a query string. */
+  authEndpoint: string;
+  copyHeaders: string[];
+  trustedProxies: string[];
+  /** Answer a non-browser caller with 401 rather than the auth server's portal redirect. */
+  apiSplit: boolean;
+  /** A request carrying any of these headers skips forward auth entirely. */
+  apiBypassHeaders: string[];
   protectedPaths: string[] | null;
   excludedPaths: string[] | null;
 };
@@ -1093,6 +1144,16 @@ function resolveMtlsPathMode(
   return { type: "full" };
 }
 
+/**
+ * A request a browser made: it asked for HTML, and it is not the XHR an in-page script sends.
+ * Everything else - an API client, a WebSocket handshake, curl - falls outside it.
+ */
+const BROWSER_REQUEST_MATCHER: Record<string, unknown> = {
+  header: { Accept: ["*text/html*"] },
+  // Caddy's `not` takes an array of matcher sets.
+  not: [{ header: { "X-Requested-With": ["*"] } }],
+};
+
 function appendForwardAuthPathModeRoutes(options: {
   hostRoutes: CaddyHttpRoute[];
   domainGroups: string[][];
@@ -1105,6 +1166,18 @@ function appendForwardAuthPathModeRoutes(options: {
   preserveHostHeader: boolean;
   preDomainRoute?: CaddyHttpRoute | null;
   protectedModePreRoutePlacement?: "before" | "after";
+  /**
+   * The authenticator for callers that are not browsers. Given one, every gated match is emitted
+   * twice - a browser-only route carrying `authHandler`, then an unmatched fallback carrying this
+   * one - so the two kinds of caller get the answer each can act on. Without it a single route
+   * treats them alike.
+   */
+  apiAuthHandler?: Record<string, unknown> | null;
+  /**
+   * Header names whose presence skips authentication entirely: the upstream is expected to check
+   * the credential itself. These routes come first, so they win over every gated one.
+   */
+  bypassHeaders?: string[];
 }) {
   const {
     hostRoutes,
@@ -1118,9 +1191,46 @@ function appendForwardAuthPathModeRoutes(options: {
     preserveHostHeader,
     preDomainRoute,
     protectedModePreRoutePlacement = "before",
+    apiAuthHandler = null,
+    bypassHeaders = [],
   } = options;
 
+  /**
+   * One gated match, as one route or as the browser/non-browser pair. The pair is ordered
+   * browser-first: Caddy takes the first route that matches, and the fallback deliberately has no
+   * matcher of its own beyond the match being gated.
+   */
+  const pushGatedRoutes = (matcher: Record<string, unknown>, proxy: Record<string, unknown>) => {
+    if (!apiAuthHandler) {
+      hostRoutes.push({
+        match: [matcher],
+        handle: [...baseHandlers, authHandler, proxy],
+        terminal: true,
+      });
+      return;
+    }
+    hostRoutes.push({
+      match: [{ ...matcher, ...BROWSER_REQUEST_MATCHER }],
+      handle: [...baseHandlers, authHandler, proxy],
+      terminal: true,
+    });
+    hostRoutes.push({
+      match: [{ ...matcher }],
+      handle: [...baseHandlers, apiAuthHandler, cloneJson(proxy)],
+      terminal: true,
+    });
+  };
+
   for (const domainGroup of domainGroups) {
+    // Before anything gated, including the pre-domain route: a caller holding the credential the
+    // upstream checks must never be sent to the auth server at all.
+    for (const bypassHeader of bypassHeaders) {
+      hostRoutes.push({
+        match: [{ host: domainGroup, header: { [bypassHeader]: ["*"] } }],
+        handle: [...baseHandlers, cloneJson(reverseProxyHandler)],
+        terminal: true,
+      });
+    }
     const pushPreDomainRoute = () => {
       if (preDomainRoute) {
         hostRoutes.push(attachHostToRoute(preDomainRoute, domainGroup));
@@ -1131,11 +1241,10 @@ function appendForwardAuthPathModeRoutes(options: {
       if (protectedModePreRoutePlacement === "before") pushPreDomainRoute();
 
       for (const protectedPath of authMode.paths) {
-        hostRoutes.push({
-          match: [{ host: domainGroup, path: [protectedPath] }],
-          handle: [...baseHandlers, authHandler, cloneJson(reverseProxyHandler)],
-          terminal: true,
-        });
+        pushGatedRoutes(
+          { host: domainGroup, path: [protectedPath] },
+          cloneJson(reverseProxyHandler),
+        );
       }
 
       if (protectedModePreRoutePlacement === "after") pushPreDomainRoute();
@@ -1170,20 +1279,30 @@ function appendForwardAuthPathModeRoutes(options: {
       }
     }
 
-    appendLocationRoutes({
-      hostRoutes,
-      domainGroup,
-      locationRules,
-      skipHttpsHostnameValidation,
-      preserveHostHeader,
-      handlers: baseHandlers,
-      extraHandlers: [authHandler],
-    });
-    hostRoutes.push({
-      match: [{ host: domainGroup }],
-      handle: [...baseHandlers, authHandler, reverseProxyHandler],
-      terminal: true,
-    });
+    if (apiAuthHandler) {
+      // The same split, one location rule at a time: appendLocationRoutes emits a single route per
+      // rule, and each of those needs its own browser and non-browser pair.
+      for (const rule of locationRules) {
+        const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
+          rule,
+          skipHttpsHostnameValidation,
+          preserveHostHeader,
+        );
+        if (!safePath) continue;
+        pushGatedRoutes({ host: domainGroup, path: [safePath] }, locationProxy);
+      }
+    } else {
+      appendLocationRoutes({
+        hostRoutes,
+        domainGroup,
+        locationRules,
+        skipHttpsHostnameValidation,
+        preserveHostHeader,
+        handlers: baseHandlers,
+        extraHandlers: [authHandler],
+      });
+    }
+    pushGatedRoutes({ host: domainGroup }, reverseProxyHandler);
   }
 }
 
@@ -1400,6 +1519,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     if (tailscale?.upstreamNode) tailscaleNodes.add(tailscale.upstreamNode);
 
     const authentik = parseAuthentikConfig(meta.authentik);
+    const forwardAuth = parseForwardAuthConfig(meta.forward_auth);
     const cpmForwardAuth = meta.cpm_forward_auth?.enabled ? meta.cpm_forward_auth : null;
     const locationRules = meta.location_rules ?? [];
     const hostRoutes: CaddyHttpRoute[] = [];
@@ -1797,9 +1917,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
 
       // Create the forward auth reverse_proxy handler
       // Convert "private_ranges" to actual CIDR blocks for JSON config
-      const trustedProxies = authentik.trustedProxies.includes("private_ranges")
-        ? ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "fd00::/8", "::1/128"]
-        : authentik.trustedProxies;
+      const trustedProxies = expandPrivateRanges(authentik.trustedProxies);
 
       // Parse the outpost upstream into host:port for dial, dropping scheme and slashes
       let dialAddress = authentik.outpostUpstream.replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -1853,6 +1971,42 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         preserveHostHeader: Boolean(row.preserveHostHeader),
         preDomainRoute: outpostRoute,
         protectedModePreRoutePlacement: "after",
+      });
+    } else if (forwardAuth) {
+      // ── Generic forward auth ─────────────────────────────────────────
+      // An auth server this app does not run: Authelia, tinyauth, anything that answers a
+      // forward-auth subrequest. Second of the mutually exclusive integrations, so a host that
+      // configured Authentik never reaches here.
+      //
+      // The strip handler goes on the shared chain, so it runs on excluded and whitelisted paths
+      // too. Those authenticate nothing, and the copy step only overwrites a header when the auth
+      // server answered with a value - without the strip, a caller could set Remote-User itself
+      // and the upstream could not tell the difference. Same reasoning as the X-Cpm-* strip below.
+      const forwardAuthHandlers =
+        forwardAuth.copyHeaders.length > 0
+          ? [
+              {
+                handler: "headers",
+                request: { delete: [...forwardAuth.copyHeaders] },
+              } as Record<string, unknown>,
+              ...handlers,
+            ]
+          : handlers;
+
+      appendForwardAuthPathModeRoutes({
+        hostRoutes,
+        domainGroups,
+        authMode: resolvePathAuthMode(forwardAuth.protectedPaths, forwardAuth.excludedPaths),
+        baseHandlers: forwardAuthHandlers,
+        authHandler: buildGenericForwardAuthHandler(forwardAuth, false),
+        apiAuthHandler: forwardAuth.apiSplit
+          ? buildGenericForwardAuthHandler(forwardAuth, true)
+          : null,
+        bypassHeaders: forwardAuth.apiBypassHeaders,
+        reverseProxyHandler,
+        locationRules,
+        skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
+        preserveHostHeader: Boolean(row.preserveHostHeader),
       });
     } else if (cpmForwardAuth) {
       // ── CPM Forward Auth ────────────────────────────────────────────
@@ -3438,6 +3592,57 @@ function assertCaddyAccepted(response: { status: number; text: string }, who: st
 }
 
 /**
+ * What each Caddy was serving immediately after this controller last loaded it, keyed by agent
+ * ("" for the Caddy reached with no agent attached).
+ *
+ * The health monitor compares this against the config a Caddy is actually serving. A hash is the
+ * only signal that holds: Caddy answers `/config/` with an ETag whichever config it holds, and a
+ * container that came back on the image's default Caddyfile serves a perfectly non-empty `http`
+ * app - so "did the ETag go" and "is the config empty" both miss a real drift. What is compared is
+ * the config Caddy reports, not the document that was posted, because Caddy normalises what it
+ * stores and the two would never match.
+ */
+const appliedConfigHashes = new Map<string, string>();
+
+/** The fingerprint recorded by the last successful load onto this Caddy, if there was one. */
+export function getLastAppliedConfigHash(agentId?: string): string | null {
+  return appliedConfigHashes.get(agentId ?? "") ?? null;
+}
+
+/** Fingerprint of what a Caddy is serving right now, or null when it cannot be asked. */
+export async function getCaddyLiveConfigHash(agentId?: string): Promise<string | null> {
+  try {
+    const response = await caddyAdminRequest({
+      path: "/config/",
+      method: "GET",
+      timeoutMs: 5000,
+      agentId,
+    });
+    if (response.status < 200 || response.status >= 300) return null;
+    return createHash("sha256").update(response.text).digest("hex");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Record what a Caddy serves now that a load has been accepted. Failing to read it back only
+ * forgets the fingerprint: the monitor then treats that Caddy as one it has nothing to compare
+ * against, which is where it started.
+ */
+async function noteAppliedConfig(agentId?: string): Promise<void> {
+  const key = agentId ?? "";
+  const hash = await getCaddyLiveConfigHash(agentId);
+  if (hash) appliedConfigHashes.set(key, hash);
+  else appliedConfigHashes.delete(key);
+}
+
+/** Test seam: forget every recorded fingerprint. */
+export function resetAppliedConfigHashes(): void {
+  appliedConfigHashes.clear();
+}
+
+/**
  * Build the configuration and load it onto every agent's Caddy.
  *
  * A document per agent, not one for the fleet. The controller's database is still the single
@@ -3488,6 +3693,9 @@ export async function applyCaddyConfig() {
     if (!result.ok) continue;
     assertCaddyAccepted(result.value, result.agent);
   }
+
+  // Every agent accepted, so record what each is serving for the monitor to compare against.
+  await Promise.all(targets.map((target) => noteAppliedConfig(target.agentId)));
 }
 
 /**
@@ -3517,6 +3725,7 @@ async function loadOne(
     throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
   }
   assertCaddyAccepted(response, who);
+  await noteAppliedConfig(agent?.agentId);
 }
 
 /**
@@ -3627,6 +3836,149 @@ function parseAuthentikConfig(
     protectedPaths,
     excludedPaths,
   };
+}
+
+/**
+ * Reads the generic forward-auth block into what the routes need, or null when the host must not
+ * be published with it.
+ *
+ * Null is fail-closed only because of where it is used: the branch that emits these routes is
+ * chosen by the same parse, so a host whose block will not parse falls through to being published
+ * *unauthenticated*. That is why the model refuses to store an enabled block it cannot complete -
+ * by the time the config is built the only remaining answer is a bad one. This re-validates
+ * anyway: it reads the raw meta JSON, which a sync from an older master or a hand-edited row can
+ * put anything into.
+ */
+function parseForwardAuthConfig(
+  meta: ForwardAuthMeta | undefined | null,
+): ForwardAuthRouteConfig | null {
+  if (!meta?.enabled) return null;
+
+  const upstreamRaw = typeof meta.auth_upstream === "string" ? meta.auth_upstream.trim() : "";
+  if (!upstreamRaw) return null;
+
+  let dialAddress: string;
+  try {
+    const url = new URL(upstreamRaw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    dialAddress = `${url.hostname}:${url.port || (url.protocol === "https:" ? "443" : "80")}`;
+  } catch {
+    return null;
+  }
+
+  const provider = meta.provider === "custom" ? "custom" : "authelia";
+  const endpointRaw = stripCaddyPlaceholders(
+    typeof meta.auth_endpoint === "string" ? meta.auth_endpoint.trim() : "",
+  );
+  const authEndpoint =
+    endpointRaw || (provider === "authelia" ? DEFAULT_AUTHELIA_FORWARD_AUTH_ENDPOINT : "");
+  // A relative URI, and nothing that could split the request line: a control character in
+  // there would be interpolated straight into the rewrite Caddy performs.
+  if (!authEndpoint.startsWith("/")) return null;
+  if ([...authEndpoint].some((char) => char < " " || char === "\u007f")) return null;
+
+  const headerList = (values: unknown): string[] =>
+    Array.isArray(values)
+      ? values
+          .map((value) => (typeof value === "string" ? value.trim() : ""))
+          .filter((value) => value && HEADER_NAME_PATTERN.test(value))
+          .map(canonicalHeaderName)
+      : [];
+
+  const copyHeadersRaw = headerList(meta.copy_headers);
+  const copyHeaders =
+    copyHeadersRaw.length > 0
+      ? copyHeadersRaw
+      : provider === "authelia"
+        ? [...DEFAULT_AUTHELIA_FORWARD_AUTH_HEADERS]
+        : [];
+
+  const trustedProxiesRaw =
+    Array.isArray(meta.trusted_proxies) && meta.trusted_proxies.length > 0
+      ? meta.trusted_proxies
+          .map((proxy) => proxy?.trim())
+          .filter((proxy): proxy is string => Boolean(proxy))
+      : DEFAULT_AUTHENTIK_TRUSTED_PROXIES;
+
+  const paths = (values: unknown): string[] | null => {
+    if (!Array.isArray(values) || values.length === 0) return null;
+    const cleaned = values
+      .map((value) => (typeof value === "string" ? stripCaddyPlaceholders(value.trim()) : ""))
+      .filter(Boolean);
+    return cleaned.length > 0 ? cleaned : null;
+  };
+
+  return {
+    provider,
+    dialAddress,
+    authEndpoint,
+    copyHeaders,
+    trustedProxies: expandPrivateRanges(trustedProxiesRaw),
+    apiSplit: Boolean(meta.api_split),
+    apiBypassHeaders: headerList(meta.api_bypass_headers),
+    protectedPaths: paths(meta.protected_paths),
+    excludedPaths: paths(meta.excluded_paths),
+  };
+}
+
+/**
+ * The auth subrequest: a reverse proxy to the auth server with the request rewritten to its
+ * verify endpoint, copying the identity headers it answers with onto the upstream request.
+ *
+ * With `api401`, a redirect from the auth server - "go and sign in at the portal" - becomes a bare
+ * 401 instead. That is the whole point of the split: an API client or a WebSocket handshake cannot
+ * follow a login page, and a 302 into HTML mid-stream is a worse error than the honest one.
+ */
+function buildGenericForwardAuthHandler(
+  cfg: ForwardAuthRouteConfig,
+  api401: boolean,
+): Record<string, unknown> {
+  // Canonical casing is required, not cosmetic: Caddy resolves the placeholder by literal lookup
+  // in Go's canonicalised header map - see upstreamHeaderPlaceholder.
+  const handleResponseRoutes: Record<string, unknown>[] = [{ handle: [{ handler: "vars" }] }];
+  for (const headerName of cfg.copyHeaders) {
+    const placeholder = upstreamHeaderPlaceholder(headerName);
+    handleResponseRoutes.push({
+      handle: [
+        {
+          handler: "headers",
+          request: { set: { [headerName]: [placeholder] } },
+        } as Record<string, unknown>,
+      ],
+      match: [{ not: [{ vars: { [placeholder]: [""] } }] }],
+    });
+  }
+
+  const handleResponse: Record<string, unknown>[] = [
+    { match: { status_code: [2] }, routes: handleResponseRoutes },
+  ];
+  if (api401) {
+    handleResponse.push({
+      match: { status_code: [301, 302, 303, 307, 308] },
+      routes: [
+        { handle: [{ handler: "static_response", status_code: 401, body: "Unauthorized" }] },
+      ],
+    });
+  }
+
+  const handler: Record<string, unknown> = {
+    handler: "reverse_proxy",
+    upstreams: [{ dial: cfg.dialAddress }],
+    rewrite: { method: "GET", uri: cfg.authEndpoint },
+    headers: {
+      request: {
+        set: {
+          "X-Forwarded-Method": ["{http.request.method}"],
+          "X-Forwarded-Uri": ["{http.request.uri}"],
+          "X-Forwarded-Host": ["{http.request.hostport}"],
+          "X-Forwarded-Proto": ["{http.request.scheme}"],
+        },
+      },
+    },
+    handle_response: handleResponse,
+  };
+  if (cfg.trustedProxies.length > 0) handler.trusted_proxies = [...cfg.trustedProxies];
+  return handler;
 }
 
 /**

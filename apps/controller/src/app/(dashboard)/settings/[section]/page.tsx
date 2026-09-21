@@ -1,9 +1,13 @@
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { defaultDashboardSettings } from "@/src/lib/dashboard-host";
+import { redirect } from "next/navigation";
 import SettingsClient from "../SettingsClient";
+import { LEGACY_SECTION_PAGES } from "../sections";
 import {
   getGeneralSettings,
   getAcmeSettings,
   getAuthentikSettings,
+  getForwardAuthSettings,
   getMetricsSettings,
   getLoggingSettings,
   getDnsSettings,
@@ -33,6 +37,7 @@ import { config } from "@/src/lib/config";
 import { getPublicBaseUrl } from "@/src/lib/public-url";
 import { requireAdmin } from "@/src/lib/auth";
 import { stagedView } from "@/src/lib/settings/staged-view";
+import { registryFields } from "../registry-fields";
 import { stagedOverlay } from "@/src/lib/settings/staging";
 import { withStagedReads } from "@/src/lib/settings/staging-context";
 import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
@@ -64,6 +69,13 @@ export default async function SettingsSectionPage({
 }) {
   const session = await requireAdmin();
   const { section } = await params;
+
+  // `/settings/authentik` and the rest were pages of their own until these were merged. They are
+  // links in the docs and in whatever an operator bookmarked, so they land on the block itself
+  // rather than on the overview.
+  const legacy = LEGACY_SECTION_PAGES.get(section);
+  if (legacy) redirect(`/settings/${legacy.page}#${legacy.anchor}`);
+
   const userId = Number(session.user.id);
 
   // Every read below resolves against this operator's staged set, so a form shows what they have
@@ -72,6 +84,8 @@ export default async function SettingsSectionPage({
   const overlay = await stagedOverlay(userId);
   // The root translator, for the stored update-check and GeoIP failures this page shows.
   const tRoot = await getTranslations();
+  // Resolved here, inside the staged scope, so a pending edit to one of them reads as pending.
+  const registry = await registryFields(tRoot);
 
   // The agent and staging reads sit outside the staged scope on purpose - they are not settings -
   // but run alongside it: the scope is AsyncLocalStorage, so a sibling promise cannot see the
@@ -82,6 +96,7 @@ export default async function SettingsSectionPage({
       acme,
       dnsProvider,
       authentik,
+      forwardAuth,
       metrics,
       logging,
       dns,
@@ -116,6 +131,7 @@ export default async function SettingsSectionPage({
         getAcmeSettings(),
         getDnsProviderSettings(),
         getAuthentikSettings(),
+        getForwardAuthSettings(),
         getMetricsSettings(),
         getLoggingSettings(),
         getDnsSettings(),
@@ -168,6 +184,7 @@ export default async function SettingsSectionPage({
       mtlsRoles,
       issuedClientCerts,
       authentikDefaults: authentik,
+      forwardAuthDefaults: forwardAuth,
       agents: agentOptions,
       tailscaleDefaults: {
         enabled: tailscale?.enabled ?? false,
@@ -188,6 +205,7 @@ export default async function SettingsSectionPage({
       dnsProvider={dnsProvider ? redactDnsProviderSettingsForApi(dnsProvider) : null}
       dnsProviderDefinitions={DNS_PROVIDERS}
       authentik={authentik}
+      forwardAuth={forwardAuth}
       metrics={metrics}
       logging={logging}
       dns={dns}
@@ -198,7 +216,7 @@ export default async function SettingsSectionPage({
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
       primaryProviderId={primaryProviderId}
-      localUsersDisabled={config.auth.disableLocalUsers}
+      localUsersDisabled={await localUsersDisabled()}
       avatars={{
         // The stored toggle only applies when AVATAR_GRAVATAR leaves the choice open.
         gravatarEnabled: config.avatars.gravatarFromEnv ?? avatarSettings?.gravatarEnabled ?? true,
@@ -234,6 +252,7 @@ export default async function SettingsSectionPage({
         ...updates,
         error: updates.error ? storedErrorMessage(tRoot, updates.error, updates.errorCode) : null,
       }}
+      registry={registry}
       analytics={analytics}
       geoip={geoip}
       // Starting or stopping the optional containers needs an agent to run compose. Without one the

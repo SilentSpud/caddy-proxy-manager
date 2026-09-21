@@ -1,5 +1,6 @@
 "use server";
 
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/domain-error";
@@ -12,7 +13,6 @@ import {
   type User,
 } from "@/src/lib/models/user";
 import { logAuditEvent } from "@/src/lib/audit";
-import { config } from "@/src/lib/config";
 import { hashPassword } from "@/src/lib/password";
 import { getTranslations } from "next-intl/server";
 import { actionError, actionSuccess, type ActionState } from "@/src/lib/actions";
@@ -28,7 +28,7 @@ async function createUserActionUntranslated(formData: FormData) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
-  if (config.auth.disableLocalUsers) {
+  if (await localUsersDisabled()) {
     throw domainError("localUserCreationDisabled");
   }
 

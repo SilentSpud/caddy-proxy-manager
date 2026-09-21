@@ -13,12 +13,16 @@ export interface TcpResponse {
 /**
  * Open a TCP connection to host:port, send a payload, and collect whatever comes back within the
  * timeout window.
+ *
+ * The default window is generous: the stack's echo backends are linux/amd64 images, and under
+ * emulation on an arm64 host they can miss a tighter deadline while the rest of the suite runs -
+ * which surfaces as a "connected but empty echo" failure rather than as slowness.
  */
 export function tcpSend(
   host: string,
   port: number,
   payload: string,
-  timeoutMs = 5_000,
+  timeoutMs = 10_000,
 ): Promise<TcpResponse> {
   return new Promise((resolve, reject) => {
     let data = '';

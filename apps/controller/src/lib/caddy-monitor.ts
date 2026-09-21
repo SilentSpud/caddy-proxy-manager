@@ -4,15 +4,27 @@
  * Per agent, never through one "primary": an agent answers only for its own Caddy, so what it says
  * may only ever cause work on that same agent. A lying agent can make this re-apply its own config,
  * at most once a minute, and nothing else in the fleet.
+ *
+ * A restart is detected by content: `caddy.ts` fingerprints what each Caddy serves right after it
+ * accepts a load, and anything else on the wire later means that Caddy is no longer running what
+ * this controller gave it - a recreated container with no autosave, the image's default Caddyfile,
+ * or an edit from outside. Comparing the ETag or looking for an empty config cannot see any of
+ * those: Caddy always serves an ETag, and its default Caddyfile is a perfectly non-empty config.
  */
 
 import type { ConnectedAgent } from "./agent/registry";
 import { connectedAgents } from "./agent/registry";
-import { caddyAdminRequest } from "./caddy-admin";
-import { applyCaddyConfig, applyCaddyConfigToAgent } from "./caddy";
+import { config } from "./config";
+import {
+  applyCaddyConfig,
+  applyCaddyConfigToAgent,
+  getCaddyLiveConfigHash,
+  getLastAppliedConfigHash,
+} from "./caddy";
 
 type CaddyMonitorState = {
   isHealthy: boolean;
+  /** Fingerprint of the config this Caddy was last seen serving. */
   lastConfigId: string | null;
   lastCheckTime: number;
   consecutiveFailures: number;
@@ -36,39 +48,6 @@ const states = new Map<string, CaddyMonitorState>();
 let monitorInterval: NodeJS.Timeout | null = null;
 let isMonitoring = false;
 
-/**
- * The current Caddy config ID from one admin API, used to detect a restart (the ID changes).
- */
-async function getCaddyConfigId(agentId?: string): Promise<string | null> {
-  try {
-    const response = await caddyAdminRequest({
-      path: "/config/",
-      method: "GET",
-      timeoutMs: 5000,
-      agentId,
-    });
-
-    if (response.status < 200 || response.status >= 300) {
-      return null;
-    }
-
-    // Use ETag or compute a simple hash from the response
-    const etag = response.headers.etag;
-    if (typeof etag === "string" && etag) {
-      return etag;
-    }
-
-    // Fallback: use the config object's structure
-    const configData = JSON.parse(response.text);
-    // Check if config is essentially empty (default state after restart)
-    const isEmpty = !configData.apps || Object.keys(configData.apps).length === 0;
-    return isEmpty ? "empty" : "configured";
-  } catch {
-    // Network error or timeout
-    return null;
-  }
-}
-
 function targets(): Target[] {
   const agents = connectedAgents();
   if (agents.length === 0) return [{ key: DIRECT, agent: null }];
@@ -91,7 +70,7 @@ async function checkTarget(target: Target, now: number, reapplyDelayMs: number):
   state.lastCheckTime = now;
   const who = target.agent ? ` on ${target.agent.name}` : "";
 
-  const currentConfigId = await getCaddyConfigId(target.agent?.agentId);
+  const currentConfigId = await getCaddyLiveConfigHash(target.agent?.agentId);
 
   if (currentConfigId === null) {
     // Caddy is not responding
@@ -107,14 +86,13 @@ async function checkTarget(target: Target, now: number, reapplyDelayMs: number):
   }
 
   // Caddy is responding
-  const wasUnhealthy = !state.isHealthy;
   state.consecutiveFailures = 0;
   state.isHealthy = true;
 
-  // Detect restart: config ID changed to "empty" or Caddy was previously unhealthy
-  const hasRestarted =
-    (state.lastConfigId !== null && currentConfigId === "empty") ||
-    (wasUnhealthy && currentConfigId === "empty");
+  // Detect a restart: this Caddy is serving something other than what it was given. Nothing to
+  // compare against until a load of ours has landed on it - that case is the first sighting below.
+  const appliedConfigId = getLastAppliedConfigHash(target.agent?.agentId);
+  const hasRestarted = appliedConfigId !== null && currentConfigId !== appliedConfigId;
 
   // First sighting since this process started also re-applies: the startup apply usually ran before
   // any agent attached, so a running Caddy can still hold a config the previous release built (an
@@ -143,7 +121,7 @@ async function checkTarget(target: Target, now: number, reapplyDelayMs: number):
       // Only this agent's own document, built with snippets this same agent adapted.
       if (target.agent) await applyCaddyConfigToAgent(target.agent);
       else await applyCaddyConfig();
-      pending.lastConfigId = await getCaddyConfigId(target.agent?.agentId);
+      pending.lastConfigId = await getCaddyLiveConfigHash(target.agent?.agentId);
       // A first sighting that landed is not a restart, so it must not hold back the next real one.
       if (!hasRestarted) pending.lastReapplyAt = 0;
     } catch (error) {
@@ -184,6 +162,12 @@ export async function checkCaddyHealth(reapplyDelayMs = REAPPLY_DELAY): Promise<
 
 /** Start monitoring Caddy health. */
 export function startCaddyMonitoring(): void {
+  if (!config.caddyMonitorEnabled) {
+    console.log(
+      "[CaddyMonitor] Disabled (CADDY_MONITOR_ENABLED=false); this controller does not own the Caddy it points at",
+    );
+    return;
+  }
   if (isMonitoring) {
     console.log("[CaddyMonitor] Already monitoring");
     return;

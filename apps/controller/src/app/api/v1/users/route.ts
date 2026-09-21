@@ -1,7 +1,7 @@
+import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { listUsers, createUser } from "@/src/lib/models/user";
-import { config } from "@/src/lib/config";
 import { hashPassword } from "@/src/lib/password";
 import { DomainError, domainErrorMessage } from "@/src/lib/domain-error";
 import { isEmailAddress } from "@/src/lib/email-address";
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   try {
     await requireApiAdmin(request);
 
-    if (config.auth.disableLocalUsers) {
+    if (await localUsersDisabled()) {
       return NextResponse.json(
         { error: "Local user creation is disabled. Users are provisioned by the OIDC provider." },
         { status: 403 },

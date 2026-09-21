@@ -863,6 +863,7 @@ const spec = {
                 "cloudflare",
                 "dns-provider",
                 "authentik",
+                "forward-auth",
                 "metrics",
                 "logging",
                 "dns",
@@ -921,6 +922,7 @@ const spec = {
                 "cloudflare",
                 "dns-provider",
                 "authentik",
+                "forward-auth",
                 "metrics",
                 "logging",
                 "dns",
@@ -2006,6 +2008,62 @@ const spec = {
           },
         },
       },
+      ForwardAuthConfig: {
+        type: "object",
+        description:
+          "Authentication through an external forward-auth server (Authelia and anything else answering a forward-auth subrequest). Mutually exclusive with `authentik` and `cpmForwardAuth`.",
+        properties: {
+          enabled: { type: "boolean" },
+          provider: {
+            type: "string",
+            enum: ["authelia", "custom"],
+            description: "Preset filling in the endpoint and identity headers. Default: authelia",
+          },
+          authUpstream: {
+            type: ["string", "null"],
+            example: "http://authelia:9091",
+            description: "Base URL of the auth server. Required when enabled",
+          },
+          authEndpoint: {
+            type: ["string", "null"],
+            example: "/api/authz/forward-auth",
+            description: "URI the auth subrequest is rewritten to. Required for provider=custom",
+          },
+          copyHeaders: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Headers copied from the auth server's 2xx answer onto the upstream request, and stripped from every inbound request so they cannot be forged",
+          },
+          trustedProxies: {
+            type: "array",
+            items: { type: "string" },
+            description: "CIDRs, or the shorthand private_ranges",
+          },
+          apiSplit: {
+            type: "boolean",
+            description:
+              "Answer a caller that did not ask for HTML with 401 rather than the auth server's redirect to its login portal",
+          },
+          apiBypassHeaders: {
+            type: "array",
+            items: { type: "string" },
+            example: ["X-Api-Key"],
+            description:
+              "A request carrying any of these headers skips forward auth entirely; the upstream checks the credential itself",
+          },
+          protectedPaths: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Paths to protect (null = all)",
+          },
+          excludedPaths: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Paths to exclude from auth. Ignored when protectedPaths is set",
+          },
+        },
+      },
       CpmForwardAuthConfig: {
         type: "object",
         description: "Built-in CPM forward-auth (replaces Authentik when enabled)",
@@ -2335,6 +2393,9 @@ const spec = {
           },
           waf: { oneOf: [{ $ref: "#/components/schemas/WafConfig" }, { type: "null" }] },
           mtls: { oneOf: [{ $ref: "#/components/schemas/MtlsConfig" }, { type: "null" }] },
+          forwardAuth: {
+            oneOf: [{ $ref: "#/components/schemas/ForwardAuthConfig" }, { type: "null" }],
+          },
           cpmForwardAuth: {
             oneOf: [{ $ref: "#/components/schemas/CpmForwardAuthConfig" }, { type: "null" }],
           },
@@ -2401,6 +2462,9 @@ const spec = {
           geoblockMode: { type: "string", enum: ["merge", "override"] },
           waf: { oneOf: [{ $ref: "#/components/schemas/WafConfig" }, { type: "null" }] },
           mtls: { oneOf: [{ $ref: "#/components/schemas/MtlsConfig" }, { type: "null" }] },
+          forwardAuth: {
+            oneOf: [{ $ref: "#/components/schemas/ForwardAuthConfig" }, { type: "null" }],
+          },
           cpmForwardAuth: {
             oneOf: [{ $ref: "#/components/schemas/CpmForwardAuthConfig" }, { type: "null" }],
           },

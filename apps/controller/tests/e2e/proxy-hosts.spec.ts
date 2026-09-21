@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { goToSettingsSection } from '../helpers/settings-nav';
+import { goToSetting } from '../helpers/settings-nav';
 import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
 import { waitForHydration } from '../helpers/hydration';
 
@@ -266,7 +266,7 @@ test.describe('Proxy Hosts', () => {
     const originalSettings = (await originalSettingsResp.json()) as Partial<typeof defaultSettings>;
 
     try {
-      await goToSettingsSection(page, 'Authentik Defaults');
+      await goToSetting(page, 'Authentik Defaults');
 
       await page.locator('input[name="outpostDomain"]').fill(defaultSettings.outpostDomain);
       await page.locator('input[name="outpostUpstream"]').fill(defaultSettings.outpostUpstream);
@@ -284,7 +284,9 @@ test.describe('Proxy Hosts', () => {
 
       const dialog = page.getByRole('dialog');
       const authentikSection = dialog.locator('div:has(> input[name="authentikPresent"])');
-      const authentikSwitch = authentikSection.getByRole('switch');
+      const authentikSwitch = authentikSection.getByRole('switch', {
+        name: 'Enable Authentik forward auth',
+      });
       await expect(authentikSwitch).not.toBeChecked();
 
       await authentikSwitch.click();
@@ -360,7 +362,9 @@ test.describe('Proxy Hosts', () => {
       await expect(dialog).toBeVisible();
 
       const authentikSection = dialog.locator('div:has(> input[name="authentikPresent"])');
-      const authentikSwitch = authentikSection.getByRole('switch');
+      const authentikSwitch = authentikSection.getByRole('switch', {
+        name: 'Enable Authentik forward auth',
+      });
       await expect(authentikSwitch).not.toBeChecked();
       await authentikSwitch.click();
       await expect(authentikSwitch).toBeChecked();

@@ -74,7 +74,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   const activeProvider = input.dnsProvider?.default ?? null;
   sections.push({
     id: "dns-providers",
-    name: t("sections.dnsProviders.name"),
+    name: t("blocks.dnsProviders.name"),
     group: "traffic",
     status: activeProvider ? "ok" : "unset",
     value: activeProvider
@@ -92,7 +92,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   const certificateCount = input.certificateCount;
   sections.push({
     id: "acme",
-    name: t("sections.acme.name"),
+    name: t("blocks.acme.name"),
     group: "traffic",
     status: "ok",
     value: input.acmeConfigured
@@ -107,7 +107,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   const geoBlockNeedsProxies = Boolean(input.geoBlock?.enabled) && ranges.length === 0;
   sections.push({
     id: "trusted-proxies",
-    name: t("sections.trustedProxies.name"),
+    name: t("blocks.trustedProxies.name"),
     group: "traffic",
     status: geoBlockNeedsProxies ? "attention" : ranges.length > 0 ? "ok" : "unset",
     value:
@@ -121,7 +121,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   const hasDefaultResponse = Boolean(input.defaultResponse);
   sections.push({
     id: "default-response",
-    name: t("sections.defaultResponse.name"),
+    name: t("blocks.defaultResponse.name"),
     group: "traffic",
     status: hasDefaultResponse ? "ok" : "unset",
     value: hasDefaultResponse
@@ -133,7 +133,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
 
   sections.push({
     id: "oauth",
-    name: t("sections.oauth.name"),
+    name: t("blocks.oauth.name"),
     group: "access",
     status: input.oauthProviderCount > 0 ? "ok" : "unset",
     value:
@@ -228,7 +228,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   const agentsMissing = input.agentsPaired > 0 && input.agentsConnected === 0;
   sections.push({
     id: "agent",
-    name: t("sections.agent.name"),
+    name: t("blocks.agent.name"),
     group: "runtime",
     status: input.agentsPaired === 0 ? "unset" : agentsMissing ? "attention" : "ok",
     value:
@@ -254,7 +254,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   const custom = input.caddyBuild?.customModules?.length ?? 0;
   sections.push({
     id: "caddy-build",
-    name: t("sections.caddyBuild.name"),
+    name: t("blocks.caddyBuild.name"),
     group: "runtime",
     status: "ok",
     value:
@@ -283,7 +283,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   const analyticsFromEnv = input.analytics.source === "environment";
   sections.push({
     id: "analytics",
-    name: t("sections.analytics.name"),
+    name: t("blocks.analytics.name"),
     group: "runtime",
     status: analyticsFromEnv ? "env" : input.analytics.enabled ? "ok" : "unset",
     value: input.analytics.enabled

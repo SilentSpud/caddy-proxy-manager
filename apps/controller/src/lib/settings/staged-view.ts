@@ -5,6 +5,7 @@
  * a change set spans sections, so the two must not be able to disagree about what is pending.
  */
 
+import db from "../db";
 import { listStagedSettings } from "./staging";
 import { recentRevisions } from "./apply";
 import { renderConfigComparison } from "./apply";
@@ -15,6 +16,15 @@ export type StagedChange = {
   key: string;
   sectionId: string | null;
   label: string;
+  /**
+   * The fields inside this key that differ from what is stored.
+   *
+   * A settings key is usually one JSON blob for a whole block, so "general is staged" was all the
+   * review sheet could say. Comparing the staged blob with the stored one names the fields the
+   * operator actually touched. Empty for a key that is a single value, and for a blob whose shape
+   * is not an object.
+   */
+  fields: string[];
   stagedAt: string;
 };
 
@@ -25,8 +35,38 @@ export type StagedView = {
   currentRevision: number | null;
 };
 
+/** The top-level fields that differ between the stored JSON and the staged JSON. */
+function changedFields(storedValue: string | null, stagedValue: string): string[] {
+  const parse = (raw: string | null): Record<string, unknown> | null => {
+    if (raw === null) return null;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const before = parse(storedValue);
+  const after = parse(stagedValue);
+  // A single value rather than a blob, or a shape this cannot read: the key itself is the change.
+  if (!after) return [];
+
+  const names = new Set([...Object.keys(before ?? {}), ...Object.keys(after)]);
+  return [...names]
+    .filter((name) => JSON.stringify(before?.[name]) !== JSON.stringify(after[name]))
+    .sort();
+}
+
 export async function stagedView(userId: number): Promise<StagedView> {
   const [staged, revisions] = await Promise.all([listStagedSettings(userId), recentRevisions(3)]);
+
+  // The stored rows, read straight from the table: the point is to compare the staged values
+  // against what is saved, and the read path would hand back the staged ones.
+  const storedRows = await db.query.settings.findMany();
+  const stored = new Map(storedRows.map((row) => [row.key, row.value]));
 
   const changes: StagedChange[] = staged.map((entry) => {
     const known = sectionForStorageKey(entry.key);
@@ -36,6 +76,7 @@ export async function stagedView(userId: number): Promise<StagedView> {
       // An unmapped key still shows, under its own name: a change nobody can see is worse than an
       // ugly label, and this is the only place that would silently drop one.
       label: known?.label ?? entry.key,
+      fields: changedFields(stored.get(entry.key) ?? null, entry.value),
       stagedAt: entry.stagedAt,
     };
   });

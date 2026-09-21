@@ -24,6 +24,7 @@ import {
 import {
   parseAuthentikConfig,
   parseCpmForwardAuthConfig,
+  parseForwardAuthConfig,
   parseDnsResolverConfig,
   parseErrorPagesConfig,
   parseGeoBlockConfig,
@@ -81,6 +82,7 @@ export async function createProxyHostAction(
         customReverseProxyJson: parseOptionalText(formData.get("customReverseProxyJson")),
         customCaddyfile: parseOptionalText(formData.get("customCaddyfile")),
         authentik: parseAuthentikConfig(formData),
+        forwardAuth: parseForwardAuthConfig(formData),
         cpmForwardAuth: parseCpmForwardAuthConfig(formData),
         tailscale: parseTailscaleConfig(formData),
         loadBalancer: parseLoadBalancerConfig(formData),

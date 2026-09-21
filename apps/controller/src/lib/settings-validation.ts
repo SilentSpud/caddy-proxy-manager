@@ -2,6 +2,8 @@ import { isHostname } from "./dashboard-host";
 import { isIP } from "node:net";
 import {
   bodyLimitRangeMessage,
+  droppedWafDirectiveDetails,
+  filterCustomDirectives,
   findInvalidBodyLimitDirective,
   isValidBodyLimit,
 } from "./caddy-waf";
@@ -214,6 +216,21 @@ function validateAuthentik(value: Record<string, unknown>): void {
   );
   httpUrl(upstream, "authentik.outpostUpstream");
   optionalString(value, "authEndpoint", "authentik", 4096);
+}
+
+function validateForwardAuth(value: Record<string, unknown>): void {
+  onlyKeys(value, ["provider", "authUpstream", "authEndpoint"], "Forward Auth settings");
+  const provider = required(value, "provider", "Forward Auth settings");
+  if (provider !== "authelia" && provider !== "custom") {
+    invalid("forward_auth.provider must be authelia or custom");
+  }
+  const upstream = stringValue(
+    required(value, "authUpstream", "Forward Auth settings"),
+    "forward_auth.authUpstream",
+    { min: 1, max: 4096 },
+  );
+  httpUrl(upstream, "forward_auth.authUpstream");
+  optionalString(value, "authEndpoint", "forward_auth", 4096);
 }
 
 function validateDashboard(value: Record<string, unknown>): void {
@@ -483,6 +500,14 @@ function validateWaf(value: Record<string, unknown>): void {
       `waf.custom_directives has an out-of-range body limit: "${badDirective}" - ${bodyLimitRangeMessage("the byte count")}`,
     );
   }
+  // A dropped line is a rule the user believes is running. Refuse the write and name each one,
+  // rather than accepting the settings and quietly emitting a WAF without them.
+  const { dropped } = filterCustomDirectives(directives);
+  if (dropped.length > 0) {
+    invalid(
+      `waf.custom_directives has ${dropped.length} line(s) that would be dropped and never sent to Caddy: ${droppedWafDirectiveDetails(dropped).join(", ")}. Remove or rewrite them for them to take effect.`,
+    );
+  }
   if (value.excluded_rule_ids !== undefined)
     validateNumberList(value.excluded_rule_ids, "waf.excluded_rule_ids");
   validateBodyLimits(value, "waf");
@@ -605,6 +630,9 @@ export function validateSettingsGroup(group: string, input: unknown): unknown {
       break;
     case "authentik":
       validateAuthentik(value);
+      break;
+    case "forward-auth":
+      validateForwardAuth(value);
       break;
     case "dashboard":
       validateDashboard(value);

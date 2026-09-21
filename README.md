@@ -66,7 +66,7 @@ no ClickHouse credentials and records nothing until it is upgraded. Then:
 
 The controller now downloads the GeoLite2 databases itself, so the `geoipupdate` container and the
 `geoip-data` volume are gone from `docker-compose.yml`. There is nothing to reconfigure: it uses the
-account ID and licence key already saved under **Settings → GeoIP** (or still in `.env`), downloads
+account ID and licence key already saved under **Settings → Geo-blocking → GeoIP Databases** (or still in `.env`), downloads
 fresh databases onto `caddy-manager-data` on its first start, and every agent picks them up from
 there. After pulling the new `docker-compose.yml`, on the controller host and on every agent host:
 
@@ -240,6 +240,7 @@ from inside the image - the runtime has no shell HTTP client to call instead.
 - **User Management** - Admin page for managing users: edit roles, status, profiles; disable or delete accounts; search and filter
 - **Groups** - Organize users into groups for forward auth access control. Assign groups to proxy hosts to grant access to all members at once
 - **Authentik Integration** - Forward-auth SSO per proxy host with configurable header forwarding and protected paths
+- **Forward Auth (external)** - Point a host at any forward-auth server (Authelia preset, or custom). Optionally answer non-browser callers with 401 instead of the login redirect, and let a header such as `X-Api-Key` bypass auth so the upstream checks it itself. **Settings → Forward Auth → Forward Auth Defaults** sets what new hosts inherit
 - **Tailscale** - Serve a proxy host privately on your tailnet, gate it on the caller's Tailscale identity, or reach a backend that only exists on the tailnet. A Tailscale node runs inside the Caddy container - no `tailscaled` on the host, no TUN device, no published ports - and `*.ts.net` certificates come from Tailscale rather than ACME
 - **DNS Controls** - Custom DNS resolvers per host, upstream DNS pinning with IPv4/IPv6/both address family selection
 - **GraphQL API** - Every resource under `/api/graphql`, with Bearer token authentication. One endpoint, one schema, introspectable by any GraphQL client. The agent protocol lives in the same schema as a subscription, separated by which credential a field requires
@@ -247,7 +248,7 @@ from inside the image - the runtime has no shell HTTP client to call instead.
 - **API Tokens** - Create and manage API tokens with optional expiration for programmatic access
 - **Default Response** - Replace Caddy's native behavior for unknown hosts or direct-IP requests with a custom status/body/headers, redirect, or connection abort
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
-- **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, and ClouDNS. Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults)
+- **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, ClouDNS, and RFC2136 (BIND/TSIG). Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults)
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format - plus everything that used to be in `.env`, stored in the database and editable without a restart
 - **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
@@ -279,16 +280,47 @@ Each field on the Settings page shows which layer its current value came from.
 A stored value that no longer validates - because a range was tightened, say - is ignored with a
 warning and falls through to the environment and the default, rather than taking the app down.
 
+#### Getting back in: `SETTINGS_ENV_OVERRIDE`
+
+Two settings can lock you out of the instance that holds them. **OIDC-only mode**
+(`AUTH_DISABLE_LOCAL_USERS`) saved on before OAuth works leaves nobody able to sign in, and a
+**Public URL** (`BASE_URL`) that no longer matches the registered redirect URI breaks the OAuth
+round trip that would let you back in. Neither can be corrected from a Settings page nobody can
+reach, and a stored value normally wins - so there would be nothing to do short of editing the
+database.
+
+`SETTINGS_ENV_OVERRIDE` names the variables that override a stored value instead of only filling
+in for a missing one:
+
+```bash
+SETTINGS_ENV_OVERRIDE=AUTH_DISABLE_LOCAL_USERS
+AUTH_DISABLE_LOCAL_USERS=false
+```
+
+Restart, and the instance resolves that setting from the variable whatever is saved. It takes a
+space or comma separated list, so `SETTINGS_ENV_OVERRIDE=BASE_URL,AUTH_DISABLE_LOCAL_USERS`
+covers both, and it works for any variable in the table below.
+
+Naming a variable here rather than having those two always prefer the environment is deliberate:
+`docker-compose.yml` passes `BASE_URL` and `AUTH_DISABLE_LOCAL_USERS` on every deployment,
+defaults included, so "the variable always wins" would mean neither setting could ever be changed
+from Settings at all.
+
+While a variable is listed, Settings draws that field greyed out and says so. Remove it from
+`SETTINGS_ENV_OVERRIDE` and restart to hand the setting back.
+
 ### Stored in the database
 
 Each of these is a field on **Settings** (and on the setup flow's final step). The variable named
-is still honoured as an override until a value is stored.
+is still honoured as an override until a value is stored, and `SETTINGS_ENV_OVERRIDE` above makes
+it win even then.
 
 | Setting | Variable | Default |
 | ------- | -------- | ------- |
 | Application name - sidebar, login card, page-title suffix | `APP_NAME` | `Caddy Proxy Manager` |
 | Public URL. OAuth redirect URIs are built from it, so it must match what the provider has registered | `BASE_URL` | `http://localhost:3000` |
 | Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy-admin:2019` |
+| Re-apply this controller's configuration to a Caddy that drifted away from it (restarted onto an old or default config). Turn it off on a controller pointed at a Caddy it does not own, or two of them fight over the configuration | `CADDY_MONITOR_ENABLED` | `true` |
 | Pinned as `admin.listen` in a config the controller loads with no agent in between, as the agent pins every config it forwards. Must match the `caddy` service's value | `CADDY_ADMIN_LISTEN` | `caddy-admin:2019` in `docker-compose.yml`, else unset (sent as built) |
 | Gravatar fallback for user icons. Off keeps every avatar lookup off the network | `AVATAR_GRAVATAR` | `true` |
 | Internal forward-auth address Caddy dials. Derived from the container network when empty | `FORWARD_AUTH_INTERNAL_URL` | Derived |
@@ -345,7 +377,7 @@ is still honoured as an override until a value is stored.
 | `L4_PORTS_DIR` | Directory where the controller leaves the bootstrap token the agent in its own stack pairs with. For non-Docker deployments | `/app/data` | No |
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` | Built-in date | No |
 | `LEGACY_SQLITE_PATH` | Pins which pre-3.0 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
-| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`. Only needed without an agent - with one, **Settings → Analytics** starts and stops ClickHouse regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
+| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`. Only needed without an agent - with one, **Settings → Observability → Analytics** starts and stops ClickHouse regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `AGENT_PUID` / `AGENT_PGID` | Build args setting the UID/GID the agent runs as | `10002`/`10002` | No |
 | `CADDY_GID` | Caddy's GID, added to the web and agent containers' supplementary groups so they can use Caddy's logs. Must match Caddy's `PGID` | `10000` | No |
@@ -717,7 +749,7 @@ reach.
 
 Caddy automatically obtains Let's Encrypt certificates for all proxy hosts.
 
-**DNS-01 Challenge** (optional): Configure a DNS provider in **Settings → DNS Providers** for wildcard certificates and environments where ports 80/443 are not public. Supported providers: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, and ClouDNS. Credentials are encrypted at rest with AES-256-GCM. You can override the DNS provider per certificate.
+**DNS-01 Challenge** (optional): Configure a DNS provider in **Settings → DNS → DNS Providers** for wildcard certificates and environments where ports 80/443 are not public. Supported providers: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, ClouDNS, and RFC2136 (BIND/TSIG). Credentials are encrypted at rest with AES-256-GCM. You can override the DNS provider per certificate.
 
 **Custom Certificates** (optional): Import your own certificates via the Certificates page. Private keys are encrypted at rest with AES-256-GCM, migrated from legacy plaintext storage on startup, and treated as write-only by ordinary API responses and browser payloads.
 
@@ -746,12 +778,12 @@ itself:
 
 1. Register for a free MaxMind account at [maxmind.com](https://www.maxmind.com/)
 2. Generate a license key with `GeoLite2-Country` and `GeoLite2-ASN` permissions
-3. Open **Settings → GeoIP Databases**, tick **Use GeoIP**, and enter the account ID and licence key
+3. Open **Settings → Geo-blocking → GeoIP Databases**, tick **Use GeoIP**, and enter the account ID and licence key
 
 That is the whole setup, with or without an agent. The controller downloads the Country, ASN and
 City databases onto `caddy-manager-data`, asks MaxMind for newer builds once a day (the interval is
-a field under **Settings → GeoIP**), and
-downloads only an edition that changed. **Settings → GeoIP** shows when it last checked, and **Check
+a field under **Settings → Geo-blocking → GeoIP Databases**), and
+downloads only an edition that changed. **Settings → Geo-blocking → GeoIP Databases** shows when it last checked, and **Check
 now** runs it on demand. Turning the toggle off stops the downloads and hides country matching from
 the proxy-host forms; the databases already on disk are kept.
 
@@ -770,7 +802,7 @@ Analytics uses a bundled ClickHouse instance for storing and querying traffic ev
 
 ### Enabling and disabling analytics
 
-Open **Settings → Analytics**, tick **Collect analytics**, and set a ClickHouse password. Saving
+Open **Settings → Observability → Analytics**, tick **Collect analytics**, and set a ClickHouse password. Saving
 starts the `clickhouse` container; unticking stops it. Nothing needs to change in `.env`, and no
 Compose profile has to be listed - the agent runs `docker compose --profile clickhouse up -d
 clickhouse` on your behalf, passing the saved credentials through.
@@ -1199,7 +1231,7 @@ other hosts down with it.
 
 ## Default Response
 
-Configure **Settings → Default Response** to preserve Caddy's native behavior for unmatched HTTP requests (such as an automatic HTTPS redirect or empty response, depending on the generated server config), or replace it with:
+Configure **Settings → Responses → Default Response** to preserve Caddy's native behavior for unmatched HTTP requests (such as an automatic HTTPS redirect or empty response, depending on the generated server config), or replace it with:
 
 - a custom HTTP status, body, and response headers (including custom HTML);
 - a redirect; or
@@ -1211,7 +1243,7 @@ Configured proxy hosts always take precedence over this catch-all. For HTTPS, Ca
 
 ## Upstream DNS Pinning
 
-You can enable upstream DNS pinning globally (**Settings → Upstream DNS Pinning**) and override per host (**Proxy Host → Upstream DNS Pinning**).
+You can enable upstream DNS pinning globally (**Settings → DNS → Upstream DNS Pinning**) and override per host (**Proxy Host → Upstream DNS Pinning**).
 
 When enabled, hostname upstreams are resolved during config save/reload and written to Caddy as concrete IP dials. Address family selection supports:
 
@@ -1235,7 +1267,7 @@ public internet - and it does not need anything else on the host. The
 userspace inside the Caddy process: no `tailscaled`, no `/dev/net/tun`, no extra published ports,
 and no change to `docker-compose.yml`.
 
-Turn it on in **Settings → Tailscale**. The one thing it needs is a reusable auth key from the
+Turn it on in **Settings → Network → Tailscale**. The one thing it needs is a reusable auth key from the
 Tailscale admin console. If you would rather not store the key in the database, put a Caddy
 placeholder in the field instead - `{env.TS_AUTHKEY}` is passed through untouched, and Caddy
 resolves it from the container's environment.
@@ -1304,7 +1336,7 @@ covers the REST API as well as the form. A Caddy placeholder counts as a key: wh
 environment actually defines `TS_AUTHKEY` is only knowable inside the Caddy container.
 
 **Optionally, the key itself is checked before it is stored.** Turn on *Check the auth key against
-the Tailscale API* in **Settings → Tailscale**. A revoked, expired or mistyped key is then refused
+the Tailscale API* in **Settings → Network → Tailscale**. A revoked, expired or mistyped key is then refused
 at the point you paste it, with the reason, instead of surfacing at the next config apply.
 
 This needs a second credential. An auth key (`tskey-auth-…`) authenticates a device registration and
@@ -1362,11 +1394,11 @@ L4 proxy hosts are not on the tailnet - only HTTP proxy hosts are.
 
 ## OAuth Authentication
 
-Supports any OIDC-compliant provider (Authentik, Keycloak, Auth0, etc.). Providers can be configured via environment variables or the **Settings → OAuth Providers** UI.
+Supports any OIDC-compliant provider (Authentik, Keycloak, Auth0, etc.). Providers can be configured via environment variables or the **Settings → Authentication → OAuth Providers** UI.
 
 ### Option A: Configure via UI (Recommended)
 
-1. Log in as admin and navigate to **Settings → OAuth Providers**
+1. Log in as admin and navigate to **Settings → Authentication → OAuth Providers**
 2. Click **Add Provider** and fill in the details
 3. Copy the displayed **Callback URL** and add it to your OAuth provider's allowed redirect URIs
 
@@ -1391,7 +1423,7 @@ The callback URL format is:
 {BASE_URL}/api/auth/callback/{provider-id}
 ```
 
-For environment-configured providers, the provider ID is derived from `OAUTH_PROVIDER_NAME` (lowercased, non-alphanumeric replaced with `-`). The exact callback URL is shown in **Settings → OAuth Providers** after the provider is synced.
+For environment-configured providers, the provider ID is derived from `OAUTH_PROVIDER_NAME` (lowercased, non-alphanumeric replaced with `-`). The exact callback URL is shown in **Settings → Authentication → OAuth Providers** after the provider is synced.
 
 Examples:
 
@@ -1400,7 +1432,7 @@ Examples:
 
 The `BASE_URL` environment variable must match exactly where users access your dashboard.
 
-> **Upgrading from < 1.0-RC:** The old callback URL (`/api/auth/callback/oauth2`) no longer works. Update your OAuth provider's redirect URI to the new format shown in **Settings → OAuth Providers**.
+> **Upgrading from < 1.0-RC:** The old callback URL (`/api/auth/callback/oauth2`) no longer works. Update your OAuth provider's redirect URI to the new format shown in **Settings → Authentication → OAuth Providers**.
 
 > **Upgrading to better-auth 1.7:** The callback URL changed again, from
 > `/api/auth/oauth2/callback/{provider-id}` to `/api/auth/callback/{provider-id}`.
@@ -1408,7 +1440,7 @@ The `BASE_URL` environment variable must match exactly where users access your d
 > are served by the core callback endpoint, so the old plugin-specific path no
 > longer exists. Update the redirect URI at your identity provider, or OAuth
 > sign-in will fail with a redirect-URI mismatch. The current value is always
-> shown in **Settings → OAuth Providers**.
+> shown in **Settings → Authentication → OAuth Providers**.
 
 OAuth login appears on the login page alongside credentials.
 
@@ -1422,7 +1454,7 @@ Register this as the provider's **back-channel logout URL**:
 {BASE_URL}/api/auth/oidc/backchannel-logout
 ```
 
-It is also shown in **Settings → OAuth Providers**, beside the callback URL. One URL serves every configured provider: the logout token names its own issuer, and that selects the provider whose client ID and signing keys it is checked against.
+It is also shown in **Settings → Authentication → OAuth Providers**, beside the callback URL. One URL serves every configured provider: the logout token names its own issuer, and that selects the provider whose client ID and signing keys it is checked against.
 
 The endpoint is optional - nothing else changes if you do not configure it - and unauthenticated by design, because the caller is the provider's server rather than a browser. The signed token is the whole of the authentication, so it is rejected unless it verifies against the issuer's published JWKS, carries that provider's client ID as its audience, names a back-channel logout in its `events` claim, carries no `nonce`, was issued within the last five minutes, and has a `jti` that has not been seen before.
 
@@ -1438,7 +1470,7 @@ Failures answer `400` with an `error_description` naming the check that failed. 
 
 A signed-in user can always attach an OAuth identity to their own account from **Profile → OAuth Connections**, whatever the provider's settings. Their session proves who owns the CPM account and the provider login proves the identity, so the provider's email does not have to match - which is what lets the administrator setup creates (`name@localhost`) link one at all.
 
-**Auto-link accounts** (**Settings → OAuth Providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers) governs only what happens when someone *signs in* through the provider and a CPM user already has the same email address:
+**Auto-link accounts** (**Settings → Authentication → OAuth Providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers) governs only what happens when someone *signs in* through the provider and a CPM user already has the same email address:
 
 - **On:** the sign-in links the identity to that existing user. The switch marks the provider as trusted to prove its identity owns the CPM account carrying that email, so leave it off for any IdP where users can register an arbitrary email themselves.
 - **Off:** the sign-in is refused, and the user links the provider from their profile instead.
@@ -1448,7 +1480,7 @@ With it disabled, both paths are refused and the provider redirects to `/api/aut
 ### Group-Based Roles
 
 CPM can take a user's role from their identity provider's group claim instead of
-managing it by hand. Configure it per provider in **Settings → OAuth Providers →
+managing it by hand. Configure it per provider in **Settings → Authentication → OAuth Providers →
 Group mapping**, or with the `OAUTH_*` variables for the env-configured provider.
 
 There are two equivalent ways to say which groups grant which role. Use whichever
@@ -1525,7 +1557,8 @@ mirrored name matches one of them, the user is added to it but never removed.
 
 ### OIDC-Only Mode
 
-Set `AUTH_DISABLE_LOCAL_USERS=true` to hand identity entirely to your IdP:
+Turn on **Settings -> Authentication -> Sign-in -> OIDC-only mode**, or set
+`AUTH_DISABLE_LOCAL_USERS=true`, to hand identity entirely to your IdP:
 
 - No bootstrap admin is created, and `ADMIN_USERNAME` / `ADMIN_PASSWORD` are no
   longer required at startup - even in production.
@@ -1534,8 +1567,9 @@ Set `AUTH_DISABLE_LOCAL_USERS=true` to hand identity entirely to your IdP:
 - Creating local users and setting or changing passwords is rejected in the UI and
   the REST API.
 - OAuth self-provisioning defaults to enabled, since the IdP is the only way an
-  account can come into existence. Set `AUTH_ALLOW_OAUTH_REGISTRATION=false` to
-  restrict sign-in to accounts that already exist.
+  account can come into existence. Clear **Allow OAuth registration**, or set
+  `AUTH_ALLOW_OAUTH_REGISTRATION=false`, to restrict sign-in to accounts that
+  already exist.
 
 ```bash
 AUTH_DISABLE_LOCAL_USERS=true
