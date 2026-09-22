@@ -81,6 +81,37 @@ test.describe('L4 Proxy Hosts page', () => {
     await expect(page.getByRole('table').getByText(':19999', { exact: true })).toBeVisible();
   });
 
+  /**
+   * Regression (#295): an L4 host listening on 80/443/2019 collides with
+   * CPM's own Caddy listeners. SO_REUSEPORT makes the bind succeed, so the
+   * conflict is not reported — instead connections are silently split between
+   * the two listeners and ~50% of TLS handshakes fail. Creating such a host
+   * must be rejected with an explanatory error and the dialog must stay open.
+   */
+  test('rejects a listen address on reserved port 443', async ({ page }) => {
+    await page.goto('/l4-proxy-hosts');
+    await page.getByRole('button', { name: /create l4 host/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.getByLabel('Name').fill('E2E Reserved Port Host');
+    await page.getByLabel('Listen Address').fill(':443');
+    await page.getByLabel('Upstreams').fill('10.0.0.1:8443');
+
+    await page.getByRole('button', { name: /create/i }).click();
+
+    // Dialog stays open and the reservation error is surfaced
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/port 443 is reserved/i)).toBeVisible();
+    await expect(page.getByRole('table').getByText('E2E Reserved Port Host')).not.toBeVisible();
+  });
+
+  test('listen address field documents the reserved ports', async ({ page }) => {
+    await page.goto('/l4-proxy-hosts');
+    await page.getByRole('button', { name: /create l4 host/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText(/ports 80, 443 and 2019 are reserved/i)).toBeVisible();
+  });
+
   test('deletes the created L4 proxy host', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
     await expect(page.getByRole('table').getByText('E2E Test Host')).toBeVisible();

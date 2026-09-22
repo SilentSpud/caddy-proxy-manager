@@ -173,7 +173,7 @@ function L4HostForm({
       <FormField
         label="Listen Address"
         htmlFor="listenAddress"
-        helperText="Format: :PORT or HOST:PORT. Make sure to expose this port in docker-compose.yml on the caddy service."
+        helperText="Format: :PORT or HOST:PORT. Make sure to expose this port in docker-compose.yml on the caddy service. Ports 80, 443 and 2019 are reserved for Caddy's own listeners."
       >
         <Input
           id="listenAddress"

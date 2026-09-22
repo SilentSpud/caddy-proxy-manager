@@ -20,6 +20,7 @@ import crypto from "node:crypto";
 import db from "./db";
 import { l4ProxyHosts } from "./db/schema";
 import { eq } from "drizzle-orm";
+import { isReservedL4Port } from "./l4-reserved-ports";
 
 const DATA_DIR = process.env.L4_PORTS_DIR || "/app/data";
 const OVERRIDE_FILE = "docker-compose.l4-ports.yml";
@@ -60,6 +61,13 @@ export async function getRequiredL4Ports(): Promise<string[]> {
     // Extract port from ":PORT" or "HOST:PORT"
     const match = addr.match(/:(\d+)$/);
     if (!match) continue;
+    // Never publish ports reserved for CPM's own Caddy listeners (issue #295)
+    if (isReservedL4Port(addr)) {
+      console.warn(
+        `[l4-ports] Not publishing reserved port ${match[1]} for an L4 proxy host (80/443/2019 belong to Caddy's HTTP app and admin API).`
+      );
+      continue;
+    }
     const port = match[1];
     const proto = host.protocol === "udp" ? "/udp" : "";
     portSet.add(`${port}:${port}${proto}`);

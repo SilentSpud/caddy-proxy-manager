@@ -48,6 +48,7 @@ import {
   type TrustedProxiesSettings
 } from "./settings";
 import { buildDefaultResponseRoute } from "./caddy-default-response";
+import { isReservedL4Port } from "./l4-reserved-ports";
 import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
 import { syncInstances } from "./instance-sync";
 import {
@@ -2332,6 +2333,21 @@ async function buildL4Servers(): Promise<Record<string, unknown> | null> {
 
   if (l4Hosts.length === 0) return null;
 
+  // Safety net for rows created before reserved-port validation (issue #295):
+  // an L4 host on :80/:443/:2019 would share a listener with CPM's own HTTP
+  // app or admin API (SO_REUSEPORT makes the bind succeed but silently splits
+  // connections). Skip them so one legacy row cannot break every other host.
+  const l4HostsFiltered = l4Hosts.filter((host) => {
+    if (isReservedL4Port(host.listenAddress)) {
+      console.warn(
+        `[l4] Skipping L4 proxy host "${host.name}" (id ${host.id}): listen address ${host.listenAddress} uses a reserved port (80/443/2019). Edit the host to use a different port.`
+      );
+      return false;
+    }
+    return true;
+  });
+  if (l4HostsFiltered.length === 0) return null;
+
   const [globalDnsSettings, globalUpstreamDnsResolutionSettings, globalGeoBlock] = await Promise.all([
     getDnsSettings(),
     getUpstreamDnsResolutionSettings(),
@@ -2339,8 +2355,8 @@ async function buildL4Servers(): Promise<Record<string, unknown> | null> {
   ]);
 
   // Group hosts by listen address — multiple hosts on the same port share routes in one server
-  const serverMap = new Map<string, typeof l4Hosts>();
-  for (const host of l4Hosts) {
+  const serverMap = new Map<string, typeof l4HostsFiltered>();
+  for (const host of l4HostsFiltered) {
     const key = host.listenAddress;
     if (!serverMap.has(key)) serverMap.set(key, []);
     serverMap.get(key)!.push(host);

@@ -59,6 +59,7 @@ function makePayload() {
           skipHttpsHostnameValidation: false,
         },
       ],
+      l4ProxyHosts: [] as unknown[],
     },
   };
 }
@@ -122,5 +123,85 @@ describe('POST /api/instances/sync', () => {
       error: 'Failed to apply synchronized configuration',
     });
     expect(JSON.stringify(mockSetSlaveLastSync.mock.calls)).not.toContain(sensitiveDetail);
+  });
+
+  /**
+   * Regression (#295): an L4 host on a port CPM's own Caddy listeners bind
+   * (80/443/2019) must not be applied on the replica — two listeners on the
+   * same port silently split connections via SO_REUSEPORT.
+   */
+  it('rejects synced L4 hosts listening on reserved port 443', async () => {
+    const payload = makePayload();
+    payload.data.l4ProxyHosts = [
+      {
+        id: 1,
+        name: 'SNI Passthrough',
+        protocol: 'tcp',
+        listenAddress: ':443',
+        upstreams: JSON.stringify(['mail.internal:993']),
+        matcherType: 'tls_sni',
+        matcherValue: JSON.stringify(['mail.example.com']),
+        tlsTermination: false,
+        proxyProtocolVersion: null,
+        proxyProtocolReceive: false,
+        ownerUserId: null,
+        meta: null,
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+    const request = new NextRequest('http://localhost/api/instances/sync', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer sync-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "L4 proxy host 1: listen port 443 is reserved for CPM's own Caddy listeners (HTTP 80/443, admin API 2019)",
+    });
+    expect(mockApplySyncPayload).not.toHaveBeenCalled();
+  });
+
+  it('accepts synced L4 hosts on non-reserved ports', async () => {
+    const payload = makePayload();
+    payload.data.l4ProxyHosts = [
+      {
+        id: 2,
+        name: 'Postgres',
+        protocol: 'tcp',
+        listenAddress: ':5432',
+        upstreams: JSON.stringify(['db.internal:5432']),
+        matcherType: 'none',
+        matcherValue: null,
+        tlsTermination: false,
+        proxyProtocolVersion: null,
+        proxyProtocolReceive: false,
+        ownerUserId: null,
+        meta: null,
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+    const request = new NextRequest('http://localhost/api/instances/sync', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer sync-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(mockApplySyncPayload).toHaveBeenCalledOnce();
   });
 });

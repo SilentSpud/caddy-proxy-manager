@@ -1925,7 +1925,7 @@ const spec = {
           id: { type: "integer" },
           name: { type: "string" },
           protocol: { type: "string", enum: ["tcp", "udp"] },
-          listenAddress: { type: "string", example: ":5432", description: "Single host:port or :port to listen on" },
+          listenAddress: { type: "string", example: ":5432", description: "Single host:port or :port to listen on. Ports 80, 443 and 2019 are reserved for Caddy's own listeners and are rejected." },
           upstreams: { type: "array", items: { type: "string" }, example: ["db-server:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
           matcherValue: { type: "array", items: { type: "string" }, description: "Match values for tls_sni / http_host (empty otherwise)" },
@@ -1948,7 +1948,7 @@ const spec = {
         properties: {
           name: { type: "string", example: "PostgreSQL Proxy" },
           protocol: { type: "string", enum: ["tcp", "udp"] },
-          listenAddress: { type: "string", example: ":5432", description: "Single host:port or :port" },
+          listenAddress: { type: "string", example: ":5432", description: "Single host:port or :port. Ports 80, 443 and 2019 are reserved and rejected." },
           upstreams: { type: "array", items: { type: "string" }, example: ["db:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
           matcherValue: { type: "array", items: { type: "string" } },

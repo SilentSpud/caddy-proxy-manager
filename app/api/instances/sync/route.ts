@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
 import { applyCaddyConfig } from "@/src/lib/caddy";
+import { extractL4ListenPort, isReservedL4Port } from "@/src/lib/l4-reserved-ports";
 import { applySyncPayload, getInstanceMode, getSlaveMasterToken, setSlaveLastSync, SyncPayload } from "@/src/lib/instance-sync";
 
 const DEFAULT_MAX_SYNC_BODY_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -199,6 +200,20 @@ function isL4ProxyHost(value: unknown): value is NonNullable<SyncPayload["data"]
 }
 
 /**
+ * Validate semantic content of L4 proxy host fields. The listen port must not
+ * collide with the ports CPM's generated Caddy config always binds itself
+ * (HTTP 80/443, admin API 2019) — two listeners on the same port silently
+ * split connections via SO_REUSEPORT (issue #295).
+ */
+function validateL4ProxyHostContent(host: Record<string, unknown>): string | null {
+  if (isString(host.listenAddress) && isReservedL4Port(host.listenAddress)) {
+    const port = extractL4ListenPort(host.listenAddress);
+    return `L4 proxy host ${host.id}: listen port ${port} is reserved for CPM's own Caddy listeners (HTTP 80/443, admin API 2019)`;
+  }
+  return null;
+}
+
+/**
  * Validate semantic content of proxy host fields to prevent
  * config injection via compromised master or stolen sync token.
  */
@@ -341,6 +356,15 @@ export async function POST(request: NextRequest) {
   // Semantic validation of proxy host content
   for (const host of (payload as SyncPayload).data.proxyHosts) {
     const err = validateProxyHostContent(host as unknown as Record<string, unknown>);
+    if (err) {
+      return NextResponse.json({ error: err }, { status: 400 });
+    }
+  }
+
+  // Semantic validation of L4 proxy host content (l4ProxyHosts is optional for
+  // backward compatibility with older master instances)
+  for (const host of (payload as SyncPayload).data.l4ProxyHosts ?? []) {
+    const err = validateL4ProxyHostContent(host as unknown as Record<string, unknown>);
     if (err) {
       return NextResponse.json({ error: err }, { status: 400 });
     }

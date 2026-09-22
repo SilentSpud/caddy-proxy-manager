@@ -1,5 +1,6 @@
 import db, { nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
+import { RESERVED_L4_PORTS } from "../l4-reserved-ports";
 import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
 import { asc, desc, eq, count, like, or } from "drizzle-orm";
@@ -382,6 +383,14 @@ function parseL4ProxyHost(row: L4ProxyHostRow): L4ProxyHost {
   };
 }
 
+// Reserved ports (80/443/2019) are defined in ./l4-reserved-ports — kept
+// re-exported here for API surface convenience.
+export {
+  RESERVED_L4_PORTS,
+  extractL4ListenPort,
+  isReservedL4Port,
+} from "../l4-reserved-ports";
+
 function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, isCreate: boolean) {
   if (isCreate) {
     if (!input.name?.trim()) {
@@ -408,6 +417,11 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
     const port = parseInt(portMatch[1], 10);
     if (port < 1 || port > 65535) {
       throw new Error("Port must be between 1 and 65535");
+    }
+    if ((RESERVED_L4_PORTS as readonly number[]).includes(port)) {
+      throw new Error(
+        `Port ${port} is reserved for CPM's own Caddy listeners (HTTP 80/443, admin API 2019) and cannot be used for L4 proxy hosts. Choose a different port.`
+      );
     }
   }
 

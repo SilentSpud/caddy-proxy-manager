@@ -162,6 +162,31 @@ describe('getRequiredL4Ports', () => {
     expect(ports).toEqual(['5432:5432']);
   });
 
+  /**
+   * Regression (#295): legacy hosts created before reserved-port validation
+   * may still sit on 80/443/2019. The port manager must not publish those —
+   * they belong to CPM's own Caddy listeners.
+   */
+  it('never publishes reserved ports (80/443/2019)', async () => {
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
+      name: 'Legacy SNI',
+      listenAddress: ':443',
+      enabled: true,
+    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
+      name: 'Legacy HTTP',
+      listenAddress: '0.0.0.0:80',
+      enabled: true,
+    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
+      name: 'Valid',
+      listenAddress: ':8443',
+      enabled: true,
+    }));
+    const ports = await getRequiredL4Ports();
+    expect(ports).toEqual(['8443:8443']);
+  });
+
   it('returns multiple ports sorted', async () => {
     await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
       name: 'Redis',
