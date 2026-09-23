@@ -1,6 +1,6 @@
 import db, { toIso, nowIso } from "../db";
 import { auditEvents } from "../db/schema";
-import { desc, gte, like, or, count, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, like, or, count, sql } from "drizzle-orm";
 
 export type AuditEvent = {
   id: number;
@@ -17,36 +17,65 @@ function escapeLikePattern(input: string): string {
   return input.replace(/[%_\\]/g, (ch) => `\\${ch}`);
 }
 
-export async function countAuditEvents(search?: string): Promise<number> {
-  const where = search
-    ? (() => {
-        const escaped = escapeLikePattern(search);
-        return or(
-          like(auditEvents.summary, `%${escaped}%`),
-          like(auditEvents.action, `%${escaped}%`),
-          like(auditEvents.entityType, `%${escaped}%`),
-        );
-      })()
-    : undefined;
-  const [row] = await db.select({ value: count() }).from(auditEvents).where(where);
+/** A bare string is the free-text search alone, which is all the REST and GraphQL APIs pass. */
+export type AuditEventFilter = {
+  search?: string;
+  /** null is the system actor. */
+  userId?: number | null;
+  entityType?: string;
+  action?: string;
+};
+
+function auditWhere(filter?: string | AuditEventFilter) {
+  const { search, userId, entityType, action } =
+    typeof filter === "string" ? { search: filter } : (filter ?? {});
+  const clauses = [];
+  if (search) {
+    const escaped = escapeLikePattern(search);
+    clauses.push(
+      or(
+        like(auditEvents.summary, `%${escaped}%`),
+        like(auditEvents.action, `%${escaped}%`),
+        like(auditEvents.entityType, `%${escaped}%`),
+      ),
+    );
+  }
+  if (userId === null) clauses.push(isNull(auditEvents.userId));
+  else if (userId !== undefined) clauses.push(eq(auditEvents.userId, userId));
+  if (entityType) clauses.push(eq(auditEvents.entityType, entityType));
+  if (action) clauses.push(eq(auditEvents.action, action));
+  return clauses.length > 0 ? and(...clauses) : undefined;
+}
+
+export async function countAuditEvents(filter?: string | AuditEventFilter): Promise<number> {
+  const [row] = await db.select({ value: count() }).from(auditEvents).where(auditWhere(filter));
   return row?.value ?? 0;
+}
+
+/** Every entity type and action the log holds, for the filter menus. */
+export async function auditFilterOptions(): Promise<{ entityTypes: string[]; actions: string[] }> {
+  const [entityTypes, actions] = await Promise.all([
+    db
+      .selectDistinct({ value: auditEvents.entityType })
+      .from(auditEvents)
+      .orderBy(asc(auditEvents.entityType)),
+    db
+      .selectDistinct({ value: auditEvents.action })
+      .from(auditEvents)
+      .orderBy(asc(auditEvents.action)),
+  ]);
+  return {
+    entityTypes: entityTypes.map((row) => row.value),
+    actions: actions.map((row) => row.value),
+  };
 }
 
 export async function listAuditEvents(
   limit = 100,
   offset = 0,
-  search?: string,
+  filter?: string | AuditEventFilter,
 ): Promise<AuditEvent[]> {
-  const where = search
-    ? (() => {
-        const escaped = escapeLikePattern(search);
-        return or(
-          like(auditEvents.summary, `%${escaped}%`),
-          like(auditEvents.action, `%${escaped}%`),
-          like(auditEvents.entityType, `%${escaped}%`),
-        );
-      })()
-    : undefined;
+  const where = auditWhere(filter);
   const events = await db
     .select()
     .from(auditEvents)

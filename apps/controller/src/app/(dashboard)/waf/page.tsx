@@ -6,6 +6,7 @@ import {
   countWafEvents,
   getWafEventStats,
   getWafRuleMessages,
+  type WafEventFilter,
 } from "@/src/lib/models/waf-events";
 import { getWafSettings } from "@/src/lib/settings";
 import { stagedOverlay } from "@/src/lib/settings/staging";
@@ -14,6 +15,7 @@ import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { getWafPresetUsage, listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
 import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/WafPresetOptions";
 import { requireAdmin } from "@/src/lib/auth";
+import { strictId } from "@/src/lib/strict-id";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -53,6 +55,11 @@ interface PageProps {
   searchParams: Promise<{
     page?: string;
     search?: string;
+    host?: string;
+    ip?: string;
+    rule?: string;
+    action?: string;
+    severity?: string;
     range?: string;
     from?: string;
     to?: string;
@@ -67,10 +74,17 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function WafPage({ searchParams }: PageProps) {
   const session = await requireAdmin();
   const resolvedSearchParams = await searchParams;
-  const { page: pageParam, search: searchParam } = resolvedSearchParams;
+  const { page: pageParam, ...params } = resolvedSearchParams;
   const { range, from, to } = parseRange(resolvedSearchParams);
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-  const search = searchParam?.trim() || undefined;
+  const filter: WafEventFilter = {
+    search: params.search?.trim() || undefined,
+    host: params.host?.trim() || undefined,
+    clientIp: params.ip?.trim() || undefined,
+    ruleId: strictId(params.rule),
+    blocked: params.action === "blocked" ? true : params.action === "detected" ? false : undefined,
+    severity: params.severity?.trim() || undefined,
+  };
   const offset = (page - 1) * PER_PAGE;
 
   // The settings form here saves through a staged action, so read it the way the settings pages do:
@@ -78,9 +92,9 @@ export default async function WafPage({ searchParams }: PageProps) {
   const overlay = await stagedOverlay(Number(session.user.id));
 
   const [events, total, stats, globalWaf, hosts, presets, presetUsage] = await Promise.all([
-    listWafEvents(PER_PAGE, offset, search, from, to),
-    countWafEvents(search, from, to),
-    getWafEventStats(search, from, to),
+    listWafEvents(PER_PAGE, offset, filter, from, to),
+    countWafEvents(filter, from, to),
+    getWafEventStats(filter, from, to),
     withStagedReads(overlay, () => getWafSettings()),
     listProxyHosts(),
     listWafPresets(),
@@ -104,7 +118,7 @@ export default async function WafPage({ searchParams }: PageProps) {
         events={events}
         stats={stats}
         pagination={{ total, page, perPage: PER_PAGE }}
-        initialSearch={search ?? ""}
+        hostOptions={[...new Set(hosts.flatMap((host) => host.domains))].sort()}
         initialRange={range}
         initialFrom={from ?? null}
         initialTo={to ?? null}

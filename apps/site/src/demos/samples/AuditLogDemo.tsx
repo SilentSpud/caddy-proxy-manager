@@ -102,29 +102,44 @@ const SUMMARY = {
   entityTypes: new Set(IN_WINDOW.map((event) => event.entityType)).size,
 };
 
+const distinct = (values: string[]) => [...new Set(values)].sort();
+const FILTER_OPTIONS = {
+  users: distinct(EVENTS.map((event) => event.user)).map((user) => ({ value: user, label: user })),
+  resources: distinct(EVENTS.map((event) => event.entityType)),
+  actions: distinct(EVENTS.map((event) => event.action)),
+};
+
 /**
- * The audit log page itself, searching and paging for real.
+ * The audit log page itself, filtering and paging for real.
  *
  * In the app the server answers each new query string; here this component does, off the rows
- * above. Nothing else changes - the search field, the table and the pager are the ones shipped.
+ * above. Nothing else changes - the filter bar, the table and the pager are the ones shipped.
  */
 export default function AuditLogDemo() {
   const params = useSearchParams();
   const search = params.get("search") ?? "";
+  const user = params.get("user");
+  const resource = params.get("resource");
+  const action = params.get("action");
   const page = Math.max(1, Number(params.get("page")) || 1);
 
   const matches = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    if (!needle) return EVENTS;
-    return EVENTS.filter((e) => `${e.user} ${e.summary}`.toLowerCase().includes(needle));
-  }, [search]);
+    return EVENTS.filter(
+      (e) =>
+        (!needle || `${e.user} ${e.summary}`.toLowerCase().includes(needle)) &&
+        (!user || e.user === user) &&
+        (!resource || e.entityType === resource) &&
+        (!action || e.action === action),
+    );
+  }, [search, user, resource, action]);
 
   return (
     <DemoSurface>
       <AuditLogClient
         events={matches.slice((page - 1) * PER_PAGE, page * PER_PAGE)}
         pagination={{ total: matches.length, page, perPage: PER_PAGE }}
-        initialSearch={search}
+        filterOptions={FILTER_OPTIONS}
         activity={ACTIVITY}
         summary={SUMMARY}
       />

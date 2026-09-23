@@ -140,6 +140,30 @@ describe('demo analytics in SQLite', () => {
     expect(events).toHaveLength(Math.min(5, waf.length));
     expect(typeof events[0]!.blocked).toBe('boolean');
   });
+
+  it('answers the WAF log structured filters', async () => {
+    const sample = waf[0]!;
+    const bareHost = (host: string) => host.replace(/:\d+$/, '');
+    const filter = {
+      host: bareHost(sample.host),
+      ruleId: sample.rule_id ?? undefined,
+      blocked: sample.blocked,
+      severity: sample.severity?.toLowerCase(),
+    };
+    const expected = count(
+      waf,
+      (row) =>
+        bareHost(row.host) === filter.host &&
+        row.rule_id === sample.rule_id &&
+        row.blocked === sample.blocked &&
+        row.severity === sample.severity,
+    );
+    expect(expected).toBeGreaterThan(0);
+    expect(await client.queryWafCountWithSearch(filter, FROM, NOW)).toBe(expected);
+    expect(await client.queryWafCountWithSearch({ clientIp: sample.client_ip }, FROM, NOW)).toBe(
+      count(waf, (row) => row.client_ip === sample.client_ip),
+    );
+  });
 });
 
 describe('translateClickHouseSql', () => {

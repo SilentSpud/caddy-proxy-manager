@@ -8,7 +8,7 @@ import AuditLogDemo from "../../../demos/samples/AuditLogDemo";
 
 Every configuration change is recorded: what changed, which account changed it, and when.
 
-<Demo title="The audit log" note="Search and paging really run - over nine rows.">
+<Demo title="The audit log" note="Filtering and paging really run - over nine rows.">
   <AuditLogDemo client:visible />
 </Demo>
 
@@ -27,8 +27,10 @@ the context for whatever you are looking through.
 
 ## Searching it
 
-Server-side search and pagination, like the other data tables. Search covers the action, the entity
-and the account, so "who disabled this host last Tuesday" is one query rather than a scroll.
+Server-side filtering and pagination. Type to search the summary, action and resource, or pick a
+field - **User**, **Resource** or **Action** - to narrow on it exactly. Filters combine, so "every
+certificate change Avery made" is two tokens rather than a scroll. The filters live in the address
+bar, so a filtered view can be bookmarked or linked.
 
 ## Attribution
 

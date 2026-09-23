@@ -28,7 +28,13 @@ vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { countProxyHostsByState } from '../../src/lib/models/proxy-hosts';
 import { countL4ProxyHostsByProtocol } from '../../src/lib/models/l4-proxy-hosts';
-import { auditActivityByHour, auditActivitySummary } from '../../src/lib/models/audit';
+import {
+  auditActivityByHour,
+  auditActivitySummary,
+  auditFilterOptions,
+  countAuditEvents,
+  listAuditEvents,
+} from '../../src/lib/models/audit';
 import { lastSessionByUser } from '../../src/lib/models/user';
 import * as schema from '../../src/lib/db/schema';
 
@@ -201,6 +207,46 @@ describe('audit activity', () => {
     // count(distinct userId) skips the null actor, so a system event is not counted as a person.
     expect(summary.actors).toBe(1);
     expect(summary.entityTypes).toBe(2);
+  });
+
+  it('filters the log on actor, resource and action together, and lists what can be filtered on', async () => {
+    const now = iso();
+    const [alice] = await db
+      .insert(schema.users)
+      .values({
+        email: 'alice@example.com',
+        name: 'Alice',
+        role: 'admin',
+        status: 'active',
+        provider: 'local',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    await insertEvent(iso(), 'create', alice.id);
+    await insertEvent(iso(), 'update', alice.id);
+    await insertEvent(iso(), 'update', null);
+    await db.insert(schema.auditEvents).values({
+      action: 'update',
+      entityType: 'certificate',
+      entityId: 2,
+      summary: 'renewed a certificate',
+      data: null,
+      userId: alice.id,
+      createdAt: iso(),
+    });
+
+    const aliceUpdates = { userId: alice.id, entityType: 'proxy_host', action: 'update' };
+    expect(await countAuditEvents(aliceUpdates)).toBe(1);
+    // null is the system actor, not "no filter".
+    expect(await countAuditEvents({ userId: null })).toBe(1);
+    expect(await countAuditEvents({ search: 'renewed', userId: alice.id })).toBe(1);
+    expect((await listAuditEvents(10, 0, { action: 'update' })).length).toBe(3);
+
+    expect(await auditFilterOptions()).toEqual({
+      entityTypes: ['certificate', 'proxy_host'],
+      actions: ['create', 'update'],
+    });
   });
 });
 

@@ -449,17 +449,52 @@ function timeParams(from: number, to: number): QueryParams {
   return { p_from: safeUint(from), p_to: safeUint(to) };
 }
 
+/** A bare string is the free-text search alone, which is all the REST API passes. */
+export type WafEventFilter = {
+  search?: string;
+  host?: string;
+  clientIp?: string;
+  ruleId?: number;
+  blocked?: boolean;
+  severity?: string;
+};
+
 function buildWafFilter(
-  search?: string,
+  filter?: string | WafEventFilter,
   from?: number,
   to?: number,
 ): { where: string; params: QueryParams } {
   const clauses: string[] = [];
   let params: QueryParams = {};
+  const { search, host, clientIp, ruleId, blocked, severity } =
+    typeof filter === "string" ? { search: filter } : (filter ?? {});
 
   if (Number.isFinite(from) && Number.isFinite(to)) {
     clauses.push(timeFilter());
     params = { ...params, ...timeParams(from as number, to as number) };
+  }
+
+  // The column is the Host header, so the same site also appears with its port.
+  if (host) {
+    clauses.push(`(host = {p_host:String} OR startsWith(host, concat({p_host:String}, ':')))`);
+    params.p_host = host;
+  }
+  if (clientIp) {
+    clauses.push(`client_ip = {p_client_ip:String}`);
+    params.p_client_ip = clientIp;
+  }
+  if (ruleId !== undefined && Number.isInteger(ruleId)) {
+    clauses.push(`rule_id = {p_rule_id:Int32}`);
+    params.p_rule_id = ruleId;
+  }
+  if (blocked !== undefined) {
+    clauses.push(`blocked = {p_blocked:Bool}`);
+    params.p_blocked = blocked;
+  }
+  // Severity arrives in whatever case the rule set wrote it, as the stats query already allows for.
+  if (severity) {
+    clauses.push(`upperUTF8(ifNull(severity, '')) = upperUTF8({p_severity:String})`);
+    params.p_severity = severity;
   }
 
   if (search) {
@@ -1096,17 +1131,17 @@ export async function queryWafCount(from: number, to: number): Promise<number> {
 }
 
 export async function queryWafCountWithSearch(
-  search?: string,
+  filter?: string | WafEventFilter,
   from?: number,
   to?: number,
 ): Promise<number> {
-  const filter = buildWafFilter(search, from, to);
+  const built = buildWafFilter(filter, from, to);
   const row = await queryRow<{ value: string }>(
     `
     SELECT count() AS value FROM waf_events
-    ${filter.where}
+    ${built.where}
   `,
-    filter.params,
+    built.params,
   );
   return Number(row?.value ?? 0);
 }
@@ -1120,11 +1155,11 @@ export interface WafEventStats {
 }
 
 export async function queryWafEventStatsWithSearch(
-  search?: string,
+  filter?: string | WafEventFilter,
   from?: number,
   to?: number,
 ): Promise<WafEventStats> {
-  const filter = buildWafFilter(search, from, to);
+  const built = buildWafFilter(filter, from, to);
   const row = await queryRow<{
     total: string;
     blocked: string;
@@ -1140,9 +1175,9 @@ export async function queryWafEventStatsWithSearch(
       uniqExact(host) AS unique_hosts,
       uniqExactIf(rule_id, rule_id IS NOT NULL) AS rule_ids_triggered
     FROM waf_events
-    ${filter.where}
+    ${built.where}
   `,
-    filter.params,
+    built.params,
   );
 
   return {
@@ -1304,22 +1339,22 @@ export interface WafEvent {
 export async function queryWafEvents(
   limit = 50,
   offset = 0,
-  search?: string,
+  filter?: string | WafEventFilter,
   from?: number,
   to?: number,
 ): Promise<WafEvent[]> {
   const safeLimit = safeUint(limit);
   const safeOffset = safeUint(offset);
-  const filter = buildWafFilter(search, from, to);
+  const built = buildWafFilter(filter, from, to);
   const query = `
     SELECT toUInt32(ts) AS ts, host, client_ip, country_code, method, uri,
            rule_id, rule_message, severity, raw_data, blocked
     FROM waf_events
-    ${filter.where}
+    ${built.where}
     ORDER BY ts DESC
     LIMIT {p_limit:UInt32} OFFSET {p_offset:UInt32}
   `;
-  const params = { ...filter.params, p_limit: safeLimit, p_offset: safeOffset };
+  const params = { ...built.params, p_limit: safeLimit, p_offset: safeOffset };
 
   const rows = await queryRows<{
     ts: string;

@@ -310,6 +310,40 @@ describe('clickhouse client analytics enablement', () => {
 
     expect(query).toHaveBeenCalledTimes(1);
   });
+
+  it('narrows WAF events on each structured filter, binding every value as a parameter', async () => {
+    vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
+
+    const query = vi.fn().mockResolvedValue({ json: async () => [{ value: '0' }] });
+    vi.mock('@clickhouse/client', () => ({
+      createClient: vi.fn(() => ({ query, command: vi.fn(), insert: vi.fn(), close: vi.fn() })),
+    }));
+
+    const { queryWafCountWithSearch } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    await queryWafCountWithSearch({
+      search: "' OR 1=1",
+      host: 'app.example.com',
+      clientIp: '203.0.113.9',
+      ruleId: 942100,
+      blocked: false,
+      severity: 'critical',
+    });
+
+    const [{ query: sql, query_params }] = query.mock.calls[0];
+    expect(sql).toContain('startsWith(host, concat({p_host:String}');
+    expect(sql).toContain('client_ip = {p_client_ip:String}');
+    expect(sql).toContain('rule_id = {p_rule_id:Int32}');
+    expect(sql).toContain('blocked = {p_blocked:Bool}');
+    expect(sql).not.toContain('OR 1=1');
+    expect(query_params).toMatchObject({
+      p_search: "%' OR 1=1%",
+      p_host: 'app.example.com',
+      p_client_ip: '203.0.113.9',
+      p_rule_id: 942100,
+      p_blocked: false,
+      p_severity: 'critical',
+    });
+  });
 });
 
 describe('per-country analytics', () => {
