@@ -3377,6 +3377,7 @@
     "presetName": "Name",
     "presetDescription": "Description",
     "presetDirectives": "SecLang directives",
+    "presetDirectivesPlaceholder": "SecRule REQUEST_FILENAME \"@beginsWith /remote.php/dav\" \"id:9500,phase:1,pass,nolog,ctl:ruleRemoveById=920420\"",
     "presetDirectivesHelp": "The same directives custom rules allow: SecRule, SecAction, SecMarker and SecDefaultAction. A rule may span lines with a trailing backslash.",
     "presetUsedBy": "Used by",
     "presetUsedGlobally": "Global",

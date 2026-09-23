@@ -33,9 +33,6 @@ export type WafPresetRow = {
   hostCount: number;
 };
 
-const DIRECTIVES_PLACEHOLDER = `SecRule REQUEST_FILENAME "@beginsWith /remote.php/dav" \\
-    "id:9500,phase:1,pass,nolog,ctl:ruleRemoveById=920420"`;
-
 export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
   const t = useTranslations("waf");
   const router = useRouter();
@@ -268,7 +265,7 @@ function WafPresetDialog({
             height="md"
             value={directives}
             onChange={setDirectives}
-            placeholder={DIRECTIVES_PLACEHOLDER}
+            placeholder={t("presetDirectivesPlaceholder")}
             description={t("presetDirectivesHelp")}
           />
         </VStack>
