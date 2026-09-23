@@ -2508,7 +2508,8 @@ const spec = {
             example: ":5432",
             description:
               "Address to listen on: ':port', 'host:port', or '[ipv6]:port'. An IPv6 literal " +
-              "must be bracketed - unbracketed, its last group is indistinguishable from a port.",
+              "must be bracketed - unbracketed, its last group is indistinguishable from a port. " +
+              "Ports 80, 443, 2019, 3000, 9090 and the enabled metrics port are reserved and rejected.",
           },
           upstreams: { type: "array", items: { type: "string" }, example: ["db-server:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
@@ -2557,7 +2558,9 @@ const spec = {
           listenAddress: {
             type: "string",
             example: ":5432",
-            description: "Single host:port or :port",
+            description:
+              "':port', 'host:port', or '[ipv6]:port'. Ports 80, 443, 2019, 3000, 9090 and the " +
+              "enabled metrics port are reserved and rejected.",
           },
           upstreams: { type: "array", items: { type: "string" }, example: ["db:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },

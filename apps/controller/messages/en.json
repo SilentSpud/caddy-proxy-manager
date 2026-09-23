@@ -946,7 +946,7 @@
     "lbWeights": "Weights",
     "listen": "Listen",
     "listenAddress": "Listen Address",
-    "listenAddressHelp": "Format: :PORT, HOST:PORT, or [IPv6]:PORT - an IPv6 address must be bracketed. The agent publishes the port on the Caddy container for you.",
+    "listenAddressHelp": "Format: :PORT, HOST:PORT, or [IPv6]:PORT - an IPv6 address must be bracketed. The agent publishes the port on the Caddy container for you. Ports 80, 443, 2019, 3000, 9090 and the metrics port are reserved.",
     "listeners": "Agents",
     "listenersNote": "Bind the ports for these hosts",
     "loadBalancer": "Load Balancer",

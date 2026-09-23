@@ -121,6 +121,30 @@ test.describe('L4 Proxy Hosts page', () => {
     await expect(page.getByRole('table').getByText(':19999', { exact: true })).toBeVisible();
   });
 
+  // Upstream #295: SO_REUSEPORT lets a second listener on 80/443/2019 bind silently and split traffic.
+  test('rejects a listen address on reserved port 443', async ({ page }) => {
+    await page.goto('/l4-proxy-hosts');
+    await waitForHydration(page);
+    await page.getByRole('button', { name: /create l4 host/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.getByLabel('Name').fill('E2E Reserved Port Host');
+    await page.getByLabel('Listen Address').fill(':443');
+    await page.getByLabel('Upstreams').fill('10.0.0.1:8443');
+
+    await page.getByRole('button', { name: /^create$/i }).click();
+
+    await expect(page.getByRole('dialog').getByText(/port 443 is reserved/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('table').getByText('E2E Reserved Port Host')).not.toBeVisible();
+  });
+
+  test('listen address field documents the reserved ports', async ({ page }) => {
+    await page.goto('/l4-proxy-hosts');
+    await waitForHydration(page);
+    await page.getByRole('button', { name: /create l4 host/i }).click();
+    await expect(page.getByRole('dialog').getByText(/ports 80, 443, 2019, 3000, 9090/i)).toBeVisible();
+  });
+
   test('deletes the created L4 proxy host', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
     await expect(page.getByRole('table').getByText('E2E Test Host', { exact: true })).toBeVisible();
