@@ -126,7 +126,8 @@ export function UrlPowerSearch({
     }
     params.delete("page");
     setFilters(filtersFromUrl(fields, params));
-    router.push(`${pathname}?${params.toString()}`);
+    const nextQuery = params.toString();
+    router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname);
   }
 
   return (

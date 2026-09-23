@@ -15,6 +15,7 @@ import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { getWafPresetUsage, listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
 import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/WafPresetOptions";
 import { requireAdmin } from "@/src/lib/auth";
+import { strictId } from "@/src/lib/strict-id";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -76,12 +77,11 @@ export default async function WafPage({ searchParams }: PageProps) {
   const { page: pageParam, ...params } = resolvedSearchParams;
   const { range, from, to } = parseRange(resolvedSearchParams);
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-  const ruleId = parseInt(params.rule ?? "", 10);
   const filter: WafEventFilter = {
     search: params.search?.trim() || undefined,
     host: params.host?.trim() || undefined,
     clientIp: params.ip?.trim() || undefined,
-    ruleId: Number.isInteger(ruleId) ? ruleId : undefined,
+    ruleId: strictId(params.rule),
     blocked: params.action === "blocked" ? true : params.action === "detected" ? false : undefined,
     severity: params.severity?.trim() || undefined,
   };

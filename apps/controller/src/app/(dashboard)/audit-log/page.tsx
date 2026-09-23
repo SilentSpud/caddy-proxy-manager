@@ -9,6 +9,7 @@ import {
 } from "@/src/lib/models/audit";
 import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
+import { strictId } from "@/src/lib/strict-id";
 import { auditSummaryText } from "@/src/lib/audit-summary";
 import type { Metadata } from "next";
 import { getFormatter, getTranslations } from "next-intl/server";
@@ -34,11 +35,10 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
   await requireAdmin();
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
-  const userId = parseInt(params.user ?? "", 10);
   const filter: AuditEventFilter = {
     search: params.search?.trim() || undefined,
     // "system" is the actor with no user row; anything else unparseable is no filter at all.
-    userId: params.user === "system" ? null : Number.isInteger(userId) ? userId : undefined,
+    userId: params.user === "system" ? null : strictId(params.user),
     entityType: params.resource?.trim() || undefined,
     action: params.action?.trim() || undefined,
   };
