@@ -5,7 +5,6 @@ import { ClipboardCopy, ShieldOff } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
-import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Icon } from "@astryxdesign/core/Icon";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
@@ -212,15 +211,18 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                 isGroupLabel
                 description={limitActionHelp[limitAction]}
               >
-                <SegmentedControl
-                  label={t("overLimitAction")}
-                  value={limitAction}
-                  onChange={(next) => setLimitAction(next as LimitAction)}
-                >
-                  <SegmentedControlItem value="inherit" label={t("inherit")} />
-                  <SegmentedControlItem value="Reject" label={t("reject")} />
-                  <SegmentedControlItem value="ProcessPartial" label={t("partial")} />
-                </SegmentedControl>
+                {/* The HStack keeps Field's column from stretching the control across the dialog. */}
+                <HStack>
+                  <SegmentedControl
+                    label={t("overLimitAction")}
+                    value={limitAction}
+                    onChange={(next) => setLimitAction(next as LimitAction)}
+                  >
+                    <SegmentedControlItem value="inherit" label={t("inherit")} />
+                    <SegmentedControlItem value="Reject" label={t("reject")} />
+                    <SegmentedControlItem value="ProcessPartial" label={t("partial")} />
+                  </SegmentedControl>
+                </HStack>
               </Field>
             </VStack>
 
@@ -246,7 +248,10 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               description={t("customWafDirectivesHelp")}
             />
 
-            <Collapsible trigger={t("quickTemplates")}>
+            <VStack gap={2}>
+              <Text type="body" size="lg" weight="semibold">
+                {t("quickTemplates")}
+              </Text>
               <HStack gap={2} wrap="wrap">
                 {QUICK_TEMPLATES.map((template) => (
                   <Button
@@ -263,7 +268,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                   />
                 ))}
               </HStack>
-            </Collapsible>
+            </VStack>
           </VStack>
         )}
       </VStack>

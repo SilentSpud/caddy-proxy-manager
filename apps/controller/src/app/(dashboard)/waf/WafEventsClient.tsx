@@ -1546,16 +1546,18 @@ export default function WafEventsClient({
                 isGroupLabel
                 description={bodyLimitActions.find((o) => o.value === wafLimitAction)?.help}
               >
-                <SegmentedControl
-                  label={t("overLimitAction")}
-                  size="sm"
-                  value={wafLimitAction}
-                  onChange={setWafLimitAction}
-                >
-                  {bodyLimitActions.map((o) => (
-                    <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
-                  ))}
-                </SegmentedControl>
+                {/* The HStack keeps Field's column from stretching the control across the page. */}
+                <HStack>
+                  <SegmentedControl
+                    label={t("overLimitAction")}
+                    value={wafLimitAction}
+                    onChange={setWafLimitAction}
+                  >
+                    {bodyLimitActions.map((o) => (
+                      <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
+                    ))}
+                  </SegmentedControl>
+                </HStack>
               </Field>
               <WafPresetPicker
                 value={wafPresetIds}
@@ -1577,14 +1579,10 @@ export default function WafEventsClient({
                 placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
                 description={t("customDirectivesHelp")}
               />
-              <Collapsible
-                defaultIsOpen={false}
-                trigger={
-                  <Text type="body" size="sm">
-                    {t("quickTemplates")}
-                  </Text>
-                }
-              >
+              <VStack gap={2}>
+                <Text type="body" size="lg" weight="semibold">
+                  {t("quickTemplates")}
+                </Text>
                 <HStack gap={2} wrap="wrap">
                   {WAF_TEMPLATES.map((template) => (
                     <Button
@@ -1602,7 +1600,7 @@ export default function WafEventsClient({
                     />
                   ))}
                 </HStack>
-              </Collapsible>
+              </VStack>
               <Banner status="info" title={t("exclusionsTabHelp")} />
               <SaveButton label={t("save")} />
             </VStack>
