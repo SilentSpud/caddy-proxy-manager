@@ -24,6 +24,10 @@ const spec = {
     { name: "Users", description: "User management" },
     { name: "Groups", description: "User groups for forward auth access control" },
     { name: "mTLS Roles", description: "Role-based access control for mTLS client certificates" },
+    {
+      name: "WAF Presets",
+      description: "Named SecLang rule sets the global WAF settings and each host select by id",
+    },
     { name: "Forward Auth", description: "Forward auth sessions and per-host access control" },
     { name: "Audit Log", description: "Audit log" },
     { name: "Caddy", description: "Caddy server operations" },
@@ -1231,6 +1235,119 @@ const spec = {
     },
 
     // ── mTLS Roles ─────────────────────────────────────────────────
+    "/api/v1/waf-presets": {
+      get: {
+        tags: ["WAF Presets"],
+        summary: "List WAF presets",
+        operationId: "listWafPresets",
+        responses: {
+          "200": {
+            description: "List of presets",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/WafPreset" } },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      post: {
+        tags: ["WAF Presets"],
+        summary: "Create a WAF preset",
+        operationId: "createWafPreset",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name", "directives"],
+                properties: {
+                  name: { type: "string" },
+                  description: { type: ["string", "null"] },
+                  directives: {
+                    type: "string",
+                    description:
+                      "SecRule, SecAction, SecMarker and SecDefaultAction only - the custom-directive allowlist. A write that would drop a directive is refused.",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Preset created",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/WafPreset" } } },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/waf-presets/{id}": {
+      get: {
+        tags: ["WAF Presets"],
+        summary: "Get a WAF preset",
+        operationId: "getWafPreset",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": {
+            description: "Preset details",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/WafPreset" } } },
+          },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["WAF Presets"],
+        summary: "Update a WAF preset",
+        description:
+          "Applies the Caddy config when a host or the global settings select the preset.",
+        operationId: "updateWafPreset",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  description: { type: ["string", "null"] },
+                  directives: {
+                    type: "string",
+                    description:
+                      "SecRule, SecAction, SecMarker and SecDefaultAction only - the custom-directive allowlist. A write that would drop a directive is refused.",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Preset updated",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/WafPreset" } } },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      delete: {
+        tags: ["WAF Presets"],
+        summary: "Delete a WAF preset",
+        description: "Refused with 409 while the global settings or any host still select it.",
+        operationId: "deleteWafPreset",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": { $ref: "#/components/responses/Ok" },
+          "404": { $ref: "#/components/responses/NotFound" },
+          "409": { description: "The preset is still selected" },
+        },
+      },
+    },
     "/api/v1/mtls-roles": {
       get: {
         tags: ["mTLS Roles"],
@@ -1970,6 +2087,12 @@ const spec = {
             items: { type: "integer" },
             description: "Rule IDs to exclude",
           },
+          preset_ids: {
+            type: "array",
+            items: { type: "integer" },
+            description:
+              "WAF preset ids, loaded ahead of the CRS rules. Merge mode adds them to the global selection; override replaces it.",
+          },
           waf_mode: {
             type: "string",
             enum: ["merge", "override"],
@@ -2508,7 +2631,8 @@ const spec = {
             example: ":5432",
             description:
               "Address to listen on: ':port', 'host:port', or '[ipv6]:port'. An IPv6 literal " +
-              "must be bracketed - unbracketed, its last group is indistinguishable from a port.",
+              "must be bracketed - unbracketed, its last group is indistinguishable from a port. " +
+              "Ports 80, 443, 2019, 3000, 9090 and the enabled metrics port are reserved and rejected.",
           },
           upstreams: { type: "array", items: { type: "string" }, example: ["db-server:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
@@ -2557,7 +2681,9 @@ const spec = {
           listenAddress: {
             type: "string",
             example: ":5432",
-            description: "Single host:port or :port",
+            description:
+              "':port', 'host:port', or '[ipv6]:port'. Ports 80, 443, 2019, 3000, 9090 and the " +
+              "enabled metrics port are reserved and rejected.",
           },
           upstreams: { type: "array", items: { type: "string" }, example: ["db:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
@@ -2923,6 +3049,11 @@ const spec = {
           load_owasp_crs: { type: "boolean" },
           custom_directives: { type: "string" },
           excluded_rule_ids: { type: "array", items: { type: "integer" } },
+          preset_ids: {
+            type: "array",
+            items: { type: "integer" },
+            description: "WAF preset ids, loaded ahead of the CRS rules on every host",
+          },
           request_body_limit: {
             type: "integer",
             minimum: 1024,
@@ -2968,6 +3099,18 @@ const spec = {
           createdAt: { type: "string", format: "date-time" },
         },
         required: ["userId", "email", "createdAt"],
+      },
+      WafPreset: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          name: { type: "string" },
+          description: { type: ["string", "null"] },
+          directives: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+        required: ["id", "name", "directives", "createdAt", "updatedAt"],
       },
       MtlsRole: {
         type: "object",

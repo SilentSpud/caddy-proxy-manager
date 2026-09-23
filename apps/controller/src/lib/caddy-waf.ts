@@ -100,13 +100,56 @@ export function findInvalidBodyLimitDirective(
   directives: string | null | undefined,
 ): string | null {
   if (!directives?.trim()) return null;
-  for (const line of directives.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const match = BODY_LIMIT_DIRECTIVE.exec(trimmed);
-    if (match && !isValidBodyLimit(Number(match[2]))) return trimmed;
+  for (const { text } of seclangDirectives(directives)) {
+    if (!text) continue;
+    const match = BODY_LIMIT_DIRECTIVE.exec(text);
+    if (match && !isValidBodyLimit(Number(match[2]))) return text;
   }
   return null;
+}
+
+/**
+ * One directive as Coraza reads it: `text` is what its parser evaluates, `lines` the source lines
+ * it came from, emitted verbatim. `text` is empty for a blank or comment line, and null for a
+ * continuation or backtick block the input never closed.
+ */
+type SeclangDirective = { text: string | null; lines: string[] };
+
+/**
+ * Groups lines exactly as Coraza's parser does (internal/seclang/parser.go, v3.7): a trailing `\`
+ * continues, a line ending in a backtick opens a block that a line starting with one closes, and a
+ * comment line is skipped even mid-rule. The allowlist must judge what Coraza evaluates, or a rule
+ * split across lines is checked in pieces.
+ */
+function seclangDirectives(raw: string): SeclangDirective[] {
+  const out: SeclangDirective[] = [];
+  let buffer = "";
+  let pending: string[] = [];
+  let inBackticks = false;
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      if (pending.length > 0) pending.push(line);
+      else out.push({ text: "", lines: [line] });
+      continue;
+    }
+    pending.push(line);
+    if (!inBackticks && trimmed.endsWith("`")) inBackticks = true;
+    else if (inBackticks && trimmed.startsWith("`")) inBackticks = false;
+    if (inBackticks) {
+      buffer += `${trimmed}\n`;
+      continue;
+    }
+    if (trimmed.endsWith("\\")) {
+      buffer += trimmed.slice(0, -1);
+      continue;
+    }
+    out.push({ text: buffer + trimmed, lines: pending });
+    buffer = "";
+    pending = [];
+  }
+  if (pending.length > 0) out.push({ text: null, lines: pending });
+  return out;
 }
 
 /**
@@ -118,7 +161,8 @@ export type DroppedWafDirectiveReason =
   | "wafDirectiveDroppedRuleMutation"
   | "wafDirectiveDroppedCtlRuleEngine"
   | "wafDirectiveDroppedBodyLimit"
-  | "wafDirectiveDroppedNotAllowed";
+  | "wafDirectiveDroppedNotAllowed"
+  | "wafDirectiveDroppedUnterminated";
 
 /** A custom SecLang line CPM will not send to Caddy, and why. */
 export type DroppedWafDirective = { line: string; reason: DroppedWafDirectiveReason };
@@ -157,47 +201,52 @@ export function filterCustomDirectives(raw: string | null | undefined): {
   const dropped: DroppedWafDirective[] = [];
   if (!raw?.trim()) return { kept, dropped };
 
-  for (const line of raw.trim().split("\n")) {
-    const trimmed = line.trim();
+  for (const { text, lines } of seclangDirectives(raw.trim())) {
     // Blank lines and comments carry nothing to reject.
-    if (!trimmed || trimmed.startsWith("#")) {
-      kept.push(line);
+    if (text === "") {
+      kept.push(...lines);
+      continue;
+    }
+    // A dangling `\` would join whatever CPM emits next - a preset, or SecRuleEngine - onto it.
+    if (text === null) {
+      dropped.push({ line: lines.join("\n").trim(), reason: "wafDirectiveDroppedUnterminated" });
       continue;
     }
     // Include would read arbitrary files out of the container filesystem.
-    if (/^Include\s/i.test(trimmed)) {
-      dropped.push({ line: trimmed, reason: "wafDirectiveDroppedInclude" });
+    if (/^Include\s/i.test(text)) {
+      dropped.push({ line: text, reason: "wafDirectiveDroppedInclude" });
       continue;
     }
     // Body limits are allowed, but only inside the range Coraza accepts - an out-of-range value
     // would make Caddy reject the whole config document. Input validation reports these; dropping
     // here is the net. (SecRequestBodyNoFilesLimit parses but is not enforced by Coraza:
     // corazawaf/coraza#896. Kept accepted so existing configs keep loading.)
-    const bodyLimit = BODY_LIMIT_DIRECTIVE.exec(trimmed);
+    const bodyLimit = BODY_LIMIT_DIRECTIVE.exec(text);
     if (bodyLimit) {
-      if (isValidBodyLimit(Number(bodyLimit[2]))) kept.push(line);
-      else dropped.push({ line: trimmed, reason: "wafDirectiveDroppedBodyLimit" });
+      if (isValidBodyLimit(Number(bodyLimit[2]))) kept.push(...lines);
+      else dropped.push({ line: text, reason: "wafDirectiveDroppedBodyLimit" });
       continue;
     }
-    if (BODY_LIMIT_ACTION_DIRECTIVE.test(trimmed)) {
-      kept.push(line);
+    if (BODY_LIMIT_ACTION_DIRECTIVE.test(text)) {
+      kept.push(...lines);
       continue;
     }
     // Before the generic allowlist, so the reason names the real objection.
-    if (BLOCKED_SEC_RULE_PREFIXES.some((pattern) => pattern.test(trimmed))) {
-      dropped.push({ line: trimmed, reason: "wafDirectiveDroppedRuleMutation" });
+    if (BLOCKED_SEC_RULE_PREFIXES.some((pattern) => pattern.test(text))) {
+      dropped.push({ line: text, reason: "wafDirectiveDroppedRuleMutation" });
       continue;
     }
-    if (!ALLOWED_DIRECTIVE_PREFIXES.some((pattern) => pattern.test(trimmed))) {
-      dropped.push({ line: trimmed, reason: "wafDirectiveDroppedNotAllowed" });
+    if (!ALLOWED_DIRECTIVE_PREFIXES.some((pattern) => pattern.test(text))) {
+      dropped.push({ line: text, reason: "wafDirectiveDroppedNotAllowed" });
       continue;
     }
-    // ctl:ruleEngine inside an allowed line can conditionally disable the WAF.
-    if (/ctl:ruleEngine/i.test(trimmed)) {
-      dropped.push({ line: trimmed, reason: "wafDirectiveDroppedCtlRuleEngine" });
+    // ctl:ruleEngine inside an allowed rule can conditionally disable the WAF. Coraza trims around
+    // the colon, so this does too.
+    if (/ctl\s*:\s*ruleEngine/i.test(text)) {
+      dropped.push({ line: text, reason: "wafDirectiveDroppedCtlRuleEngine" });
       continue;
     }
-    kept.push(line);
+    kept.push(...lines);
   }
   return { kept, dropped };
 }
@@ -211,6 +260,14 @@ export function droppedWafDirectiveDetails(dropped: readonly DroppedWafDirective
   // body-limit reason reads them; the others ignore the extra params.
   const bounds = { min: String(CORAZA_MIN_BODY_LIMIT), max: String(CORAZA_MAX_BODY_LIMIT) };
   return dropped.map((entry) => `"${entry.line}" - ${domainErrorMessage(entry.reason, bounds)}`);
+}
+
+/** Positive integers, deduplicated, in first-seen order - the order presets are emitted in. */
+export function normalizeWafPresetIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(value.filter((id): id is number => Number.isInteger(id) && (id as number) > 0)),
+  ];
 }
 
 /**
@@ -235,6 +292,7 @@ export function resolveEffectiveWaf(
       load_owasp_crs: host.load_owasp_crs ?? false,
       custom_directives: host.custom_directives ?? "",
       excluded_rule_ids: host.excluded_rule_ids,
+      preset_ids: host.preset_ids,
       request_body_limit: host.request_body_limit,
       request_body_in_memory_limit: host.request_body_in_memory_limit,
       request_body_limit_action: host.request_body_limit_action,
@@ -253,6 +311,7 @@ export function resolveEffectiveWaf(
         .filter(Boolean)
         .join("\n"),
       excluded_rule_ids: [...(global.excluded_rule_ids ?? []), ...(host.excluded_rule_ids ?? [])],
+      preset_ids: [...new Set([...(global.preset_ids ?? []), ...(host.preset_ids ?? [])])],
       // Body limits are scalars, not lists: the host value wins when set,
       // otherwise the global one applies.
       request_body_limit: host.request_body_limit ?? global.request_body_limit,
@@ -269,6 +328,7 @@ export function resolveEffectiveWaf(
       load_owasp_crs: host.load_owasp_crs ?? false,
       custom_directives: host.custom_directives ?? "",
       excluded_rule_ids: host.excluded_rule_ids,
+      preset_ids: host.preset_ids,
       request_body_limit: host.request_body_limit,
       request_body_in_memory_limit: host.request_body_in_memory_limit,
       request_body_limit_action: host.request_body_limit_action,
@@ -291,7 +351,10 @@ export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
  * coraza-coreruleset filesystem, mounted only when `load_owasp_crs` is true - so every @-include
  * is gated on that flag, or the config load fails.
  */
-export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
+export function buildWafHandler(
+  waf: WafSettings,
+  presets: ReadonlyMap<number, string> = new Map(),
+): Record<string, unknown> {
   const parts: string[] = [];
 
   // `mode` is interpolated straight into the directive block and settings are stored unvalidated,
@@ -302,12 +365,18 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
   if (waf.load_owasp_crs) {
     // @-prefixed paths resolve from the embedded coraza-coreruleset filesystem,
     // which is only mounted when load_owasp_crs is true.
-    parts.push(
-      "Include @coraza.conf-recommended",
-      "Include @crs-setup.conf.example",
-      "Include @owasp_crs/*.conf",
-    );
+    parts.push("Include @coraza.conf-recommended", "Include @crs-setup.conf.example");
   }
+
+  // Where CRS 4 loads a plugin's -before file: after crs-setup, ahead of the rules. A runtime
+  // exclusion (ctl:ruleRemove*) only works on rules that have not run yet. An unknown id is a
+  // preset deleted under a stale selection, and emits nothing.
+  for (const id of new Set(waf.preset_ids ?? [])) {
+    const { kept } = filterCustomDirectives(presets.get(id));
+    if (kept.length > 0) parts.push(kept.join("\n"));
+  }
+
+  if (waf.load_owasp_crs) parts.push("Include @owasp_crs/*.conf");
 
   // Runtime-validate excluded_rule_ids are positive integers
   if (waf.excluded_rule_ids?.length) {
@@ -429,8 +498,9 @@ function reconcileInMemoryBodyLimit(directives: string, crsLoaded: boolean): str
 export function buildWafHandlerEntry(
   waf: WafSettings,
   allowWebsocket = false,
+  presets: ReadonlyMap<number, string> = new Map(),
 ): Record<string, unknown> {
-  const wafHandler = buildWafHandler(waf);
+  const wafHandler = buildWafHandler(waf, presets);
   if (!allowWebsocket) return wafHandler;
   return {
     handler: "subroute",

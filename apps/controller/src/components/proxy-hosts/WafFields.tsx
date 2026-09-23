@@ -1,11 +1,9 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ClipboardCopy, ShieldOff } from "lucide-react";
-import { Button } from "@astryxdesign/core/Button";
+import { ShieldOff } from "lucide-react";
 import { Card } from "@astryxdesign/core/Card";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
-import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Icon } from "@astryxdesign/core/Icon";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
@@ -16,6 +14,8 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { WafHostConfig } from "@/lib/models/proxy-hosts";
 import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/lib/caddy-waf";
 import { WafRuleExclusions } from "./WafRuleExclusions";
+import { WafPresetPicker } from "./WafPresetPicker";
+import { WafQuickTemplates } from "./WafQuickTemplates";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { useTranslations } from "next-intl";
@@ -29,22 +29,6 @@ function bodyLimitMib(bytes: number | undefined): number | null {
   const mib = bytesToMib(bytes);
   return mib ? Number(mib) : null;
 }
-
-const QUICK_TEMPLATES = [
-  {
-    labelKey: "wafTemplates.allowIp",
-    snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"`,
-  },
-  {
-    labelKey: "wafTemplates.disableWafForPath",
-    snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"`,
-  },
-  { labelKey: "wafTemplates.removeXssRules", snippet: `SecRuleRemoveByTag "attack-xss"` },
-  {
-    labelKey: "wafTemplates.blockUserAgent",
-    snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"`,
-  },
-] as const;
 
 type Props = {
   value?: WafHostConfig | null;
@@ -64,6 +48,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
   );
   const [loadCrs, setLoadCrs] = useState(value?.load_owasp_crs ?? true);
   const [customDirectives, setCustomDirectives] = useState(value?.custom_directives ?? "");
+  const [presetIds, setPresetIds] = useState<number[]>(value?.preset_ids ?? []);
   const [bodyLimitMb, setBodyLimitMb] = useState(bodyLimitMib(value?.request_body_limit));
   const [inMemoryLimitMb, setInMemoryLimitMb] = useState(
     bodyLimitMib(value?.request_body_in_memory_limit),
@@ -86,6 +71,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
       <input type="hidden" name="wafEngineMode" value={engineMode} />
       <input type="hidden" name="wafLoadOwaspCrs" value={loadCrs ? "on" : ""} />
       <input type="hidden" name="wafCustomDirectives" value={customDirectives} />
+      <input type="hidden" name="wafPresetIds" value={JSON.stringify(presetIds)} />
       <input type="hidden" name="wafRequestBodyLimitMb" value={bodyLimitMb ?? ""} />
       <input type="hidden" name="wafRequestBodyInMemoryLimitMb" value={inMemoryLimitMb ?? ""} />
       <input
@@ -209,21 +195,32 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                 isGroupLabel
                 description={limitActionHelp[limitAction]}
               >
-                <SegmentedControl
-                  label={t("overLimitAction")}
-                  value={limitAction}
-                  onChange={(next) => setLimitAction(next as LimitAction)}
-                >
-                  <SegmentedControlItem value="inherit" label={t("inherit")} />
-                  <SegmentedControlItem value="Reject" label={t("reject")} />
-                  <SegmentedControlItem value="ProcessPartial" label={t("partial")} />
-                </SegmentedControl>
+                {/* The HStack keeps Field's column from stretching the control across the dialog. */}
+                <HStack>
+                  <SegmentedControl
+                    label={t("overLimitAction")}
+                    value={limitAction}
+                    onChange={(next) => setLimitAction(next as LimitAction)}
+                  >
+                    <SegmentedControlItem value="inherit" label={t("inherit")} />
+                    <SegmentedControlItem value="Reject" label={t("reject")} />
+                    <SegmentedControlItem value="ProcessPartial" label={t("partial")} />
+                  </SegmentedControl>
+                </HStack>
               </Field>
             </VStack>
 
             <Divider />
 
             <WafRuleExclusions value={value?.excluded_rule_ids} />
+
+            <WafPresetPicker
+              value={presetIds}
+              onChange={setPresetIds}
+              description={
+                wafMode === "override" ? t("wafPresetsHelpOverride") : t("wafPresetsHelpMerge")
+              }
+            />
 
             <CodeEditor
               label={t("customSeclangDirectives")}
@@ -235,24 +232,16 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               description={t("customWafDirectivesHelp")}
             />
 
-            <Collapsible trigger={t("quickTemplates")}>
-              <HStack gap={2} wrap="wrap">
-                {QUICK_TEMPLATES.map((template) => (
-                  <Button
-                    key={template.labelKey}
-                    size="sm"
-                    variant="secondary"
-                    label={t(template.labelKey)}
-                    icon={<ClipboardCopy />}
-                    onClick={() =>
-                      setCustomDirectives((prev) =>
-                        prev ? `${prev}\n${template.snippet}` : template.snippet,
-                      )
-                    }
-                  />
-                ))}
-              </HStack>
-            </Collapsible>
+            <WafQuickTemplates
+              onInsert={(snippet) =>
+                setCustomDirectives((prev) =>
+                  prev
+                    ? `${prev}
+${snippet}`
+                    : snippet,
+                )
+              }
+            />
           </VStack>
         )}
       </VStack>

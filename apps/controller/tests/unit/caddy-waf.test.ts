@@ -640,6 +640,135 @@ describe('filterCustomDirectives', () => {
   });
 });
 
+// Coraza joins continued lines before it evaluates a directive, so the allowlist has to as well:
+// checked line by line, a rule split across lines was judged in pieces (upstream #149).
+describe('filterCustomDirectives - multi-line directives', () => {
+  it('keeps a rule continued across lines, verbatim', () => {
+    const raw = [
+      'SecRule REQUEST_FILENAME "@beginsWith /remote.php/dav" \\',
+      '    "id:9500,\\',
+      '    phase:1,\\',
+      '    pass,\\',
+      '    nolog,\\',
+      '    ctl:ruleRemoveTargetById=920420;REQUEST_HEADERS:Content-Type"',
+    ].join('\n');
+    const { kept, dropped } = filterCustomDirectives(raw);
+    expect(dropped).toEqual([]);
+    expect(kept.join('\n')).toBe(raw);
+  });
+
+  it('skips a comment in the middle of a rule, as Coraza does', () => {
+    const raw = ['SecRule ARGS "@rx x" \\', '# why', '    "id:9501,pass,nolog"'].join('\n');
+    expect(filterCustomDirectives(raw)).toEqual({ kept: raw.split('\n'), dropped: [] });
+  });
+
+  it('judges the joined rule, so ctl:ruleEngine split across lines is still caught', () => {
+    const { kept, dropped } = filterCustomDirectives(
+      ['SecRule ARGS "@rx x" "id:9502,\\', 'ctl:ruleEngine=Off"'].join('\n'),
+    );
+    expect(kept).toEqual([]);
+    expect(dropped).toEqual([
+      {
+        line: 'SecRule ARGS "@rx x" "id:9502,ctl:ruleEngine=Off"',
+        reason: 'wafDirectiveDroppedCtlRuleEngine',
+      },
+    ]);
+  });
+
+  it('catches ctl:ruleEngine with whitespace around the colon', () => {
+    const { dropped } = filterCustomDirectives(
+      'SecRule ARGS "@rx x" "id:9503,ctl: ruleEngine=Off"',
+    );
+    expect(dropped.map((entry) => entry.reason)).toEqual(['wafDirectiveDroppedCtlRuleEngine']);
+  });
+
+  it('drops a continuation the input never closes', () => {
+    const { kept, dropped } = filterCustomDirectives(
+      ['SecRule ARGS "@rx x" "id:9504,pass,nolog"', 'SecAction "id:9505,pass" \\'].join('\n'),
+    );
+    expect(kept).toEqual(['SecRule ARGS "@rx x" "id:9504,pass,nolog"']);
+    expect(dropped).toEqual([
+      { line: 'SecAction "id:9505,pass" \\', reason: 'wafDirectiveDroppedUnterminated' },
+    ]);
+  });
+
+  it('refuses a disallowed directive hidden behind a continuation', () => {
+    const { dropped } = filterCustomDirectives(['Include \\', '/etc/passwd'].join('\n'));
+    expect(dropped.map((entry) => entry.reason)).toEqual(['wafDirectiveDroppedInclude']);
+  });
+
+  it('finds an out-of-range body limit split across lines', () => {
+    expect(findInvalidBodyLimitDirective('SecRequestBodyLimit \\\n10737418240')).toBe(
+      'SecRequestBodyLimit 10737418240',
+    );
+  });
+});
+
+describe('buildWafHandler - presets', () => {
+  const presets = new Map([
+    [1, 'SecRule ARGS "@rx one" "id:9601,pass,nolog"'],
+    [2, 'SecRule ARGS "@rx two" "id:9602,pass,nolog"'],
+  ]);
+
+  it('loads presets after crs-setup and before the CRS rules', () => {
+    const directives = buildWafHandler(
+      { ...baseWaf, load_owasp_crs: true, preset_ids: [2, 1] },
+      presets,
+    ).directives as string;
+    const setup = directives.indexOf('@crs-setup.conf.example');
+    const two = directives.indexOf('id:9602');
+    const one = directives.indexOf('id:9601');
+    const rules = directives.indexOf('@owasp_crs/*.conf');
+    expect(setup).toBeLessThan(two);
+    expect(two).toBeLessThan(one);
+    expect(one).toBeLessThan(rules);
+  });
+
+  it('emits presets without the CRS too', () => {
+    const directives = buildWafHandler({ ...baseWaf, preset_ids: [1] }, presets)
+      .directives as string;
+    expect(directives).toContain('id:9601');
+    expect(directives).not.toContain('@owasp_crs');
+  });
+
+  it('emits a preset once, and nothing for an unknown id', () => {
+    const directives = buildWafHandler({ ...baseWaf, preset_ids: [1, 1, 99] }, presets)
+      .directives as string;
+    expect(directives.split('id:9601').length).toBe(2);
+  });
+
+  it('still drops what the allowlist refuses, for a row stored before a check existed', () => {
+    const directives = buildWafHandler(
+      { ...baseWaf, preset_ids: [3] },
+      new Map([[3, 'SecRuleEngine Off\nSecRule ARGS "@rx x" "id:9603,pass,nolog"']]),
+    ).directives as string;
+    expect(directives).toContain('id:9603');
+    expect(directives).toContain('SecRuleEngine On');
+    expect(directives).not.toContain('SecRuleEngine Off');
+  });
+});
+
+describe('resolveEffectiveWaf - presets', () => {
+  const global = { ...baseWaf, preset_ids: [1, 2] };
+
+  it('merge mode adds the host presets to the global ones, once each', () => {
+    expect(resolveEffectiveWaf(global, { enabled: true, preset_ids: [2, 3] })?.preset_ids).toEqual([
+      1, 2, 3,
+    ]);
+  });
+
+  it('override mode uses the host presets alone', () => {
+    expect(
+      resolveEffectiveWaf(global, { enabled: true, waf_mode: 'override', preset_ids: [3] })
+        ?.preset_ids,
+    ).toEqual([3]);
+  });
+
+  it('a host without its own config inherits the global presets', () => {
+    expect(resolveEffectiveWaf(global, null)?.preset_ids).toEqual([1, 2]);
+  });
+});
+
 describe('parseBodyLimitMib', () => {
   it('converts MiB to bytes and treats blank as unset', () => {
     expect(parseBodyLimitMib('512', 'wafRequestBodyLimitInvalid')).toBe(536870912);

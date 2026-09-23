@@ -1,6 +1,6 @@
 ---
 title: WAF
-description: Coraza and the OWASP Core Rule Set - block or detect, per host, with suppression and custom directives.
+description: Coraza and the OWASP Core Rule Set - block or detect, per host, with suppression, rule presets and custom directives.
 ---
 
 import WafEventLogDemo from "../../../demos/samples/WafEventLogDemo";
@@ -12,7 +12,7 @@ needs something different.
 import Demo from "../../../components/Demo.astro";
 import WafDemo from "../../../demos/samples/WafDemo";
 
-<Demo title="The WAF card on a proxy host" note="Toggle it off to see what the host inherits.">
+<Demo title="The WAF card on a proxy host" note="Toggle it off to see what the host inherits, or open Rule presets to pick another.">
   <WafDemo client:visible />
 </Demo>
 
@@ -41,14 +41,41 @@ list or the Suppressed Rules tab:
 - **Suppress globally** - the rule stops firing everywhere.
 - **Suppress for one host** - it keeps protecting everything else.
 
+## Presets
+
+An application that trips the CRS usually needs the same handful of exclusions everywhere it runs.
+A preset is that set of rules, written once under a name in **WAF → Presets** and then selected
+wherever it applies:
+
+- **Globally**, in **WAF → Settings**, for every host with the WAF on.
+- **Per host**, in the host's WAF card. In merge mode the host's presets are added to the global
+  ones; in override mode only the host's apply.
+
+Presets load after the CRS setup and before the CRS rules - where a
+[CRS plugin](https://coreruleset.org/docs/concepts/plugins/)'s exclusions go - so a runtime
+exclusion such as `ctl:ruleRemoveById` takes effect before the rule it removes runs. The rule
+exclusion files from plugins like the
+[Nextcloud rule exclusions](https://github.com/coreruleset/nextcloud-rule-exclusions-plugin) can be
+pasted into a preset as they are.
+
+Editing a preset applies the change to every host that selects it. A preset cannot be deleted while
+anything still selects it; the error names what does.
+
 ## Custom directives
 
-Any ModSecurity SecLang syntax is accepted, so you can write rules of your own or disable the
-engine for a path:
+Each host and the global settings also take directives of their own, loaded after the CRS rules.
+Presets and custom directives accept the same SecLang: `SecRule`, `SecAction`, `SecMarker` and
+`SecDefaultAction`, plus the request body limit directives. A rule can span several lines with a
+trailing backslash:
 
 ```text
-SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"
+SecRule REQUEST_URI "@beginsWith /api/" \
+    "id:9001,phase:1,pass,nolog,ctl:ruleRemoveById=942100"
 ```
+
+Anything that would switch the engine off or rewrite rules - `SecRuleEngine`, `ctl:ruleEngine`,
+`SecRuleRemoveById` and the other `SecRule*` mutations, or `Include` - is refused when you save,
+with the offending lines named. To stop a rule from firing, suppress it instead.
 
 ## The event log
 

@@ -27,7 +27,7 @@ import {
   PATH_BLOCK_STATUS_CODES,
   sanitizeErrorPageRules,
 } from "@/src/lib/models/proxy-hosts";
-import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
+import { normalizeWafPresetIds, parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { getCloudflareSettings, type GeoBlockSettings } from "@/src/lib/settings";
 import {
@@ -524,6 +524,8 @@ export function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null
         (x): x is number => Number.isInteger(x) && (x as number) > 0,
       )
     : [];
+  const rawPresets = formData.get("wafPresetIds");
+  const preset_ids = rawPresets ? normalizeWafPresetIds(JSON.parse(rawPresets as string)) : [];
 
   if (!enabled) {
     return { waf: { enabled: false, waf_mode: wafMode } };
@@ -550,6 +552,7 @@ export function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null
       load_owasp_crs: loadCrs,
       custom_directives: customDirectives,
       excluded_rule_ids,
+      ...(preset_ids.length > 0 ? { preset_ids } : {}),
       waf_mode: wafMode,
       ...(requestBodyLimit !== undefined ? { request_body_limit: requestBodyLimit } : {}),
       ...(requestBodyInMemoryLimit !== undefined

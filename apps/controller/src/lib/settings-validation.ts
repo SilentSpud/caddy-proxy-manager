@@ -477,6 +477,7 @@ function validateWaf(value: Record<string, unknown>): void {
       "load_owasp_crs",
       "custom_directives",
       "excluded_rule_ids",
+      "preset_ids",
       "request_body_limit",
       "request_body_in_memory_limit",
       "request_body_limit_action",
@@ -510,6 +511,7 @@ function validateWaf(value: Record<string, unknown>): void {
   }
   if (value.excluded_rule_ids !== undefined)
     validateNumberList(value.excluded_rule_ids, "waf.excluded_rule_ids");
+  if (value.preset_ids !== undefined) validateNumberList(value.preset_ids, "waf.preset_ids");
   validateBodyLimits(value, "waf");
 }
 

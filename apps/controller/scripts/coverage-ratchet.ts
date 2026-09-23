@@ -14,8 +14,8 @@ import { resolve } from "node:path";
  * serial `bun run test:coverage`; under `--parallel` both numerator and denominator move.
  */
 const THRESHOLDS = {
-  lines: 58,
-  functions: 71,
+  lines: 76,
+  functions: 81,
 } as const;
 
 const LCOV_PATH = resolve(import.meta.dir, "..", "coverage", "lcov.info");

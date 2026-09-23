@@ -15,10 +15,12 @@ import {
   filterCustomDirectives,
   findInvalidBodyLimitDirective,
   isValidBodyLimit,
+  normalizeWafPresetIds,
 } from "../caddy-waf";
 import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
 import { agentIdsForHost, setHostAgents } from "./host-agents";
+import { assertWafPresetIdsExist } from "./waf-presets";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -150,6 +152,7 @@ export type WafHostConfig = {
   load_owasp_crs?: boolean;
   custom_directives?: string;
   excluded_rule_ids?: number[];
+  preset_ids?: number[];
   waf_mode?: WafMode;
   // Request body limits in bytes; unset inherits the global WAF setting.
   // Coraza rejects anything above 1 GiB at config-load time.
@@ -427,6 +430,11 @@ function validateWafMeta(waf: WafHostConfig): WafHostConfig {
     waf.request_body_in_memory_limit > waf.request_body_limit
   ) {
     throw domainError("hostWafInMemoryBodyLimitExceedsLimit", {}, { status: 400 });
+  }
+  if (waf.preset_ids !== undefined) {
+    // undefined rather than [] so an emptied selection leaves the stored JSON as it was before presets.
+    const presetIds = normalizeWafPresetIds(waf.preset_ids);
+    waf = { ...waf, preset_ids: presetIds.length > 0 ? presetIds : undefined };
   }
   // Safe to echo: findInvalidBodyLimitDirective only ever returns a line that
   // matched `<known directive name> <digits>`, never free-form user text.
@@ -3007,6 +3015,7 @@ export async function assertProxyHostOptionsStorable(options: {
     await assertCaddyfileAdapts(parseMeta(options.meta).custom_caddyfile, options.agentIds);
   }
   await assertTailscaleServable(options.meta);
+  await assertWafPresetIdsExist(parseMeta(options.meta).waf?.preset_ids);
 }
 
 function parseProxyHost(row: ProxyHostRow): ProxyHost {
@@ -3201,6 +3210,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   const now = nowIso();
   const meta = buildMeta({}, input);
   await assertTailscaleServable(meta);
+  await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
   const [record] = await db
     .insert(proxyHosts)
     .values({
@@ -3340,6 +3350,7 @@ export async function updateProxyHost(
   };
   const meta = buildMeta(existingMeta, input);
   await assertTailscaleServable(meta);
+  await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
 
   const now = nowIso();
   await db

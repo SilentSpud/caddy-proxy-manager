@@ -12,7 +12,7 @@ import {
 import { useActionState, useId } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Copy, MoreHorizontal, Search, ShieldOff, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, MoreHorizontal, Search, ShieldOff, Trash2, X } from "lucide-react";
 
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -56,6 +56,9 @@ import { useTimeZone, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { SaveButton } from "@/components/ui/FormLayout";
+import { WafPresetPicker } from "@/components/proxy-hosts/WafPresetPicker";
+import { WafQuickTemplates } from "@/components/proxy-hosts/WafQuickTemplates";
+import { WafPresetsPanel, type WafPresetRow } from "./WafPresetsPanel";
 import {
   suppressWafRuleGloballyAction,
   suppressWafRuleForHostAction,
@@ -77,6 +80,7 @@ type Props = {
   globalWafEnabled: boolean;
   hostWafMap: Record<string, number[]>;
   globalWaf: WafSettings | null;
+  presets: WafPresetRow[];
 };
 
 type RangeOption = Props["initialRange"];
@@ -951,23 +955,6 @@ function bodyLimitMib(bytes: number | undefined): number | null {
   return mib ? Number(mib) : null;
 }
 
-/** Labels are message keys: the catalog is only reachable from inside the component. */
-const WAF_TEMPLATES = [
-  {
-    labelKey: "templateAllowIp",
-    snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"`,
-  },
-  {
-    labelKey: "templateDisableWafForPath",
-    snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"`,
-  },
-  { labelKey: "templateRemoveXssRules", snippet: `SecRuleRemoveByTag "attack-xss"` },
-  {
-    labelKey: "templateBlockUserAgent",
-    snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"`,
-  },
-] as const;
-
 export default function WafEventsClient({
   events,
   stats,
@@ -981,6 +968,7 @@ export default function WafEventsClient({
   globalWafEnabled,
   hostWafMap,
   globalWaf,
+  presets,
 }: Props) {
   const t = useTranslations("waf");
   // Always set by the provider (see app/providers.tsx); UTC only satisfies the type.
@@ -1016,6 +1004,7 @@ export default function WafEventsClient({
   const [wafCustomDirectives, setWafCustomDirectives] = useState(
     globalWaf?.custom_directives ?? "",
   );
+  const [wafPresetIds, setWafPresetIds] = useState<number[]>(globalWaf?.preset_ids ?? []);
   const [wafBodyLimitMb, setWafBodyLimitMb] = useState(bodyLimitMib(globalWaf?.request_body_limit));
   const [wafInMemoryLimitMb, setWafInMemoryLimitMb] = useState(
     bodyLimitMib(globalWaf?.request_body_in_memory_limit),
@@ -1250,6 +1239,7 @@ export default function WafEventsClient({
   const views = [
     { value: "events", label: t("events") },
     { value: "suppressed", label: t("suppressedRules") },
+    { value: "presets", label: t("presets") },
     { value: "settings", label: t("settings") },
   ];
 
@@ -1317,6 +1307,7 @@ export default function WafEventsClient({
       <TabList value={tab} onChange={changeTab} hasDivider className="cpm-desktop-only">
         <Tab value="events" label={t("events")} />
         <Tab value="suppressed" label={t("suppressedRules")} />
+        <Tab value="presets" label={t("presets")} />
         <Tab value="settings" label={t("settings")} />
       </TabList>
 
@@ -1462,6 +1453,8 @@ export default function WafEventsClient({
         />
       )}
 
+      {tab === "presets" && <WafPresetsPanel presets={presets} />}
+
       {tab === "settings" && (
         <VStack gap={6}>
           <VStack gap={1}>
@@ -1474,6 +1467,7 @@ export default function WafEventsClient({
             <VStack gap={4}>
               <input type="hidden" name="wafEnabled" value={wafEnabled ? "on" : ""} />
               <input type="hidden" name="wafLoadOwaspCrs" value={wafLoadOwaspCrs ? "on" : ""} />
+              <input type="hidden" name="wafPresetIds" value={JSON.stringify(wafPresetIds)} />
               {wafState?.message && (
                 <Banner status={wafState.success ? "success" : "error"} title={wafState.message} />
               )}
@@ -1536,17 +1530,25 @@ export default function WafEventsClient({
                 isGroupLabel
                 description={bodyLimitActions.find((o) => o.value === wafLimitAction)?.help}
               >
-                <SegmentedControl
-                  label={t("overLimitAction")}
-                  size="sm"
-                  value={wafLimitAction}
-                  onChange={setWafLimitAction}
-                >
-                  {bodyLimitActions.map((o) => (
-                    <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
-                  ))}
-                </SegmentedControl>
+                {/* The HStack keeps Field's column from stretching the control across the page. */}
+                <HStack>
+                  <SegmentedControl
+                    label={t("overLimitAction")}
+                    value={wafLimitAction}
+                    onChange={setWafLimitAction}
+                  >
+                    {bodyLimitActions.map((o) => (
+                      <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
+                    ))}
+                  </SegmentedControl>
+                </HStack>
               </Field>
+              <WafPresetPicker
+                value={wafPresetIds}
+                onChange={setWafPresetIds}
+                description={t("presetsGlobalHelp")}
+                isReadOnly={Boolean(wafModuleDisabledReason)}
+              />
               <CodeEditor
                 label={t("customSeclangDirectives")}
                 language="seclang"
@@ -1561,32 +1563,16 @@ export default function WafEventsClient({
                 placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
                 description={t("customDirectivesHelp")}
               />
-              <Collapsible
-                defaultIsOpen={false}
-                trigger={
-                  <Text type="body" size="sm">
-                    {t("quickTemplates")}
-                  </Text>
+              <WafQuickTemplates
+                onInsert={(snippet) =>
+                  setWafCustomDirectives((prev) =>
+                    prev
+                      ? `${prev}
+${snippet}`
+                      : snippet,
+                  )
                 }
-              >
-                <HStack gap={2} wrap="wrap">
-                  {WAF_TEMPLATES.map((template) => (
-                    <Button
-                      key={template.labelKey}
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      icon={<Copy />}
-                      label={t(template.labelKey)}
-                      onClick={() =>
-                        setWafCustomDirectives((prev) =>
-                          prev ? `${prev}\n${template.snippet}` : template.snippet,
-                        )
-                      }
-                    />
-                  ))}
-                </HStack>
-              </Collapsible>
+              />
               <Banner status="info" title={t("exclusionsTabHelp")} />
               <SaveButton label={t("save")} />
             </VStack>
