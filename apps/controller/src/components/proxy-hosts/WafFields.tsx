@@ -1,8 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ClipboardCopy, ShieldOff } from "lucide-react";
-import { Button } from "@astryxdesign/core/Button";
+import { ShieldOff } from "lucide-react";
 import { Card } from "@astryxdesign/core/Card";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { Divider } from "@astryxdesign/core/Divider";
@@ -16,6 +15,7 @@ import type { WafHostConfig } from "@/lib/models/proxy-hosts";
 import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/lib/caddy-waf";
 import { WafRuleExclusions } from "./WafRuleExclusions";
 import { WafPresetPicker } from "./WafPresetPicker";
+import { WafQuickTemplates } from "./WafQuickTemplates";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { useTranslations } from "next-intl";
@@ -29,22 +29,6 @@ function bodyLimitMib(bytes: number | undefined): number | null {
   const mib = bytesToMib(bytes);
   return mib ? Number(mib) : null;
 }
-
-const QUICK_TEMPLATES = [
-  {
-    labelKey: "wafTemplates.allowIp",
-    snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"`,
-  },
-  {
-    labelKey: "wafTemplates.disableWafForPath",
-    snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"`,
-  },
-  { labelKey: "wafTemplates.removeXssRules", snippet: `SecRuleRemoveByTag "attack-xss"` },
-  {
-    labelKey: "wafTemplates.blockUserAgent",
-    snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"`,
-  },
-] as const;
 
 type Props = {
   value?: WafHostConfig | null;
@@ -248,27 +232,16 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               description={t("customWafDirectivesHelp")}
             />
 
-            <VStack gap={2}>
-              <Text type="body" size="lg" weight="semibold">
-                {t("quickTemplates")}
-              </Text>
-              <HStack gap={2} wrap="wrap">
-                {QUICK_TEMPLATES.map((template) => (
-                  <Button
-                    key={template.labelKey}
-                    size="sm"
-                    variant="secondary"
-                    label={t(template.labelKey)}
-                    icon={<ClipboardCopy />}
-                    onClick={() =>
-                      setCustomDirectives((prev) =>
-                        prev ? `${prev}\n${template.snippet}` : template.snippet,
-                      )
-                    }
-                  />
-                ))}
-              </HStack>
-            </VStack>
+            <WafQuickTemplates
+              onInsert={(snippet) =>
+                setCustomDirectives((prev) =>
+                  prev
+                    ? `${prev}
+${snippet}`
+                    : snippet,
+                )
+              }
+            />
           </VStack>
         )}
       </VStack>

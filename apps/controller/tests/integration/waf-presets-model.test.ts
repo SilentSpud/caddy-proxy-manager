@@ -9,6 +9,7 @@ import { proxyHosts, users } from '../../src/lib/db/schema';
 
 let db: TestDb;
 let globalWaf: { preset_ids?: number[] } | null = null;
+let dashboardMeta: string | null = null;
 
 vi.mock('../../src/lib/db', () => ({
   default: currentDb(() => db),
@@ -20,7 +21,7 @@ const applyCaddyConfig = vi.fn(async () => {});
 vi.mock('../../src/lib/caddy', () => ({ applyCaddyConfig }));
 vi.mock('../../src/lib/settings', () => ({
   getWafSettings: async () => globalWaf,
-  getDashboardSettings: async () => null,
+  getDashboardSettings: async () => ({ options: { meta: dashboardMeta } }),
 }));
 
 import {
@@ -40,6 +41,7 @@ beforeEach(async () => {
   db = await createTestDb();
   vi.clearAllMocks();
   globalWaf = null;
+  dashboardMeta = null;
   const now = new Date().toISOString();
   const [user] = await db
     .insert(users)
@@ -138,6 +140,17 @@ describe('deleteWafPreset', () => {
     await expect(deleteWafPreset(preset.id, userId)).rejects.toThrow('global WAF settings');
   });
 
+  it('refuses while the dashboard host selects it', async () => {
+    const preset = await createWafPreset({ name: 'A', directives: RULE }, userId);
+    dashboardMeta = JSON.stringify({ waf: { enabled: true, preset_ids: [preset.id] } });
+    expect((await getWafPresetUsage()).get(preset.id)).toEqual({
+      global: false,
+      dashboard: true,
+      hosts: [],
+    });
+    await expect(deleteWafPreset(preset.id, userId)).rejects.toThrow('dashboard host');
+  });
+
   it('deletes an unused preset', async () => {
     const preset = await createWafPreset({ name: 'A', directives: RULE }, userId);
     await deleteWafPreset(preset.id, userId);
@@ -154,6 +167,7 @@ describe('getWafPresetUsage / assertWafPresetIdsExist', () => {
     const usage = await getWafPresetUsage();
     expect(usage.get(a.id)).toEqual({
       global: true,
+      dashboard: false,
       hosts: [expect.objectContaining({ name: 'one' })],
     });
     expect(usage.get(b.id)?.global).toBe(false);

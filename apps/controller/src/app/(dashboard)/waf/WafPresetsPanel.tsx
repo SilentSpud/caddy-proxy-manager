@@ -30,6 +30,7 @@ export type WafPresetRow = {
   directives: string;
   updatedAt: string;
   usedGlobally: boolean;
+  usedByDashboard: boolean;
   hostCount: number;
 };
 
@@ -43,6 +44,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
   const usageLabel = (row: WafPresetRow) => {
     const parts: string[] = [];
     if (row.usedGlobally) parts.push(t("presetUsedGlobally"));
+    if (row.usedByDashboard) parts.push(t("presetUsedByDashboard"));
     if (row.hostCount > 0) parts.push(t("presetUsedByHosts", { count: row.hostCount }));
     return parts;
   };
@@ -239,9 +241,10 @@ function WafPresetDialog({
         {existing && <input type="hidden" name="id" value={existing.id} />}
         <VStack gap={3}>
           {error && <Banner status="error" title={error} />}
-          {existing && (existing.usedGlobally || existing.hostCount > 0) && (
-            <Banner status="info" title={t("presetEditAppliesEverywhere")} />
-          )}
+          {existing &&
+            (existing.usedGlobally || existing.usedByDashboard || existing.hostCount > 0) && (
+              <Banner status="info" title={t("presetEditAppliesEverywhere")} />
+            )}
           <TextInput
             {...NATIVE_REQUIRED}
             label={t("presetName")}

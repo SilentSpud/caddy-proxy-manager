@@ -122,6 +122,7 @@ export default async function WafPage({ searchParams }: PageProps) {
             directives: preset.directives,
             updatedAt: preset.updatedAt,
             usedGlobally: usage?.global ?? false,
+            usedByDashboard: usage?.dashboard ?? false,
             hostCount: usage?.hosts.length ?? 0,
           };
         })}

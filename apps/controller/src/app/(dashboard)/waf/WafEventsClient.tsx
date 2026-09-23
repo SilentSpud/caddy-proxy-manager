@@ -12,7 +12,7 @@ import {
 import { useActionState, useId } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Copy, MoreHorizontal, Search, ShieldOff, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, MoreHorizontal, Search, ShieldOff, Trash2, X } from "lucide-react";
 
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -57,6 +57,7 @@ import { useEmptyValue } from "@/components/ui/empty-value";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { SaveButton } from "@/components/ui/FormLayout";
 import { WafPresetPicker } from "@/components/proxy-hosts/WafPresetPicker";
+import { WafQuickTemplates } from "@/components/proxy-hosts/WafQuickTemplates";
 import { WafPresetsPanel, type WafPresetRow } from "./WafPresetsPanel";
 import {
   suppressWafRuleGloballyAction,
@@ -954,23 +955,6 @@ function bodyLimitMib(bytes: number | undefined): number | null {
   return mib ? Number(mib) : null;
 }
 
-/** Labels are message keys: the catalog is only reachable from inside the component. */
-const WAF_TEMPLATES = [
-  {
-    labelKey: "templateAllowIp",
-    snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"`,
-  },
-  {
-    labelKey: "templateDisableWafForPath",
-    snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"`,
-  },
-  { labelKey: "templateRemoveXssRules", snippet: `SecRuleRemoveByTag "attack-xss"` },
-  {
-    labelKey: "templateBlockUserAgent",
-    snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"`,
-  },
-] as const;
-
 export default function WafEventsClient({
   events,
   stats,
@@ -1579,28 +1563,16 @@ export default function WafEventsClient({
                 placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
                 description={t("customDirectivesHelp")}
               />
-              <VStack gap={2}>
-                <Text type="body" size="lg" weight="semibold">
-                  {t("quickTemplates")}
-                </Text>
-                <HStack gap={2} wrap="wrap">
-                  {WAF_TEMPLATES.map((template) => (
-                    <Button
-                      key={template.labelKey}
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      icon={<Copy />}
-                      label={t(template.labelKey)}
-                      onClick={() =>
-                        setWafCustomDirectives((prev) =>
-                          prev ? `${prev}\n${template.snippet}` : template.snippet,
-                        )
-                      }
-                    />
-                  ))}
-                </HStack>
-              </VStack>
+              <WafQuickTemplates
+                onInsert={(snippet) =>
+                  setWafCustomDirectives((prev) =>
+                    prev
+                      ? `${prev}
+${snippet}`
+                      : snippet,
+                  )
+                }
+              />
               <Banner status="info" title={t("exclusionsTabHelp")} />
               <SaveButton label={t("save")} />
             </VStack>

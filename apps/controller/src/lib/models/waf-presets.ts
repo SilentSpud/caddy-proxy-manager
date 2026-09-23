@@ -31,8 +31,12 @@ export type WafPresetInput = {
   directives: string;
 };
 
-/** Where a preset is selected. The dashboard host counts as a host. */
-export type WafPresetUsage = { global: boolean; hosts: { id: number | null; name: string }[] };
+/** Where a preset is selected. The dashboard host has no name of its own, so it is a flag. */
+export type WafPresetUsage = {
+  global: boolean;
+  dashboard: boolean;
+  hosts: { id: number; name: string }[];
+};
 
 type PresetRow = typeof wafPresets.$inferSelect;
 
@@ -152,14 +156,12 @@ export async function getWafPresetUsage(): Promise<Map<number, WafPresetUsage>> 
   ]);
   const usage = new Map<number, WafPresetUsage>();
   const entry = (id: number) => {
-    const found = usage.get(id) ?? { global: false, hosts: [] };
+    const found = usage.get(id) ?? { global: false, dashboard: false, hosts: [] };
     usage.set(id, found);
     return found;
   };
   for (const id of normalizeWafPresetIds(global?.preset_ids)) entry(id).global = true;
-  for (const id of presetIdsInMeta(dashboard?.options?.meta ?? null)) {
-    entry(id).hosts.push({ id: null, name: "dashboard" });
-  }
+  for (const id of presetIdsInMeta(dashboard?.options?.meta ?? null)) entry(id).dashboard = true;
   for (const host of hosts) {
     for (const id of presetIdsInMeta(host.meta))
       entry(id).hosts.push({ id: host.id, name: host.name });
@@ -241,6 +243,7 @@ export async function deleteWafPreset(id: number, actorUserId: number): Promise<
 
   const usage = (await getWafPresetUsage()).get(id);
   if (usage?.global) throw domainError("wafPresetInUseGlobally", {}, { status: 409 });
+  if (usage?.dashboard) throw domainError("wafPresetInUseByDashboard", {}, { status: 409 });
   if (usage && usage.hosts.length > 0) {
     throw domainError(
       "wafPresetInUseByHosts",
