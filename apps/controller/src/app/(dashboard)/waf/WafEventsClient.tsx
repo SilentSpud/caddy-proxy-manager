@@ -56,6 +56,8 @@ import { useTimeZone, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { SaveButton } from "@/components/ui/FormLayout";
+import { WafPresetPicker } from "@/components/proxy-hosts/WafPresetPicker";
+import { WafPresetsPanel, type WafPresetRow } from "./WafPresetsPanel";
 import {
   suppressWafRuleGloballyAction,
   suppressWafRuleForHostAction,
@@ -77,6 +79,7 @@ type Props = {
   globalWafEnabled: boolean;
   hostWafMap: Record<string, number[]>;
   globalWaf: WafSettings | null;
+  presets: WafPresetRow[];
 };
 
 type RangeOption = Props["initialRange"];
@@ -981,6 +984,7 @@ export default function WafEventsClient({
   globalWafEnabled,
   hostWafMap,
   globalWaf,
+  presets,
 }: Props) {
   const t = useTranslations("waf");
   // Always set by the provider (see app/providers.tsx); UTC only satisfies the type.
@@ -1016,6 +1020,7 @@ export default function WafEventsClient({
   const [wafCustomDirectives, setWafCustomDirectives] = useState(
     globalWaf?.custom_directives ?? "",
   );
+  const [wafPresetIds, setWafPresetIds] = useState<number[]>(globalWaf?.preset_ids ?? []);
   const [wafBodyLimitMb, setWafBodyLimitMb] = useState(bodyLimitMib(globalWaf?.request_body_limit));
   const [wafInMemoryLimitMb, setWafInMemoryLimitMb] = useState(
     bodyLimitMib(globalWaf?.request_body_in_memory_limit),
@@ -1250,6 +1255,7 @@ export default function WafEventsClient({
   const views = [
     { value: "events", label: t("events") },
     { value: "suppressed", label: t("suppressedRules") },
+    { value: "presets", label: t("presets") },
     { value: "settings", label: t("settings") },
   ];
 
@@ -1317,6 +1323,7 @@ export default function WafEventsClient({
       <TabList value={tab} onChange={changeTab} hasDivider className="cpm-desktop-only">
         <Tab value="events" label={t("events")} />
         <Tab value="suppressed" label={t("suppressedRules")} />
+        <Tab value="presets" label={t("presets")} />
         <Tab value="settings" label={t("settings")} />
       </TabList>
 
@@ -1462,6 +1469,8 @@ export default function WafEventsClient({
         />
       )}
 
+      {tab === "presets" && <WafPresetsPanel presets={presets} />}
+
       {tab === "settings" && (
         <VStack gap={6}>
           <VStack gap={1}>
@@ -1474,6 +1483,7 @@ export default function WafEventsClient({
             <VStack gap={4}>
               <input type="hidden" name="wafEnabled" value={wafEnabled ? "on" : ""} />
               <input type="hidden" name="wafLoadOwaspCrs" value={wafLoadOwaspCrs ? "on" : ""} />
+              <input type="hidden" name="wafPresetIds" value={JSON.stringify(wafPresetIds)} />
               {wafState?.message && (
                 <Banner status={wafState.success ? "success" : "error"} title={wafState.message} />
               )}
@@ -1547,6 +1557,12 @@ export default function WafEventsClient({
                   ))}
                 </SegmentedControl>
               </Field>
+              <WafPresetPicker
+                value={wafPresetIds}
+                onChange={setWafPresetIds}
+                description={t("presetsGlobalHelp")}
+                isReadOnly={Boolean(wafModuleDisabledReason)}
+              />
               <CodeEditor
                 label={t("customSeclangDirectives")}
                 language="seclang"

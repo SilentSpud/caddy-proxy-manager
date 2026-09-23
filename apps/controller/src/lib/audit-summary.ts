@@ -55,6 +55,7 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   ...lifecycle("mtls_role", "mTLS role", "mtlsRole"),
   ...lifecycle("access_list", "access list", "accessList"),
   ...lifecycle("group", "group", "group"),
+  ...lifecycle("waf_preset", "WAF preset", "wafPreset"),
 
   // users/actions.ts
   {

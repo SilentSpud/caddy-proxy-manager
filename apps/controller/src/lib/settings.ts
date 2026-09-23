@@ -403,6 +403,8 @@ export type WafSettings = {
   load_owasp_crs: boolean;
   custom_directives: string;
   excluded_rule_ids?: number[];
+  // waf_presets ids, emitted in this order ahead of the CRS rules.
+  preset_ids?: number[];
   // Request body limits, in bytes. Unset means Coraza's own default applies
   // (12.5 MiB from @coraza.conf-recommended when load_owasp_crs is on, else
   // 128 MiB). Coraza caps both at 1 GiB - see CORAZA_MAX_BODY_LIMIT.

@@ -18,6 +18,8 @@ import { listMtlsRoles } from "@/src/lib/models/mtls-roles";
 import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-certificates";
 import { listUsers } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
+import { listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
+import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/WafPresetOptions";
 import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
@@ -84,6 +86,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     issuedClientCerts,
     allUsers,
     allGroups,
+    wafPresets,
   ] = await Promise.all([
     listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, enabled),
     countProxyHosts(search, visibleIds, enabled),
@@ -100,6 +103,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     listIssuedClientCertificates().catch(() => []),
     listUsers().catch(() => []),
     listGroups().catch(() => []),
+    listWafPresets(),
   ]);
 
   // Only the hosts on this page: the map is for the edit dialog, and loading the fleet's whole
@@ -146,43 +150,45 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   }));
 
   return (
-    <ProxyHostsClient
-      hosts={hosts}
-      certificates={certificates.map(toCertificatePickerOption)}
-      caCertificates={caCertificates}
-      accessLists={accessLists}
-      authentikDefaults={authentikDefaults}
-      forwardAuthDefaults={forwardAuthDefaults}
-      // Prefills the domains field of a new host. Empty when setup has not run, which is the
-      // same as having no default: the field simply starts blank.
-      defaultDomain={generalSettings?.defaultDomain ?? ""}
-      // Only what the host form needs to warn accurately: whether the feature is on, whether a
-      // key exists at all, and the node a host inherits. Never the key itself.
-      //
-      // Always a value, never null: settings that have never been saved mean Tailscale is off and
-      // no key is stored, which is exactly when the form's warnings matter most. Passing null
-      // there left the fields unable to tell "off" from "not known" and silenced both.
-      tailscaleDefaults={{
-        enabled: tailscaleSettings?.enabled ?? false,
-        hasAuthKey: (tailscaleSettings?.authKey ?? "").trim().length > 0,
-        defaultNode: tailscaleSettings?.defaultNode ?? "",
-      }}
-      pagination={{ total, page, perPage: PER_PAGE }}
-      initialSearch={search ?? ""}
-      activeState={stateParam === "enabled" || stateParam === "disabled" ? stateParam : "all"}
-      initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
-      mtlsRoles={mtlsRoles}
-      issuedClientCerts={issuedClientCerts}
-      forwardAuthUsers={forwardAuthUsers}
-      forwardAuthGroups={forwardAuthGroups}
-      forwardAuthAccessMap={forwardAuthAccessMap}
-      agents={agents}
-      agentAssignments={agentAssignments}
-      counts={counts}
-      hostTraffic={hostTraffic}
-      trafficAvailable={traffic.available}
-      canCreate={canCreate(access)}
-      canEditRawConfig={access.isAdmin}
-    />
+    <WafPresetOptionsProvider presets={wafPresets.map(toWafPresetOption)}>
+      <ProxyHostsClient
+        hosts={hosts}
+        certificates={certificates.map(toCertificatePickerOption)}
+        caCertificates={caCertificates}
+        accessLists={accessLists}
+        authentikDefaults={authentikDefaults}
+        forwardAuthDefaults={forwardAuthDefaults}
+        // Prefills the domains field of a new host. Empty when setup has not run, which is the
+        // same as having no default: the field simply starts blank.
+        defaultDomain={generalSettings?.defaultDomain ?? ""}
+        // Only what the host form needs to warn accurately: whether the feature is on, whether a
+        // key exists at all, and the node a host inherits. Never the key itself.
+        //
+        // Always a value, never null: settings that have never been saved mean Tailscale is off and
+        // no key is stored, which is exactly when the form's warnings matter most. Passing null
+        // there left the fields unable to tell "off" from "not known" and silenced both.
+        tailscaleDefaults={{
+          enabled: tailscaleSettings?.enabled ?? false,
+          hasAuthKey: (tailscaleSettings?.authKey ?? "").trim().length > 0,
+          defaultNode: tailscaleSettings?.defaultNode ?? "",
+        }}
+        pagination={{ total, page, perPage: PER_PAGE }}
+        initialSearch={search ?? ""}
+        activeState={stateParam === "enabled" || stateParam === "disabled" ? stateParam : "all"}
+        initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
+        mtlsRoles={mtlsRoles}
+        issuedClientCerts={issuedClientCerts}
+        forwardAuthUsers={forwardAuthUsers}
+        forwardAuthGroups={forwardAuthGroups}
+        forwardAuthAccessMap={forwardAuthAccessMap}
+        agents={agents}
+        agentAssignments={agentAssignments}
+        counts={counts}
+        hostTraffic={hostTraffic}
+        trafficAvailable={traffic.available}
+        canCreate={canCreate(access)}
+        canEditRawConfig={access.isAdmin}
+      />
+    </WafPresetOptionsProvider>
   );
 }

@@ -15,7 +15,7 @@ import {
   type DashboardHostSettings,
   checkDashboardDns,
 } from "@/src/lib/dashboard-host";
-import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
+import { normalizeWafPresetIds, parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import { parseDefaultResponseHeaders } from "@/src/lib/caddy-default-response";
 import {
   getSetting,
@@ -52,6 +52,7 @@ import {
   sanitizeErrorPageRules,
 } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
+import { assertWafPresetIdsExist } from "@/src/lib/models/waf-presets";
 import { CADDY_MODULES, type CaddyCustomModule } from "@/src/lib/caddy-modules";
 import {
   applyCaddyBuild,
@@ -1744,6 +1745,12 @@ async function updateWafSettingsActionUnlocked(
       const existing = await getWafSettings();
       excluded_rule_ids = existing?.excluded_rule_ids ?? [];
     }
+    const rawPresets = formData.get("wafPresetIds");
+    const preset_ids =
+      typeof rawPresets === "string"
+        ? normalizeWafPresetIds(JSON.parse(rawPresets))
+        : ((await getWafSettings())?.preset_ids ?? []);
+    await assertWafPresetIdsExist(preset_ids);
 
     const requestBodyLimit = parseBodyLimitMib(
       formData.get("wafRequestBodyLimitMb"),
@@ -1773,6 +1780,7 @@ async function updateWafSettingsActionUnlocked(
       load_owasp_crs: loadOwasp,
       custom_directives: customDirectives,
       excluded_rule_ids,
+      ...(preset_ids.length > 0 ? { preset_ids } : {}),
       ...(requestBodyLimit !== undefined ? { request_body_limit: requestBodyLimit } : {}),
       ...(requestBodyInMemoryLimit !== undefined
         ? { request_body_in_memory_limit: requestBodyInMemoryLimit }

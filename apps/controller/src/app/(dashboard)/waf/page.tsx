@@ -11,6 +11,8 @@ import { getWafSettings } from "@/src/lib/settings";
 import { stagedOverlay } from "@/src/lib/settings/staging";
 import { withStagedReads } from "@/src/lib/settings/staging-context";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
+import { getWafPresetUsage, listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
+import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/WafPresetOptions";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -75,12 +77,14 @@ export default async function WafPage({ searchParams }: PageProps) {
   // against this operator's staged set. Otherwise a staged edit looks discarded after a reload.
   const overlay = await stagedOverlay(Number(session.user.id));
 
-  const [events, total, stats, globalWaf, hosts] = await Promise.all([
+  const [events, total, stats, globalWaf, hosts, presets, presetUsage] = await Promise.all([
     listWafEvents(PER_PAGE, offset, search, from, to),
     countWafEvents(search, from, to),
     getWafEventStats(search, from, to),
     withStagedReads(overlay, () => getWafSettings()),
     listProxyHosts(),
+    listWafPresets(),
+    withStagedReads(overlay, () => getWafPresetUsage()),
   ]);
 
   const globalExcludedIds = globalWaf?.excluded_rule_ids ?? [];
@@ -95,19 +99,33 @@ export default async function WafPage({ searchParams }: PageProps) {
   }
 
   return (
-    <WafEventsClient
-      events={events}
-      stats={stats}
-      pagination={{ total, page, perPage: PER_PAGE }}
-      initialSearch={search ?? ""}
-      initialRange={range}
-      initialFrom={from ?? null}
-      initialTo={to ?? null}
-      globalExcluded={globalExcludedIds}
-      globalExcludedMessages={globalExcludedMessages}
-      globalWafEnabled={globalWaf?.enabled ?? false}
-      hostWafMap={hostWafMap}
-      globalWaf={globalWaf ?? null}
-    />
+    <WafPresetOptionsProvider presets={presets.map(toWafPresetOption)}>
+      <WafEventsClient
+        events={events}
+        stats={stats}
+        pagination={{ total, page, perPage: PER_PAGE }}
+        initialSearch={search ?? ""}
+        initialRange={range}
+        initialFrom={from ?? null}
+        initialTo={to ?? null}
+        globalExcluded={globalExcludedIds}
+        globalExcludedMessages={globalExcludedMessages}
+        globalWafEnabled={globalWaf?.enabled ?? false}
+        hostWafMap={hostWafMap}
+        globalWaf={globalWaf ?? null}
+        presets={presets.map((preset) => {
+          const usage = presetUsage.get(preset.id);
+          return {
+            id: preset.id,
+            name: preset.name,
+            description: preset.description,
+            directives: preset.directives,
+            updatedAt: preset.updatedAt,
+            usedGlobally: usage?.global ?? false,
+            hostCount: usage?.hosts.length ?? 0,
+          };
+        })}
+      />
+    </WafPresetOptionsProvider>
   );
 }

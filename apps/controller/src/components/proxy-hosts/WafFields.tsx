@@ -16,6 +16,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { WafHostConfig } from "@/lib/models/proxy-hosts";
 import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/lib/caddy-waf";
 import { WafRuleExclusions } from "./WafRuleExclusions";
+import { WafPresetPicker } from "./WafPresetPicker";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { useTranslations } from "next-intl";
@@ -64,6 +65,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
   );
   const [loadCrs, setLoadCrs] = useState(value?.load_owasp_crs ?? true);
   const [customDirectives, setCustomDirectives] = useState(value?.custom_directives ?? "");
+  const [presetIds, setPresetIds] = useState<number[]>(value?.preset_ids ?? []);
   const [bodyLimitMb, setBodyLimitMb] = useState(bodyLimitMib(value?.request_body_limit));
   const [inMemoryLimitMb, setInMemoryLimitMb] = useState(
     bodyLimitMib(value?.request_body_in_memory_limit),
@@ -86,6 +88,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
       <input type="hidden" name="wafEngineMode" value={engineMode} />
       <input type="hidden" name="wafLoadOwaspCrs" value={loadCrs ? "on" : ""} />
       <input type="hidden" name="wafCustomDirectives" value={customDirectives} />
+      <input type="hidden" name="wafPresetIds" value={JSON.stringify(presetIds)} />
       <input type="hidden" name="wafRequestBodyLimitMb" value={bodyLimitMb ?? ""} />
       <input type="hidden" name="wafRequestBodyInMemoryLimitMb" value={inMemoryLimitMb ?? ""} />
       <input
@@ -224,6 +227,14 @@ export function WafFields({ value, showModeSelector = true }: Props) {
             <Divider />
 
             <WafRuleExclusions value={value?.excluded_rule_ids} />
+
+            <WafPresetPicker
+              value={presetIds}
+              onChange={setPresetIds}
+              description={
+                wafMode === "override" ? t("wafPresetsHelpOverride") : t("wafPresetsHelpMerge")
+              }
+            />
 
             <CodeEditor
               label={t("customSeclangDirectives")}

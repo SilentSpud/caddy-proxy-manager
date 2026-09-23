@@ -413,6 +413,23 @@ export const mtlsRoles = pgTable(
   }),
 );
 
+// Named SecLang snippets the global WAF and each host select by id (upstream #149).
+export const wafPresets = pgTable(
+  "waf_presets",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    directives: text("directives").notNull(),
+    createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("waf_presets_name_unique").on(table.name),
+  }),
+);
+
 export const mtlsCertificateRoles = pgTable(
   "mtls_certificate_roles",
   {

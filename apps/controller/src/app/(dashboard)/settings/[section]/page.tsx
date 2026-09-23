@@ -52,6 +52,7 @@ import { listMtlsRoles } from "@/src/lib/models/mtls-roles";
 import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-certificates";
 import { toCertificatePickerOption } from "@/src/lib/certificate-api";
 import type { DashboardHostOptionsData } from "@/src/components/proxy-hosts/DashboardHostOptionsFields";
+import { listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -168,13 +169,14 @@ export default async function SettingsSectionPage({
   // section: the section is route-derived, and every other section would pay for lists it never shows.
   let dashboardOptions: DashboardHostOptionsData | null = null;
   if (section === "dashboard") {
-    const [certificates, caCertificates, accessLists, mtlsRoles, issuedClientCerts] =
+    const [certificates, caCertificates, accessLists, mtlsRoles, issuedClientCerts, wafPresets] =
       await Promise.all([
         listCertificates(),
         listCaCertificates(),
         listAccessLists(),
         listMtlsRoles().catch(() => []),
         listIssuedClientCertificates().catch(() => []),
+        listWafPresets(),
       ]);
     dashboardOptions = {
       view: dashboardHostFormView(dashboardSettings.options),
@@ -183,6 +185,7 @@ export default async function SettingsSectionPage({
       accessLists,
       mtlsRoles,
       issuedClientCerts,
+      wafPresets: wafPresets.map(toWafPresetOption),
       authentikDefaults: authentik,
       forwardAuthDefaults: forwardAuth,
       agents: agentOptions,

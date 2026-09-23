@@ -134,7 +134,9 @@ test.describe('L4 Proxy Hosts page', () => {
 
     await page.getByRole('button', { name: /^create$/i }).click();
 
-    await expect(page.getByRole('dialog').getByText(/port 443 is reserved/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('dialog').getByText(/port 443 is reserved/i)).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByRole('table').getByText('E2E Reserved Port Host')).not.toBeVisible();
   });
 
@@ -142,7 +144,9 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.goto('/l4-proxy-hosts');
     await waitForHydration(page);
     await page.getByRole('button', { name: /create l4 host/i }).click();
-    await expect(page.getByRole('dialog').getByText(/ports 80, 443, 2019, 3000, 9090/i)).toBeVisible();
+    await expect(
+      page.getByRole('dialog').getByText(/ports 80, 443, 2019, 3000, 9090/i),
+    ).toBeVisible();
   });
 
   test('deletes the created L4 proxy host', async ({ page }) => {

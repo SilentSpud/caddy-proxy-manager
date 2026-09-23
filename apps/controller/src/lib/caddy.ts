@@ -104,6 +104,7 @@ import {
 } from "./caddy-mtls";
 import { buildRoleMaps } from "./models/mtls-roles";
 import { getAccessRulesForHosts } from "./models/mtls-access-rules";
+import { getWafPresetDirectives } from "./models/waf-presets";
 import { buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
 import {
@@ -968,6 +969,8 @@ type CaddyBuildContext = {
   globalUpstreamDnsResolutionSettings: UpstreamDnsResolutionSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalWaf?: WafSettings | null;
+  /** waf_presets id -> directives. */
+  wafPresets?: ReadonlyMap<number, string>;
   /**
    * Which plugin-backed features the running binary can serve. Caddy validates a posted config as a
    * whole, so one handler naming an uncompiled module takes every host offline.
@@ -1534,7 +1537,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
 
     const effectiveWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
     if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off" && wafUsable) {
-      handlers.unshift(buildWafHandlerEntry(effectiveWaf, Boolean(row.allowWebsocket)));
+      handlers.unshift(
+        buildWafHandlerEntry(effectiveWaf, Boolean(row.allowWebsocket), context.wafPresets),
+      );
     }
 
     if (row.hstsEnabled) {
@@ -3291,6 +3296,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     upstreamDnsResolutionSettings,
     globalGeoBlock,
     globalWaf,
+    wafPresets,
     trustedProxiesSettings,
     moduleAvailability,
     defaultResponseSettings,
@@ -3307,6 +3313,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     getUpstreamDnsResolutionSettings(),
     getGeoBlockSettings(),
     getWafSettings(),
+    getWafPresetDirectives(),
     getTrustedProxiesSettings(),
     getCaddyModuleAvailability(agentRowId),
     getDefaultResponseSettings(),
@@ -3380,6 +3387,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
     globalGeoBlock: effectiveGlobalGeoBlock,
     globalWaf,
+    wafPresets,
     moduleAvailability,
     tailscale: tailscaleRuntime,
     adaptVia: options.adaptVia,
