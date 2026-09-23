@@ -14,6 +14,7 @@ import { resolveAllSettings } from "@/src/lib/settings/resolve";
 import { settingDescription, settingGroupTitle, settingLabel } from "@/src/lib/settings/messages";
 import { getSetupState, hasLegacyDatabase, SETUP_PATHS } from "@/src/lib/setup";
 import SetupSettingsClient, { type SettingField } from "./SetupSettingsClient";
+import { sqliteNoticeApplies } from "@/src/lib/sqlite-notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("setup.settingsStep");
@@ -105,6 +106,7 @@ export default async function SetupSettingsPage() {
       domainClaims={claims}
       oauth={oauthCard(providers.map((provider) => provider.name))}
       hasMigrateStep={hasLegacyDatabase()}
+      sqliteWarning={sqliteNoticeApplies()}
     />
   );
 }

@@ -32,10 +32,10 @@ services:
       # Public URL this instance is reached at.
       BASE_URL: ${BASE_URL:-http://localhost:3000}
 
-      # PostgreSQL only. Passed as discrete fields rather than folded into a URL: the password
-      # arrives here by interpolation and nothing encodes it, so a `/` in it used to end the URL's
-      # authority early and the app would try to connect to a host nobody configured. As fields
-      # there is no delimiter to collide with, and any password works as typed.
+      # PostgreSQL, unless DATABASE_URL names a SQLite file. Passed as discrete fields rather than
+      # folded into a URL: the password arrives here by interpolation and nothing encodes it, so a
+      # `/` in it used to end the URL's authority early and the app would try to connect to a host
+      # nobody configured. As fields there is no delimiter to collide with.
       # Defaulted, not hard-coded: the bundled `postgres` service is what these point at when the
       # operator sets nothing, and overriding them is how you point the app at a server of your
       # own. Hard-coding the host and port would have left DATABASE_URL as the only way to do that,
@@ -51,8 +51,8 @@ services:
 
       # Overrides all of the above when set, for a server that needs something a URL can say and
       # the fields cannot - an sslmode, a search_path, a connection option. Remember that a
-      # password inside a URL has to be percent-encoded. An existing SQLite file is migrated
-      # through the in-app migration flow, not by pointing this at it.
+      # password inside a URL has to be percent-encoded. `file:/app/data/cpm.db` uses SQLite
+      # instead. A pre-3.0 SQLite file is migrated through the in-app flow, not by pointing this at it.
       DATABASE_URL: ${DATABASE_URL:-}
 
       # Connections the database pool may open. The real default, not `${VAR:-}`: it is read as
@@ -376,9 +376,10 @@ services:
       # Egress, for a controller on another host.
       - caddy-network
 
-  # The controller's database. No profile: unlike clickhouse this is not optional,
-  # since SQLite support was removed. Unpublished on purpose - nothing outside the compose network
-  # needs it, and publishing 5432 is how a database ends up on the internet.
+  # The controller's database. No profile, so it runs even when DATABASE_URL picks SQLite: the
+  # default stack should not depend on a variable to have a database. Unpublished on purpose -
+  # nothing outside the compose network needs it, and publishing 5432 is how a database ends up on
+  # the internet.
   postgres:
     container_name: caddy-proxy-manager-postgres
     image: postgres:18-alpine@sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd

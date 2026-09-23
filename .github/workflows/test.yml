@@ -83,6 +83,11 @@ jobs:
           TEST_OIDC_URL: http://localhost:5599
         run: bun run test:coverage
 
+      - name: Run the controller's tests against SQLite
+        env:
+          TEST_OIDC_URL: http://localhost:5599
+        run: bun run --filter @cpm/controller test:sqlite
+
       - name: Upload coverage report
         # Always: a threshold failure is exactly when the per-file breakdown in
         # coverage/lcov.info is worth reading.

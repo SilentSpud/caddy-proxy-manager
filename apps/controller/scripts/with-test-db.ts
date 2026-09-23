@@ -3,10 +3,9 @@
  *
  *   bun scripts/with-test-db.ts bun test tests/unit
  *
- * The controller dropped SQLite, so there is no in-process database left to test against and the
- * suite needs a real server. Starting one here rather than asking for it keeps `bun run test`
+ * PostgreSQL needs a real server. Starting one here rather than asking for it keeps `bun run test`
  * working on a fresh clone - the same bargain the e2e suite already makes, and Docker is already
- * required for that.
+ * required for that. With TEST_DB=sqlite nothing is started and the command runs as-is.
  *
  * An externally supplied TEST_POSTGRES_URL wins and nothing is started: that is how CI runs, where
  * the server is a service container, and how a developer points the suite at their own.
@@ -135,7 +134,10 @@ async function stopContainer(): Promise<void> {
 
 let url = process.env.TEST_POSTGRES_URL;
 
-if (url) {
+if (process.env.TEST_DB === "sqlite") {
+  // In-memory per test (tests/helpers/db.ts); nothing to start.
+  console.log("[test-db] SQLite, in memory");
+} else if (url) {
   console.log("[test-db] using TEST_POSTGRES_URL from the environment");
 } else {
   const port = await startContainer();
@@ -153,7 +155,7 @@ if (url) {
 }
 
 const child = Bun.spawn(command, {
-  env: { ...process.env, TEST_POSTGRES_URL: url },
+  env: url ? { ...process.env, TEST_POSTGRES_URL: url } : process.env,
   stdout: "inherit",
   stderr: "inherit",
   stdin: "inherit",

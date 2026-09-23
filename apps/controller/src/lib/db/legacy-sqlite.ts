@@ -1,10 +1,11 @@
 /**
- * Everything that still knows what a SQLite database is.
+ * Everything that still knows what a pre-3.0 SQLite database looks like.
  *
- * Nothing here runs during normal operation: SQLite stopped being an application backend in 3.0.
- * It is staged for the migration flow, which opens an upgrading deployment's old file, reads it,
- * and copies what it finds into PostgreSQL. Kept rather than deleted because the quirks it encodes
- * - which releases wrote which column names - are not recoverable from the current schema.
+ * Nothing here runs during normal operation, including against today's SQLite backend, which
+ * starts from its own migration history (drizzle/sqlite/). It is staged for the migration flow,
+ * which opens an upgrading deployment's old file, reads it, and copies what it finds into the
+ * current database. Kept because the quirks it encodes - which releases wrote which column names -
+ * are not recoverable from the current schema.
  *
  * Schema repairs for SQLite deployments that upgraded through an older release:
  *
@@ -17,20 +18,6 @@
  * pre-rename history to fix up.
  */
 import type { Database } from "bun:sqlite";
-
-/**
- * A `file:` URL exposes its path with a leading slash, so a Windows absolute path arrives as
- * "/C:/data/app.db" and resolves against the drive root - drop the slash when a drive letter
- * follows. Not `fileURLToPath`, which rejects POSIX-style file URLs on Windows. Windows-only; on
- * POSIX "/C:/x" is a real path. `platform` is a parameter so tests can cover both.
- */
-export function stripLeadingSlashBeforeDriveLetter(
-  pathname: string,
-  platform: NodeJS.Platform = process.platform,
-): string {
-  if (platform !== "win32") return pathname;
-  return /^\/[A-Za-z]:[/\\]/.test(pathname) ? pathname.slice(1) : pathname;
-}
 
 /** Rename a column when only the snake_case form exists. No-op if missing or already correct. */
 function renameColumnIfNeeded(client: Database, table: string, from: string, to: string) {

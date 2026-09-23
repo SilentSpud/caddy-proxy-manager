@@ -42,6 +42,8 @@
     "db:generate": "bun run --filter @cpm/controller db:generate",
     "db:migrate": "bun run --filter @cpm/controller db:migrate",
     "test": "bun run --filter @cpm/agent test && bun run --filter @cpm/controller test",
+    "demo": "bun apps/controller/scripts/demo.ts",
+    "test:sqlite": "bun run --filter @cpm/controller test:sqlite",
     "test:watch": "bun run --filter @cpm/controller test:watch",
     "test:coverage": "bun run --filter @cpm/agent test && bun run --filter @cpm/controller test:coverage",
     "test:e2e": "bun run --filter @cpm/controller test:e2e",

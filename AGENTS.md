@@ -197,11 +197,28 @@ What stays in English: messages thrown before a request exists (`config.ts` vali
 `ADMIN_PASSWORD` at startup goes to the container log), and `/api/v1/*` responses, which are a
 machine contract rather than UI copy.
 
+## Two database backends
+
+PostgreSQL by default, SQLite when `DATABASE_URL` names a file (`src/lib/db/dialect.ts`). Both run
+the same app code:
+
+- **`schema.pg.ts` is the source of truth.** `schema.sqlite.ts` is generated from it
+  (`scripts/generate-sqlite-schema.ts`) and each dialect has its own migrations folder. After a
+  schema change, run the generator and `db:generate` once per dialect; the parity test catches a
+  skipped step.
+- **`db` is typed as PostgreSQL either way**, so a SQLite-only call fails typecheck. The reverse
+  is on you: raw `sql` must be portable (no `::int`, `setval`, `ILIKE`), and a dialect-specific
+  step branches on `schemaDialect` from `src/lib/db/schema`, never on the connection module, which
+  opens the database on import.
+- **Transactions go through `runInTransaction`.** bun:sqlite commits when its synchronous callback
+  returns, so an async `db.transaction` body would commit before its first `await`.
+
 ## Tests
 
 `bun run test` from the root runs everything. It starts a throwaway PostgreSQL container, gives
 each test its own schema, and removes it afterwards; `TEST_POSTGRES_URL` points at a server of your
-own instead. Two constraints are not obvious from reading the suites:
+own instead. `bun run test:sqlite` runs the same suite on an in-memory SQLite database per test.
+Two constraints are not obvious from reading the suites:
 
 - **`mock.module` is global and leaks across files sharing a process.** The agent's tests run with
   `--parallel` for that reason - a `node:fs` mock in one file was reaching every file that ran

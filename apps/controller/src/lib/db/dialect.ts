@@ -15,13 +15,17 @@
  * is special and there is nothing to escape. DATABASE_URL still wins when it is set, because a URL
  * can carry options the fields cannot.
  *
- * PostgreSQL only. SQLite was supported through 3.0 and is now reached exclusively by the
- * migration flow, which opens the old file read-only through ./legacy-sqlite.ts - never as the
- * application's own database.
+ * SQLite is the other backend, named by a path or a `file:`/`sqlite:` URL in DATABASE_URL. It
+ * suits a single small instance or a throwaway demo; PostgreSQL is what the bundled stack runs.
  */
+import { isAbsolute, resolve as resolvePath } from "node:path";
+
+export type DatabaseDialect = "postgres" | "sqlite";
 
 /** Where the connection came from, so a caller can shape it for whatever it is configuring. */
 export type DatabaseTarget =
+  /** An absolute filesystem path, or the literal ":memory:". */
+  | { kind: "sqlite"; path: string }
   /** A libpq-style connection string, handed to the driver to parse. */
   | { kind: "url"; url: string }
   /** Discrete fields, which never passed through a URL and so were never encoded. */
@@ -35,11 +39,7 @@ export type DatabaseTarget =
       tls: boolean;
     };
 
-/**
- * Named so an operator pointing at one of these gets a straight answer. `file:`/`sqlite:` is
- * called out separately because every pre-3.0 deployment has one in its .env, and the useful
- * response is "the app migrates it for you", not "unsupported scheme".
- */
+/** Named so an operator pointing at one of these gets a straight answer. */
 const UNSUPPORTED_SCHEMES = new Map<string, string>([
   ["mysql", "MySQL"],
   ["mariadb", "MariaDB"],
@@ -67,15 +67,52 @@ function schemeOf(rawUrl: string): string | null {
   return scheme.length === 1 ? null : scheme;
 }
 
-const SQLITE_MESSAGE =
-  "DATABASE_URL points at a SQLite file, which is no longer supported as the application " +
-  "database. Point it at PostgreSQL (postgres://user:pass@host:5432/db) and start the app: it " +
-  "detects the old file and offers to migrate it.";
-
 const MISSING_MESSAGE =
   "No database is configured. Set POSTGRES_PASSWORD (with POSTGRES_HOST, POSTGRES_PORT, " +
-  "POSTGRES_USER and POSTGRES_DB as needed), or DATABASE_URL for a full connection string. " +
-  "PostgreSQL only.";
+  "POSTGRES_USER and POSTGRES_DB as needed), or DATABASE_URL for a full connection string - " +
+  "postgres://user:pass@host:5432/db, or file:/app/data/cpm.db for SQLite.";
+
+const EXAMPLES = "(postgres://user:pass@host:5432/db, or file:/app/data/cpm.db for SQLite)";
+
+/**
+ * A `file:` URL exposes its path with a leading slash, so a Windows absolute path arrives as
+ * "/C:/data/app.db" and resolves against the drive root - drop the slash when a drive letter
+ * follows. Not `fileURLToPath`, which rejects POSIX-style file URLs on Windows. Windows-only; on
+ * POSIX "/C:/x" is a real path. `platform` is a parameter so tests can cover both.
+ */
+export function stripLeadingSlashBeforeDriveLetter(
+  pathname: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform !== "win32") return pathname;
+  return /^\/[A-Za-z]:[/\\]/.test(pathname) ? pathname.slice(1) : pathname;
+}
+
+const MEMORY = new Set([":memory:", "file::memory:", "sqlite::memory:"]);
+
+/** A SQLite DATABASE_URL as an absolute path, relative ones against the working directory. */
+export function resolveSqlitePath(rawUrl: string, cwd: string = process.cwd()): string {
+  if (MEMORY.has(rawUrl)) return ":memory:";
+
+  // `sqlite:` reads exactly like `file:` past the scheme.
+  const url = rawUrl.replace(/^sqlite:/i, "file:");
+  if (!/^file:/i.test(url)) {
+    return isAbsolute(url) ? url : resolvePath(cwd, url);
+  }
+
+  const remainder = url.slice("file:".length);
+  // `file:./x` and `file:x` are relative, which a URL parser would root at `/`.
+  if (!remainder.startsWith("/")) {
+    if (!remainder) throw new Error("DATABASE_URL names a SQLite file without a path.");
+    return resolvePath(cwd, remainder);
+  }
+
+  const parsed = new URL(url);
+  if (parsed.host && parsed.host !== "localhost") {
+    throw new Error(`DATABASE_URL names a SQLite file on another host (${parsed.host}).`);
+  }
+  return stripLeadingSlashBeforeDriveLetter(decodeURIComponent(parsed.pathname));
+}
 
 /** Trimmed, or undefined for a variable that is unset or blank - which .env files produce easily. */
 function read(env: Record<string, string | undefined>, name: string): string | undefined {
@@ -83,7 +120,7 @@ function read(env: Record<string, string | undefined>, name: string): string | u
   return value ? value : undefined;
 }
 
-/** A URL naming PostgreSQL, or a message explaining what the operator actually pointed at. */
+/** A URL naming a supported backend, or a message explaining what the operator pointed at. */
 function targetFromUrl(url: string): DatabaseTarget {
   const scheme = schemeOf(url);
   if (scheme === "postgres" || scheme === "postgresql") {
@@ -91,18 +128,31 @@ function targetFromUrl(url: string): DatabaseTarget {
   }
 
   // A bare path is what a pre-3.0 .env carries when it names the file directly.
-  if (scheme === null || SQLITE_SCHEMES.has(scheme)) {
-    throw new Error(SQLITE_MESSAGE);
+  if (MEMORY.has(url) || scheme === null || SQLITE_SCHEMES.has(scheme)) {
+    return { kind: "sqlite", path: resolveSqlitePath(url) };
   }
 
   const unsupported = UNSUPPORTED_SCHEMES.get(scheme);
   throw new Error(
     unsupported
-      ? `DATABASE_URL names ${unsupported}, which is not supported. Use PostgreSQL ` +
-          "(postgres://user:pass@host:5432/db)."
-      : `DATABASE_URL has an unrecognized scheme "${scheme}". Use PostgreSQL ` +
-          "(postgres://user:pass@host:5432/db).",
+      ? `DATABASE_URL names ${unsupported}, which is not supported. Use PostgreSQL or SQLite ${EXAMPLES}.`
+      : `DATABASE_URL has an unrecognized scheme "${scheme}". Use PostgreSQL or SQLite ${EXAMPLES}.`,
   );
+}
+
+/**
+ * Which backend the environment names, without resolving or validating the rest of it.
+ *
+ * For code that must pick a schema before a connection exists - ./schema.ts, and the tests that
+ * import tables without connecting. Never throws: a misconfiguration is ./connection.ts's to report.
+ */
+export function databaseDialect(
+  env: Record<string, string | undefined> = process.env,
+): DatabaseDialect {
+  const url = read(env, "DATABASE_URL");
+  if (!url) return "postgres";
+  const scheme = schemeOf(url);
+  return MEMORY.has(url) || scheme === null || SQLITE_SCHEMES.has(scheme) ? "sqlite" : "postgres";
 }
 
 /** POSTGRES_PORT as a number, refusing anything that is not a port rather than defaulting past it. */
@@ -167,7 +217,7 @@ export function resolveDatabaseTarget(
  * - but doing it here means neither the connection nor drizzle.config has to know that.
  */
 export function driverOptions(
-  target: DatabaseTarget,
+  target: Exclude<DatabaseTarget, { kind: "sqlite" }>,
 ): Record<string, string | number | boolean | undefined> {
   const { kind: _kind, ...options } = target;
   return options;

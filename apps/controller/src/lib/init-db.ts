@@ -2,7 +2,7 @@ import { hashPassword, verifyPassword } from "./password";
 import db, { nowIso } from "./db";
 import { localUsersDisabled } from "./auth-policy";
 import { config } from "./config";
-import { users, accounts } from "./db/schema";
+import { accounts, schemaDialect, users } from "./db/schema";
 import { and, eq, sql } from "drizzle-orm";
 
 /** Ensures the env-configured admin user exists, hashing the password. Called at startup. */
@@ -100,6 +100,8 @@ export async function ensureAdminUser(): Promise<void> {
  * self-registration on a fresh deployment used to get.
  */
 async function syncUserIdSequence(): Promise<void> {
+  // SQLite's AUTOINCREMENT already counts explicit ids.
+  if (schemaDialect === "sqlite") return;
   await db.execute(
     sql`SELECT setval(
           pg_get_serial_sequence('users', 'id'),

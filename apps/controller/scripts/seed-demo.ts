@@ -42,6 +42,10 @@ installDemoCaddy();
 
 /** Whoever owns this deployment. Everything seeded is attributed to them, as the UI would. */
 async function actorId(): Promise<number> {
+  // What the app would do on its first start, so `bun run demo` can seed before the server exists.
+  if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
+    await (await import("../src/lib/init-db")).ensureAdminUser();
+  }
   const [admin] = await db
     .select({ id: schema.users.id })
     .from(schema.users)

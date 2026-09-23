@@ -37,6 +37,7 @@ import { migrationGroupDescription, migrationGroupLabel } from "@/src/lib/migrat
 import { skipMigration } from "./actions";
 import RestartDialog from "@/src/components/setup/RestartDialog";
 import { useTranslations } from "next-intl";
+import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
 
 export type Candidate = {
   path: string;
@@ -76,9 +77,11 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 export default function SetupMigrateClient({
   candidates,
   rejected,
+  sqliteWarning = false,
 }: {
   candidates: Candidate[];
   rejected: Array<{ path: string; reason: string }>;
+  sqliteWarning?: boolean;
 }) {
   const t = useTranslations("setup");
   const [selected, setSelected] = useState(candidates[0]?.path ?? "");
@@ -220,6 +223,7 @@ export default function SetupMigrateClient({
     <Center>
       <VStack gap={5} padding={5}>
         <SetupSteps stage="migrate" hasMigrateStep />
+        {sqliteWarning && <SqliteSetupWarning />}
         <VStack gap={2}>
           <Heading level={1}>{t("migrate.heading")}</Heading>
           <Text color="secondary">{t("migrationDescription")}</Text>
