@@ -168,6 +168,8 @@ const FUNCTIONS: Array<[string, (args: string[]) => string]> = [
   ["toUInt32", ([value]) => `(${value})`],
   ["intDiv", ([left, right]) => `(${left} / ${right})`],
   ["upperUTF8", ([value]) => `upper(${value})`],
+  ["startsWith", ([value, prefix]) => `(substr(${value}, 1, length(${prefix})) = ${prefix})`],
+  ["concat", (args) => `(${args.join(" || ")})`],
   ["ifNull", ([value, fallback]) => `ifnull(${value}, ${fallback})`],
   ["any", ([value]) => `min(${value})`],
 ];
