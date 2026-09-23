@@ -136,6 +136,7 @@ function callArguments(sql: string, open: number): { args: string[]; end: number
   let start = open + 1;
   for (let i = open; i < sql.length; i++) {
     const char = sql[i];
+    // An escaped quote ('') toggles twice, so a literal holding one still ends where it should.
     if (char === "'") quoted = !quoted;
     if (quoted) continue;
     if (char === "(") depth++;
@@ -175,7 +176,8 @@ function translateCalls(sql: string): string {
   let out = "";
   let i = 0;
   while (i < sql.length) {
-    // A string literal is copied whole: 'count()' in a WHERE is data, not a call.
+    // A string literal is copied whole: 'count()' in a WHERE is data, not a call. An escaped quote
+    // ('') ends one copy and starts the next, which join back into the same literal.
     if (sql[i] === "'") {
       const close = sql.indexOf("'", i + 1);
       const end = close === -1 ? sql.length : close + 1;

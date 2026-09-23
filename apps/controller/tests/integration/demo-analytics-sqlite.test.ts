@@ -154,6 +154,16 @@ describe('translateClickHouseSql', () => {
     expect(bindings).toEqual({ $p_from: 5, $p: '%x%' });
   });
 
+  it('keeps a literal with an escaped quote whole, commas and parentheses included', () => {
+    const { sql } = translateClickHouseSql(
+      "SELECT countIf(uri = 'it''s, (x') AS c, count() FROM t WHERE m = 'a'''",
+      {},
+    );
+    expect(sql).toBe(
+      "SELECT count(CASE WHEN uri = 'it''s, (x' THEN 1 END) AS c, count(*) FROM t WHERE m = 'a'''",
+    );
+  });
+
   it('leaves a function name inside a string literal alone', () => {
     const { sql } = translateClickHouseSql("SELECT count() FROM t WHERE uri = 'count()'", {});
     expect(sql).toBe("SELECT count(*) FROM t WHERE uri = 'count()'");
