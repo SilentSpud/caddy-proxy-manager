@@ -10,3 +10,14 @@
 export function isDemoMode(): boolean {
   return process.env.DEMO_MODE?.trim().toLowerCase() === "true";
 }
+
+/** The id ensureAdminUser always seeds the environment's administrator under. */
+export const SEEDED_ADMIN_ID = 1;
+
+/**
+ * The account every demo visitor signs in as. Disabling it, demoting it or changing its password
+ * would lock the next visitor out until the demo resets, so in demo mode none of that is allowed.
+ */
+export function isDemoAdmin(userId: number): boolean {
+  return isDemoMode() && userId === SEEDED_ADMIN_ID;
+}

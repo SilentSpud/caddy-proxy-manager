@@ -38,6 +38,7 @@ import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
 
 import { useChartTheme } from "./chart-theme";
+import { settingsHref } from "../settings/sections";
 import { useFormatter, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
@@ -978,7 +979,9 @@ export default function AnalyticsClient() {
           description={
             <Text type="body" size="sm">
               {t.rich("accessLoggingDisabledDescription", {
-                link: (chunks) => <AstryxLink href="/settings">{chunks}</AstryxLink>,
+                link: (chunks) => (
+                  <AstryxLink href={settingsHref("analytics")}>{chunks}</AstryxLink>
+                ),
               })}
             </Text>
           }

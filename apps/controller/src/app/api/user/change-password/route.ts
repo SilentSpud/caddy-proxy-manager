@@ -13,6 +13,7 @@ import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 import { hashPassword, verifyPassword } from "@/src/lib/password";
 import { getTranslations } from "next-intl/server";
+import { isDemoAdmin } from "@/src/lib/demo-mode";
 import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
 
 export async function POST(request: NextRequest) {
@@ -35,6 +36,11 @@ export async function POST(request: NextRequest) {
         { error: t("auth.apiErrors.passwordManagementDisabled") },
         { status: 403 },
       );
+    }
+
+    // Before the rate limit: this is not a guess, and the model would refuse it anyway.
+    if (isDemoAdmin(Number(session.user.id))) {
+      return NextResponse.json({ error: t("errors.demoAdminProtected") }, { status: 403 });
     }
 
     // Rate limit password change attempts to prevent brute-forcing current password

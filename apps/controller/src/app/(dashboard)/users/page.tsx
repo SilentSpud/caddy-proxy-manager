@@ -1,5 +1,6 @@
 import { localUsersDisabled } from "@/src/lib/auth-policy";
 import UsersClient from "./UsersClient";
+import { isDemoAdmin } from "@/src/lib/demo-mode";
 import { lastSessionByUser, listUsers, usersWithPassword } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
 import { requireAdmin } from "@/src/lib/auth";
@@ -33,6 +34,7 @@ export default async function UsersPage() {
     lastSessionAt: lastSessions.get(rest.id) ?? null,
     // The hash stays on the server; the detail only needs to know one exists.
     hasPassword: passwordHash !== null || withPassword.has(rest.id),
+    isDemoAdmin: isDemoAdmin(rest.id),
   }));
   // Only what the detail's groups section needs: who is in each group, not their details.
   const groups = allGroups.map((group) => ({

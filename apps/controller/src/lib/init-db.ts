@@ -2,6 +2,7 @@ import { hashPassword, verifyPassword } from "./password";
 import db, { nowIso } from "./db";
 import { localUsersDisabled } from "./auth-policy";
 import { config } from "./config";
+import { isDemoMode, SEEDED_ADMIN_ID } from "./demo-mode";
 import { accounts, schemaDialect, users } from "./db/schema";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -23,10 +24,13 @@ export async function ensureAdminUser(): Promise<void> {
     return;
   }
 
-  const adminId = 1; // Must match the hardcoded ID in auth.ts
+  const adminId = SEEDED_ADMIN_ID; // Must match the hardcoded ID in auth.ts
   const adminEmail = `${adminUsername}@localhost`;
   const provider = "credentials";
   const subject = adminUsername;
+  // A demo's visitors all see this account, so it gets a name that says what it is. Outside a demo
+  // the name is the operator's to change, so it is only set when the row is created.
+  const demoName = isDemoMode() ? "Demo Admin" : null;
 
   // Hash the admin password for secure storage
   const passwordHash = await hashPassword(adminPassword);
@@ -49,6 +53,7 @@ export async function ensureAdminUser(): Promise<void> {
       .update(users)
       .set({
         email: adminEmail,
+        ...(demoName ? { name: demoName } : {}),
         subject,
         passwordHash,
         ...(passwordChanged ? { passwordChangedAt: now } : {}),
@@ -69,7 +74,7 @@ export async function ensureAdminUser(): Promise<void> {
   await db.insert(users).values({
     id: adminId,
     email: adminEmail,
-    name: adminUsername,
+    name: demoName ?? adminUsername,
     passwordHash,
     passwordChangedAt: now,
     role: "admin",

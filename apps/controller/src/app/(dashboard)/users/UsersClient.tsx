@@ -66,6 +66,8 @@ type UserEntry = {
   hasPassword: boolean;
   /** When it was last set; null when there is none, or it predates the record. */
   passwordChangedAt: string | null;
+  /** The shared demo account, which cannot be disabled, deleted or demoted. */
+  isDemoAdmin: boolean;
 };
 
 /** A group, and who is in it - enough to show and change one user's memberships. */
@@ -331,7 +333,7 @@ function UserDetail({
             aria-label={t("editUserNamed", { name })}
             onClick={() => setEditOpen(true)}
           />
-          {isDisabled ? (
+          {user.isDemoAdmin ? null : isDisabled ? (
             <IconButton
               variant="ghost"
               size="sm"
@@ -353,14 +355,16 @@ function UserDetail({
               onClick={() => setConfirmKind("disable")}
             />
           )}
-          <IconButton
-            variant="ghost"
-            size="sm"
-            label={t("deleteUserNamed", { name })}
-            tooltip={t("deleteUser")}
-            icon={<Trash2 />}
-            onClick={() => setConfirmKind("delete")}
-          />
+          {!user.isDemoAdmin && (
+            <IconButton
+              variant="ghost"
+              size="sm"
+              label={t("deleteUserNamed", { name })}
+              tooltip={t("deleteUser")}
+              icon={<Trash2 />}
+              onClick={() => setConfirmKind("delete")}
+            />
+          )}
         </HStack>
       </HStack>
 
@@ -722,6 +726,8 @@ function EditUserDialog({
             options={roleOptions}
             value={role}
             onChange={(v) => setRole(v as Role)}
+            isDisabled={user.isDemoAdmin}
+            disabledMessage={user.isDemoAdmin ? t("demoAdminRoleLocked") : undefined}
           />
         </VStack>
       </form>

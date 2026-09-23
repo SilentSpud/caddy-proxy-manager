@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
+import { isDemoAdmin } from "@/src/lib/demo-mode";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { getUserById, listUserOAuthProviders, removeUserPassword } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
@@ -26,6 +27,11 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = Number(session.user.id);
+    // Before the rate limit: this is not a guess, and the model would refuse it anyway.
+    if (isDemoAdmin(userId)) {
+      return NextResponse.json({ error: t("errors.demoAdminProtected") }, { status: 403 });
+    }
+
     // Shares the change-password budget: both verify the same password, and a separate counter
     // would double the guesses anyone holding the session gets.
     const rateLimitKey = `password-change:${userId}`;

@@ -131,6 +131,7 @@ export async function register() {
     try {
       await initClickHouse();
       console.log("ClickHouse analytics initialized");
+      if (demoMode) await (await import("./lib/demo/traffic")).startLiveDemoTraffic();
     } catch (error) {
       console.error("Failed to initialize ClickHouse:", error);
       // Don't throw - analytics is non-critical

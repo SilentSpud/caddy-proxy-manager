@@ -6,8 +6,9 @@
  *   bun run demo --reset-every 6        # and again every six hours, for a public demo
  *   bun run demo --prod                 # build once, then serve the production build
  *
- * Signs in as ADMIN_USERNAME / ADMIN_PASSWORD, default potato / TestPassword123!. Everything else
- * the environment sets is passed through, so CLICKHOUSE_PASSWORD still turns analytics on.
+ * Signs in as admin / admin (ADMIN_USERNAME / ADMIN_PASSWORD override it). Demo mode keeps that
+ * account from being disabled, demoted or given a new password, so no visitor can lock out the next.
+ * Everything else the environment sets is passed through, so CLICKHOUSE_PASSWORD still works.
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -48,15 +49,18 @@ const env: Record<string, string | undefined> = {
   SESSION_SECRET: process.env.SESSION_SECRET || sessionSecret(),
   PORT: String(args.port),
   BASE_URL: process.env.BASE_URL || `http://localhost:${args.port}`,
-  ADMIN_USERNAME: process.env.ADMIN_USERNAME || "potato",
-  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || "TestPassword123!",
+  ADMIN_USERNAME: process.env.ADMIN_USERNAME || "admin",
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || "admin",
   // Every visitor shares one account, so a lockout would lock out the demo.
   AUTH_RATE_LIMIT_ENABLED: "false",
   UPDATE_CHECK_ENABLED: "false",
 };
 
 function deleteDatabase(): void {
-  for (const suffix of ["", "-wal", "-shm"]) rmSync(dbFile + suffix, { force: true });
+  // analytics.db is the demo's traffic (src/lib/clickhouse/sqlite-store.ts), which resets with it.
+  for (const file of [dbFile, join(dataDir, "analytics.db")]) {
+    for (const suffix of ["", "-wal", "-shm"]) rmSync(file + suffix, { force: true });
+  }
 }
 
 async function run(command: string[]): Promise<void> {

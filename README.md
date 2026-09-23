@@ -534,7 +534,11 @@ service; with `DATABASE_URL` set to a file the app simply never connects to it.
 
 For a demo, `bun run demo` does all of it with no containers: `DEMO_MODE` on, a SQLite file under
 `apps/controller/data/demo/`, seeded with sample hosts and people on first start, signed in as
-`ADMIN_USERNAME`/`ADMIN_PASSWORD` (default `potato` / `TestPassword123!`). `--reset` starts over,
+`admin` / `admin` (`ADMIN_USERNAME`/`ADMIN_PASSWORD` override it). In demo mode that account cannot
+be disabled, deleted, demoted or given a new password, so one visitor cannot lock out the next, and
+the password policy does not apply to it. Analytics are on: with no ClickHouse the demo keeps its
+traffic in `analytics.db` beside the database, seeded with a month of invented requests and WAF hits,
+and adds more every minute while it runs. `--reset` starts over,
 `--reset-every <hours>` does so on a timer for a public demo, `--prod` serves a production build
 and `--port` moves it off 3020.
 

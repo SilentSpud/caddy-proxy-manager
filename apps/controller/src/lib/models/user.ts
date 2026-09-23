@@ -3,6 +3,13 @@ import type { AppRole } from "../oidc-groups";
 import { users, accounts, sessions } from "../db/schema";
 import { and, count, desc, eq, max, ne } from "drizzle-orm";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
+import { isDemoAdmin } from "../demo-mode";
+import { domainError } from "../domain-error";
+
+/** See isDemoAdmin: the shared demo account keeps its password, its role and its access. */
+function assertNotDemoAdmin(userId: number): void {
+  if (isDemoAdmin(userId)) throw domainError("demoAdminProtected", {}, { status: 403 });
+}
 
 export type User = {
   id: number;
@@ -138,6 +145,7 @@ export async function updateUserProfile(
 }
 
 export async function updateUserPassword(userId: number, passwordHash: string): Promise<void> {
+  assertNotDemoAdmin(userId);
   const now = nowIso();
   await db
     .update(users)
@@ -176,6 +184,7 @@ export async function markPasswordChanged(userId: number): Promise<void> {
  * least one provider is linked - this does not, so it can never be the reason a check was skipped.
  */
 export async function removeUserPassword(userId: number): Promise<void> {
+  assertNotDemoAdmin(userId);
   const now = nowIso();
   await db
     .delete(accounts)
@@ -267,6 +276,7 @@ export async function listUsers(): Promise<User[]> {
 }
 
 export async function updateUserRole(userId: number, role: User["role"]): Promise<User | null> {
+  if (role !== "admin") assertNotDemoAdmin(userId);
   const now = nowIso();
   const [updated] = await db
     .update(users)
@@ -277,6 +287,7 @@ export async function updateUserRole(userId: number, role: User["role"]): Promis
 }
 
 export async function updateUserStatus(userId: number, status: string): Promise<User | null> {
+  if (status !== "active") assertNotDemoAdmin(userId);
   const now = nowIso();
   const [updated] = await db
     .update(users)
@@ -293,6 +304,7 @@ export async function updateUserStatus(userId: number, status: string): Promise<
 }
 
 export async function deleteUser(userId: number): Promise<void> {
+  assertNotDemoAdmin(userId);
   await db.delete(users).where(eq(users.id, userId));
 }
 
