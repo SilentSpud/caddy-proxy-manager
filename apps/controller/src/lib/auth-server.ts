@@ -240,13 +240,11 @@ async function createAuth(baseURL: string): Promise<any> {
   const trustedProviderIds = [...cachedTrustedProviderIds];
 
   return betterAuth({
-    // `schema` is the whole module: the adapter resolves each model by the `modelName` configured
-    // below, and those names already match the exported table bindings. Rows written by the
-    // previous Kysely path stay readable - tests/integration/auth-adapter-compat.test.ts signs in
-    // as a user created that way.
+    // Every table, keyed by its export name: the adapter resolves each model by the `modelName`
+    // configured below, and those names already match.
     database: drizzleAdapter(db, {
-      provider: "pg",
-      schema,
+      provider: schema.schemaDialect === "sqlite" ? "sqlite" : "pg",
+      schema: schema.activeSchema,
     }),
     secret: config.sessionSecret,
     // The Public URL, not BASE_URL alone: OAuth redirect URIs are built from this, and they have to

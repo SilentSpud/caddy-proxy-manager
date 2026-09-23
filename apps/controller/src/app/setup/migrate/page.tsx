@@ -6,6 +6,7 @@ import { scanForLegacyDatabases } from "@/src/lib/migration/legacy-database";
 import { probeLegacySecrets } from "@/src/lib/migration/legacy-secrets";
 import { getSetupState, SETUP_PATHS } from "@/src/lib/setup";
 import SetupMigrateClient from "./SetupMigrateClient";
+import { sqliteNoticeApplies } from "@/src/lib/sqlite-notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("setup.migrate");
@@ -23,6 +24,7 @@ export default async function SetupMigratePage() {
 
   return (
     <SetupMigrateClient
+      sqliteWarning={sqliteNoticeApplies()}
       candidates={candidates.map((candidate) => {
         // Asked per candidate rather than once for the selection, because the answer belongs to the
         // file: two databases on the same host can have been written under different secrets, and

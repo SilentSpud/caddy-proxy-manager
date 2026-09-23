@@ -10,10 +10,11 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '.
  * which the preload calls before any test file is imported.
  */
 export const TEST_ENV: Record<string, string> = {
-  // src/lib/db/connection.ts resolves this at module load and throws on anything but PostgreSQL,
-  // so it has to be set before the first import - not in a beforeEach. scripts/with-test-db.ts
-  // provides the server.
-  DATABASE_URL: process.env.TEST_POSTGRES_URL ?? '',
+  // src/lib/db/connection.ts resolves this at module load, so it has to be set before the first
+  // import - not in a beforeEach. scripts/with-test-db.ts provides the server; TEST_DB=sqlite needs
+  // none, and also makes src/lib/db/schema hand out the SQLite tables.
+  DATABASE_URL:
+    process.env.TEST_DB === 'sqlite' ? ':memory:' : (process.env.TEST_POSTGRES_URL ?? ''),
   // What `:memory:` used to signal: a database with no deployment history, so the one-time data
   // migrations in src/lib/db.ts have nothing to migrate.
   CPM_EPHEMERAL_DB: 'true',

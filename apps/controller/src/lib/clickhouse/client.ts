@@ -1,4 +1,6 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { isDemoMode } from "../demo-mode";
+import * as sqliteStore from "./sqlite-store";
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
@@ -18,6 +20,8 @@ type ClickHouseConfig = {
   retentionDays: number;
   /** Whether to talk to ClickHouse at all. See resolveConfig for how an unset toggle is read. */
   enabled: boolean;
+  /** A demo with no ClickHouse keeps its analytics in SQLite instead. See ./sqlite-store.ts. */
+  sqlite: boolean;
 };
 
 /**
@@ -48,14 +52,17 @@ async function resolveConfig(): Promise<ClickHouseConfig> {
   // No password, no analytics, whatever the toggle says: the ClickHouse container will not start
   // without one, and an empty password would only produce a connection refused per query.
   const configured = password.trim().length > 0;
-  if (toggle === true && !configured) {
+  // A demo runs no containers, so without a ClickHouse it gets the SQLite store - on unless switched
+  // off, since a demo's analytics page is part of what it is showing.
+  const sqlite = isDemoMode() && !configured;
+  if (toggle === true && !configured && !sqlite) {
     console.warn(
       "Analytics are switched on but no ClickHouse password is set - nothing will be recorded.",
     );
   }
   // An unset toggle means "decide from the configuration", which is the rule this file applied
   // before the toggle existed. Upgrading must not turn a working deployment's analytics off.
-  const enabled = (toggle ?? configured) && configured;
+  const enabled = sqlite ? toggle !== false : (toggle ?? configured) && configured;
 
   // Interpolated into DDL, which has no placeholder for an identifier. The registry rejects a bad
   // value on the way in; this catches one that reached the table before that pattern existed.
@@ -63,7 +70,7 @@ async function resolveConfig(): Promise<ClickHouseConfig> {
     throw new Error(`The ClickHouse database name contains invalid characters: ${database}`);
   }
 
-  return { url, user, password, database, retentionDays, enabled };
+  return { url, user, password, database, retentionDays, enabled, sqlite };
 }
 
 function chConfig(): Promise<ClickHouseConfig> {
@@ -95,6 +102,11 @@ export async function invalidateClickHouseConfig(): Promise<void> {
 /** Whether traffic and WAF events are being recorded. */
 export async function isAnalyticsEnabled(): Promise<boolean> {
   return (await chConfig()).enabled;
+}
+
+/** Whether this is a demo keeping its analytics in SQLite rather than ClickHouse. */
+export async function usesSqliteAnalytics(): Promise<boolean> {
+  return (await chConfig()).sqlite;
 }
 
 /** Number of days analytics events are retained before TTL deletion. */
@@ -300,9 +312,14 @@ async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
 }
 
 export async function initClickHouse(): Promise<void> {
-  const { enabled, database, retentionDays } = await chConfig();
+  const { enabled, database, retentionDays, sqlite } = await chConfig();
   if (!enabled) {
     console.log("ClickHouse analytics disabled");
+    return;
+  }
+  if (sqlite) {
+    sqliteStore.initSqliteStore();
+    sqliteStore.pruneSqliteStore(retentionDays);
     return;
   }
   const ch = await getClient();
@@ -323,6 +340,17 @@ export async function closeClickHouse(): Promise<void> {
     await client.close();
     client = null;
     clientKey = null;
+  }
+}
+
+/** Empty both event tables, wherever they are. For the demo seed, whose data is not incremental. */
+export async function clearAnalyticsEvents(): Promise<void> {
+  const { enabled, sqlite } = await chConfig();
+  if (!enabled) return;
+  if (sqlite) return sqliteStore.clearSqliteStore();
+  const ch = await getClient();
+  for (const table of sqliteStore.ANALYTICS_TABLES) {
+    await ch.command({ query: `TRUNCATE TABLE IF EXISTS ${table}` });
   }
 }
 
@@ -359,6 +387,13 @@ export interface WafEventRow {
 /** `agentId` is the agent that relayed the rows, recorded so a false event is attributable. */
 export async function insertTrafficEvents(rows: TrafficEventRow[], agentId = ""): Promise<void> {
   if (rows.length === 0 || !(await isAnalyticsEnabled())) return;
+  if ((await chConfig()).sqlite) {
+    sqliteStore.insertIntoSqliteStore(
+      "traffic_events",
+      rows.map((r) => ({ ...r, agent_id: agentId })),
+    );
+    return;
+  }
   const ch = await getClient();
   // Convert unix timestamp to ClickHouse DateTime string
   const values = rows.map((r) => ({
@@ -372,6 +407,13 @@ export async function insertTrafficEvents(rows: TrafficEventRow[], agentId = "")
 
 export async function insertWafEvents(rows: WafEventRow[], agentId = ""): Promise<void> {
   if (rows.length === 0 || !(await isAnalyticsEnabled())) return;
+  if ((await chConfig()).sqlite) {
+    sqliteStore.insertIntoSqliteStore(
+      "waf_events",
+      rows.map((r) => ({ ...r, agent_id: agentId })),
+    );
+    return;
+  }
   const ch = await getClient();
   const values = rows.map((r) => ({
     ...r,
@@ -444,6 +486,7 @@ function safeUint(n: number): number {
 
 async function queryRows<T>(query: string, query_params?: QueryParams): Promise<T[]> {
   if (!(await isAnalyticsEnabled())) return [];
+  if ((await chConfig()).sqlite) return sqliteStore.querySqliteStore<T>(query, query_params);
   const ch = await getClient();
   const result = await ch.query({ query, query_params, format: "JSONEachRow" });
   return result.json<T>();

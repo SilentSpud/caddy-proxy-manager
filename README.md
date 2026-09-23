@@ -3,8 +3,9 @@
 Web interface for managing [Caddy Server](https://caddyserver.com/) reverse proxies and certificates. This fork is for redoing the original UI in a way that I like and trying to make the application as lightweight as possible.
 
 > **3.0 changes how this is configured.** Most settings now live in the database and are entered
-> through a first-run setup flow in the browser, not in `.env`. PostgreSQL replaces SQLite, and an
-> existing pre-3.0 installation is migrated in-app rather than by hand. See [First Run](#first-run)
+> through a first-run setup flow in the browser, not in `.env`. PostgreSQL is the default database
+> (SQLite remains available), and an existing pre-3.0 installation is migrated in-app rather than by
+> hand. See [First Run](#first-run)
 > and [The Database](#the-database). It is a substantial change and the 3.0 line is still in beta -
 > take a backup before upgrading.
 
@@ -24,9 +25,15 @@ This project provides a web UI for Caddy Server, eliminating the need to manuall
 
 ## Installation
 
+Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
+[latest release](https://github.com/SilentSpud/caddy-proxy-manager/releases/latest). It holds
+`docker-compose.yml`, `.env.example` and the files they mount, flat, with the images pinned to that
+release - so it runs from wherever it is unpacked, and no clone is needed.
+
 ```bash
-git clone https://github.com/silentspud/caddy-proxy-manager.git
-cd caddy-proxy-manager
+VERSION=v3.2.1   # the release you downloaded
+mkdir caddy-proxy-manager && cd caddy-proxy-manager
+tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 
 # The only two values a fresh install has to have. That is the whole .env --
 # everything else is entered in the browser on first run. See .env.example for
@@ -38,7 +45,8 @@ chmod 600 .env
 docker compose up -d
 ```
 
-Then open `http://localhost:3000` and follow [First Run](#first-run) - every URL redirects there
+That also starts the bundled `postgres` service the app keeps its data in, so there is no database
+server to run yourself. Then open `http://localhost:3000` and follow [First Run](#first-run) - every URL redirects there
 until setup is finished. There is no administrator to sign in as until you create one.
 
 Data persists in Docker volumes: `postgres-data` (the database), `caddy-manager-data` (which also
@@ -195,8 +203,8 @@ domain.
 ### Runtime
 
 [Bun](https://bun.sh) is the only supported runtime. The app reaches PostgreSQL through
-`Bun.SQL`, a Bun built-in with no Node.js equivalent, so it refuses to start under Node.js
-and tells you what to run instead.
+`Bun.SQL` and SQLite through `bun:sqlite`, Bun built-ins with no Node.js equivalent, so it refuses
+to start under Node.js and tells you what to run instead.
 
 For local work:
 
@@ -365,7 +373,7 @@ it win even then.
 | `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates, and what the app connects as | `cpm` / `cpm` | No |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | Where the app looks for PostgreSQL. Set these to use a server other than the bundled one | `postgres` / `5432` | No |
 | `POSTGRES_SSL` | Whether the app connects with TLS. On/off only - anything finer wants `DATABASE_URL` | `false` | No |
-| `DATABASE_URL` | A full connection string, which overrides every `POSTGRES_*` above. Only needed for what the fields cannot express. A password in it must be percent-encoded. See [The Database](#the-database) | Unset | No |
+| `DATABASE_URL` | A full connection string, which overrides every `POSTGRES_*` above. Only needed for what the fields cannot express, or to use SQLite (`file:/app/data/cpm.db`). A password in it must be percent-encoded. See [The Database](#the-database) | Unset | No |
 | `DATABASE_POOL_MAX` | Connections the pool may open - it sizes what reads the database, so it cannot be read from it. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance | `10` | No |
 | `NODE_ENV` | Read at module load, before any query. `production` enforces the password policy | `production` in the image | No |
 | `HOST` / `PORT` | The socket binds before anything can be read. `::` is dual-stack and accepts IPv4 too; `0.0.0.0` binds IPv4 only | `::` / `3000` | No |
@@ -465,8 +473,9 @@ about what a write does. New integrations should use GraphQL.
 
 ## The Database
 
-PostgreSQL only. `docker compose up -d` starts a `postgres` service alongside the app and hands it
-the `POSTGRES_*` values, so a default install needs nothing but a password:
+PostgreSQL by default, or SQLite (see [SQLite](#sqlite) below). `docker compose up -d` starts a
+`postgres` service alongside the app and hands it the `POSTGRES_*` values, so a default install
+needs nothing but a password:
 
 ```bash
 POSTGRES_PASSWORD=$(openssl rand -base64 32)
@@ -503,6 +512,39 @@ MySQL, MariaDB and the rest are rejected by name at startup rather than half-wor
 to some of them, but Drizzle's Bun driver only builds PostgreSQL, and several write paths here
 depend on `RETURNING`.
 
+### SQLite
+
+Point `DATABASE_URL` at a file and the app uses SQLite instead, with no database server at all:
+
+```bash
+DATABASE_URL=file:/app/data/cpm.db
+```
+
+`/app/data` is the controller's own volume, so the file persists with everything else. A bare path
+and `sqlite:` work too. The file is created and migrated on boot, so a demo that should reset only
+has to delete it (with its `-wal` and `-shm` siblings) before starting.
+
+It is meant for legacy installs and demos, and an instance on it that is not in demo mode says so:
+on every setup step, and in a banner across the dashboard that can be dismissed for a week at a
+time. PostgreSQL stays the default because it is
+what the bundled stack runs and what a busy instance wants: SQLite serializes writes, and the file
+has to be backed up while nothing is writing to it (or with `sqlite3 cpm.db ".backup copy.db"`).
+The bundled `docker-compose.yml` still requires `POSTGRES_PASSWORD` and starts the `postgres`
+service; with `DATABASE_URL` set to a file the app simply never connects to it.
+
+For a demo, `bun run demo` does all of it with no containers: `DEMO_MODE` on, a SQLite file under
+`apps/controller/data/demo/`, seeded with sample hosts and people on first start, signed in as
+`admin` / `admin` (`ADMIN_USERNAME`/`ADMIN_PASSWORD` override it). In demo mode that account cannot
+be disabled, deleted, demoted or given a new password, so one visitor cannot lock out the next, and
+the password policy does not apply to it. Analytics are on: with no ClickHouse the demo keeps its
+traffic in `analytics.db` beside the database, seeded with a month of invented requests and WAF hits,
+and adds more every minute while it runs. `--reset` starts over,
+`--reset-every <hours>` does so on a timer for a public demo, `--prod` serves a production build
+and `--port` moves it off 3020.
+
+A pre-3.0 database is not opened in place, even though it is also SQLite - see
+[Upgrading from a pre-3.0 install](#upgrading-from-a-pre-30-install-which-used-sqlite).
+
 ### Upgrading from PostgreSQL 17
 
 The bundled `postgres` service moved from 17 to 18 during the 3.0 beta. A major version cannot read
@@ -517,7 +559,7 @@ docker compose stop web
 docker compose exec postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --file=/tmp/cpm.dump'
 docker compose cp postgres:/tmp/cpm.dump ./cpm.dump
 
-# 2. Update the compose file (git pull), then drop the containers and the 17 volume only
+# 2. Unpack the new release's archive over the old files, then drop the containers and the 17 volume only
 docker compose down
 docker volume rm caddy-proxy-manager_postgres-data   # <project>_postgres-data - see `docker volume ls`
 
@@ -534,8 +576,8 @@ yourself through `POSTGRES_HOST` is unaffected; the app works with 17 and 18 ali
 
 ### Upgrading from a pre-3.0 install, which used SQLite
 
-Leave the old `.env` alone and stand up PostgreSQL first, then point `DATABASE_URL` at it. On the
-next start the app finds the old SQLite file, checks it against the schema it expects, and offers
+Leave the old `.env` alone and stand up PostgreSQL first, then point `DATABASE_URL` at it - or at
+a new SQLite file (`file:/app/data/cpm.db`) to stay on SQLite. On the next start the app finds the old SQLite file, checks it against the schema it expects, and offers
 to migrate it. If several candidate files are found, it asks which one; `LEGACY_SQLITE_PATH` pins
 one instead of scanning.
 
@@ -603,17 +645,23 @@ an agent they stay: Docker is the only thing that can start ClickHouse, and it c
 database. With an agent they can go too, as long as you drop `clickhouse` from `COMPOSE_PROFILES` in
 the same pass - see [Pick one owner](#enabling-and-disabling-analytics).
 
-Starting with a SQLite `DATABASE_URL` still set fails immediately, with a message saying so. That
-is deliberate: silently starting against an empty database would look like total data loss.
+Starting with `DATABASE_URL` still pointed at the old file fails immediately, with a message saying
+so. Today's SQLite schema has its own migration history, and running it over the old file would
+leave the app on a schema it does not know.
 
 ### Working on the schema
 
-`apps/controller/src/lib/db/schema.pg.ts` is the source of truth - hand-edited, since the SQLite
-schema it used to be generated from is gone. After changing it:
+`apps/controller/src/lib/db/schema.pg.ts` is the source of truth, hand-edited.
+`schema.sqlite.ts` is generated from it, and each backend keeps its own migrations. After changing
+it:
 
 ```bash
+bun scripts/generate-sqlite-schema.ts                   # rewrites schema.sqlite.ts
 DATABASE_URL=postgres://... bun run db:generate         # emits drizzle/postgres/
+DATABASE_URL=file:./data/cpm.db bun run db:generate     # emits drizzle/sqlite/
 ```
+
+`tests/unit/db-schema-parity.test.ts` fails if either of the last two steps was skipped.
 
 `apps/controller/drizzle/legacy-sqlite/` holds the migrations every pre-3.0 deployment ran. Nothing
 generates into it; it stays so the migration flow's tests can build a realistic old database.
@@ -629,6 +677,9 @@ container. Anything in it may be dropped, so do not point it at something you ca
 ```bash
 TEST_POSTGRES_URL=postgres://cpm:pw@127.0.0.1:5432/cpm_test bun run test
 ```
+
+`bun run test:sqlite` runs the same suite against SQLite, an in-memory database per test, with no
+container.
 
 ---
 

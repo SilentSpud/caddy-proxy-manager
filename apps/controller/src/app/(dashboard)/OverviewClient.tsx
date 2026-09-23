@@ -7,6 +7,7 @@ import { ArrowLeftRight, BarChart2, Gauge, History, KeyRound, ShieldCheck } from
 import type { ReactNode } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { ClickableCard } from "@astryxdesign/core/ClickableCard";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -27,6 +28,8 @@ import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
 import { useTableDensity } from "@/components/ui/TableDensity";
+import Link from "next/link";
+import { settingsHref } from "./settings/sections";
 
 // ApexCharts renders on the client only, for the reason given in AnalyticsClient: v7's
 // server entry is an async Server Component this file cannot reach, and there is nothing
@@ -638,6 +641,18 @@ export default function OverviewClient({
           status="warning"
           title={t("loggingOffTitle")}
           description={t("loggingOffDescription")}
+          endContent={
+            // Settings is admin-only, so nobody else is offered a door they cannot open.
+            isAdmin ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                href={settingsHref("analytics")}
+                as={Link}
+                label={t("loggingOffAction")}
+              />
+            ) : undefined
+          }
         />
       )}
       {hasFailed && <Banner status="error" title={t("loadFailedTitle")} />}

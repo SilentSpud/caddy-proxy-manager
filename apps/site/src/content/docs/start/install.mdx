@@ -13,12 +13,20 @@ One compose file and two generated secrets. Everything else is entered in the br
 
 <Steps>
 
-1. Clone the repository:
+1. Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
+   [latest release](https://github.com/SilentSpud/caddy-proxy-manager/releases/latest) and unpack
+   it into a directory of its own:
 
    ```bash
-   git clone https://github.com/SilentSpud/caddy-proxy-manager.git
-   cd caddy-proxy-manager
+   VERSION=v3.2.1   # the release you downloaded
+   mkdir caddy-proxy-manager && cd caddy-proxy-manager
+   tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
    ```
+
+   The archive is flat - `docker-compose.yml`, `.env.example` and the few files they mount, all
+   at the top level - so it runs from where it lands. Its compose file pins the images to that
+   release, so what you deploy stays on it until you choose to move. No clone of the repository is
+   needed.
 
 2. Generate the two values Compose has no default for, straight into `.env`:
 
@@ -42,6 +50,9 @@ One compose file and two generated secrets. Everything else is entered in the br
    ```bash
    docker compose up -d
    ```
+
+   That also starts the `postgres` service the app keeps its data in, so there is no database
+   server to install or run yourself.
 
    Caddy itself does not start yet - it sits behind a compose profile, and the agent starts it once
    the two are paired. An unpaired host answering 80 and 443 with a default page would be worse
@@ -81,7 +92,13 @@ rest.
 
 ## Upgrading
 
+Unpack the new release's archive over the old one, in the same directory, then restart. `.env` is
+not in the archive, so it is left alone; the compose file is replaced with one naming the new
+images.
+
 ```bash
+VERSION=v3.2.1   # the release you are moving to
+tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 docker compose pull
 docker compose up -d
 ```
@@ -114,7 +131,8 @@ If you already updated the compose file, put the two old lines back for the firs
    PowerShell's `>` re-encodes what passes through it. Keep `cpm.dump` until you have signed in
    afterwards.
 
-2. Update the compose file (`git pull` in a clone), then remove the containers and the 17 volume:
+2. Unpack the new release's archive over the old files, then remove the containers and the 17
+   volume:
 
    ```bash
    docker compose down

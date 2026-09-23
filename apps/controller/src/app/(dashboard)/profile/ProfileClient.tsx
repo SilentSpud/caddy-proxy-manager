@@ -121,6 +121,8 @@ interface ProfileClientProps {
   sessions: ActiveSession[];
   /** False in OIDC-only mode: local passwords do not exist. */
   localPasswordsEnabled?: boolean;
+  /** The shared demo account, whose password every visitor signs in with. */
+  passwordLocked?: boolean;
   /** Icon sources resolved on the server, including the Gravatar fallback. */
   avatar: ResolvedAvatar;
 }
@@ -215,6 +217,7 @@ export default function ProfileClient({
   apiTokens,
   sessions,
   localPasswordsEnabled = true,
+  passwordLocked = false,
   avatar,
 }: ProfileClientProps) {
   const t = useTranslations("profile");
@@ -602,7 +605,11 @@ export default function ProfileClient({
 
         {localPasswordsEnabled && (
           <ProfileSection icon={Lock} title={t("passwordManagement")}>
-            {hasPassword ? (
+            {passwordLocked ? (
+              <Text type="body" size="sm" color="secondary">
+                {t("demoPasswordLocked")}
+              </Text>
+            ) : hasPassword ? (
               <VStack gap={2}>
                 <Text type="body" size="sm" color="secondary">
                   {t("passwordManagementDescription")}

@@ -17,7 +17,7 @@ import { join, resolve } from 'node:path';
 import { createCipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
-import { eq, sql } from 'drizzle-orm';
+import { eq, isNull } from 'drizzle-orm';
 import { vi } from '@/tests/helpers/vi';
 import { createTestDb, currentDb, type TestDb } from '@/tests/helpers/db';
 
@@ -282,11 +282,13 @@ describe('import', () => {
     // insert would fail outright rather than producing an orphan.
     await importLegacyDatabase(buildLegacyDatabase());
 
-    const [{ orphans }] = await ctx.db.execute<{ orphans: number }>(
-      sql`SELECT COUNT(*)::int AS orphans FROM accounts a
-          LEFT JOIN users u ON u.id = a."userId" WHERE u.id IS NULL`,
-    );
-    expect(orphans).toBe(0);
+    const { accounts, users } = schemaModule;
+    const orphans = await ctx.db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .leftJoin(users, eq(users.id, accounts.userId))
+      .where(isNull(users.id));
+    expect(orphans).toHaveLength(0);
   });
 });
 

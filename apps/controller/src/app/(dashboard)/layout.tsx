@@ -2,6 +2,8 @@ import { getAppName } from "@/src/lib/app-name";
 import type { ReactNode } from "react";
 import { requireUser } from "@/src/lib/auth";
 import { isDemoMode } from "@/src/lib/demo-mode";
+import { SQLITE_NOTICE_COOKIE, sqliteNoticeApplies } from "@/src/lib/sqlite-notice";
+import { cookies } from "next/headers";
 import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import { getTranslations } from "next-intl/server";
@@ -61,6 +63,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     { gravatar },
   );
   const staged = stagedSet ? [...stagedSet] : [];
+  const sqliteNotice = sqliteNoticeApplies() && !(await cookies()).get(SQLITE_NOTICE_COOKIE);
   return (
     <ModuleGateProvider value={moduleGate}>
       <TableDensityProvider initial={tableDensity}>
@@ -69,6 +72,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           avatar={avatar}
           appName={await getAppName()}
           demoMode={isDemoMode()}
+          sqliteNotice={sqliteNotice}
           updateAvailable={updates.updateAvailable}
           stagedKeys={staged}
           morePins={morePins}

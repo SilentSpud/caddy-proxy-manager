@@ -1,10 +1,20 @@
+import { Database } from 'bun:sqlite';
 import { SQL } from 'bun';
 import { drizzle } from 'drizzle-orm/bun-sql';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { drizzle as drizzleSqlite } from 'drizzle-orm/bun-sqlite';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Db } from '../../src/lib/db/connection';
 import * as schema from '../../src/lib/db/schema.pg';
+import * as sqliteSchema from '../../src/lib/db/schema.sqlite';
+
+/**
+ * `TEST_DB=sqlite` runs the suite against SQLite instead: an in-memory database per test, and no
+ * server. Set by `bun run test:sqlite`.
+ */
+export const testDialect = process.env.TEST_DB === 'sqlite' ? 'sqlite' : 'postgres';
 
 /**
  * Per-test isolation is a PostgreSQL *schema*, not a database. Both were measured: creating a
@@ -14,7 +24,7 @@ import * as schema from '../../src/lib/db/schema.pg';
  * optional: a test file creates a database per test, and leaking them exhausts max_connections
  * long before the suite ends.
  */
-const MIGRATIONS_DIR = resolve(import.meta.dir, '../../drizzle/postgres');
+const MIGRATIONS_DIR = resolve(import.meta.dir, '../../drizzle', testDialect);
 
 /**
  * Set by scripts/with-test-db.ts, which starts the throwaway server. Absent means the suite was
@@ -67,7 +77,7 @@ function ddlFor(schemaName: string): string {
  */
 export type TestDb = Db;
 
-type Live = { sql: SQL; schemaName: string };
+type Live = { sql: SQL; schemaName: string } | { sqlite: Database };
 
 const live: Live[] = [];
 let adminPool: SQL | undefined;
@@ -91,6 +101,14 @@ function admin(): SQL {
  * queries a connection still pointed at public.
  */
 export async function createTestDb(): Promise<TestDb> {
+  if (testDialect === 'sqlite') {
+    const sqlite = new Database(':memory:');
+    sqlite.run('PRAGMA foreign_keys = ON');
+    sqlite.run(migrationSql().split('--> statement-breakpoint').join('\n'));
+    live.push({ sqlite });
+    return drizzleSqlite(sqlite, { schema: sqliteSchema }) as unknown as TestDb;
+  }
+
   const schemaName = `t_${randomUUID().replaceAll('-', '')}`;
   await admin().unsafe(`CREATE SCHEMA "${schemaName}"`);
 
@@ -111,6 +129,19 @@ export async function createTestDb(): Promise<TestDb> {
  * migrator so the journal is written.
  */
 export async function createTestDatabase(): Promise<{ url: string; drop: () => Promise<void> }> {
+  if (testDialect === 'sqlite') {
+    const directory = mkdtempSync(join(tmpdir(), 'cpm-test-'));
+    return {
+      url: `file:${join(directory, 'cpm.db')}`,
+      drop: async () => {
+        // Windows refuses to delete a file a handle still holds; the OS reaps its temp dir anyway.
+        try {
+          rmSync(directory, { recursive: true, force: true });
+        } catch {}
+      },
+    };
+  }
+
   const name = `d_${randomUUID().replaceAll('-', '')}`;
   await admin().unsafe(`CREATE DATABASE "${name}"`);
   const url = new URL(adminUrl());
@@ -135,9 +166,13 @@ export async function cleanupTestDbs(): Promise<void> {
   const pending = live.splice(testBoundary, live.length - testBoundary);
   if (pending.length === 0) return;
 
-  await Promise.all(pending.map(({ sql }) => sql.close()));
+  for (const entry of pending) {
+    if ('sqlite' in entry) entry.sqlite.close(true);
+  }
+  const schemas = pending.filter((entry) => 'sql' in entry);
+  await Promise.all(schemas.map(({ sql }) => sql.close()));
   await Promise.all(
-    pending.map(({ schemaName }) => admin().unsafe(`DROP SCHEMA "${schemaName}" CASCADE`)),
+    schemas.map(({ schemaName }) => admin().unsafe(`DROP SCHEMA "${schemaName}" CASCADE`)),
   );
 }
 

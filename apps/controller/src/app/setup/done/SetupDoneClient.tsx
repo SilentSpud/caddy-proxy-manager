@@ -16,16 +16,19 @@ import type { EnvCleanup } from "@/src/lib/migration/env-file";
 import { FormCard } from "@/src/components/ui/FormLayout";
 import { useTranslations } from "next-intl";
 import { SetupSteps } from "@/src/components/ui/SetupSteps";
+import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
 
 export default function SetupDoneClient({
   source,
   cleanup,
   dashboardOrigin,
+  sqliteWarning = false,
 }: {
   source: string;
   cleanup: EnvCleanup;
   /** Where the dashboard now answers, when setup claimed a domain for it. */
   dashboardOrigin: string | null;
+  sqliteWarning?: boolean;
 }) {
   const t = useTranslations("setup");
   return (
@@ -34,6 +37,7 @@ export default function SetupDoneClient({
         {/* Reached after setup completes, so every step is behind the operator. The migrate step
             is always present here: this page only exists because a migration happened. */}
         <SetupSteps stage="complete" hasMigrateStep />
+        {sqliteWarning && <SqliteSetupWarning />}
         <VStack gap={2}>
           <Heading level={1}>{t("done.heading")}</Heading>
           <Text color="secondary">{t("migrationCompleteDescription")}</Text>

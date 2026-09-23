@@ -7,6 +7,7 @@ import { listUserSessions } from "@/src/lib/models/sessions";
 import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import ProfileClient from "./ProfileClient";
+import { isDemoAdmin } from "@/src/lib/demo-mode";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -54,6 +55,7 @@ export default async function ProfilePage() {
       apiTokens={apiTokens}
       sessions={sessions}
       localPasswordsEnabled={!(await localUsersDisabled())}
+      passwordLocked={isDemoAdmin(userId)}
       avatar={resolveAvatar(user, 160, { gravatar: gravatarEnabled })}
     />
   );

@@ -29,6 +29,7 @@ import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import { AUTOFILL_NEW_PASSWORD, AUTOFILL_USERNAME } from "@/src/components/ui/native-input-attrs";
 import { configureFirstOAuthProvider, createFirstAdmin } from "./actions";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
+import { SqliteSetupWarning } from "@/src/components/setup/SqliteSetupWarning";
 
 const AGENT_DOCS = "https://github.com/SilentSpud/caddy-proxy-manager/wiki/Agent-setup";
 
@@ -38,9 +39,11 @@ type Method = "local" | "oauth";
 export default function SetupAccountClient({
   migratedFrom,
   hasMigrateStep,
+  sqliteWarning = false,
 }: {
   migratedFrom?: string | null;
   hasMigrateStep: boolean;
+  sqliteWarning?: boolean;
 }) {
   const t = useTranslations();
   const ta = useTranslations("setup.account");
@@ -64,6 +67,7 @@ export default function SetupAccountClient({
     <Center>
       <VStack gap={5} padding={5}>
         <SetupSteps stage="account" hasMigrateStep={hasMigrateStep} />
+        {sqliteWarning && <SqliteSetupWarning />}
         <VStack gap={2}>
           <Heading level={1}>{ta("heading")}</Heading>
           <Text color="secondary">{ta("subtitle")}</Text>

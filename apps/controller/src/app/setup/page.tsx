@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { getMigrationSource, getSetupState, hasLegacyDatabase, SETUP_PATHS } from "@/src/lib/setup";
 import SetupAccountClient from "./SetupAccountClient";
+import { sqliteNoticeApplies } from "@/src/lib/sqlite-notice";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("setup.account");
@@ -31,6 +32,7 @@ export default async function SetupPage() {
       // The migrate step is only part of this flow on a host that had a previous version's
       // database, so the stepper has to be told rather than assume four steps.
       hasMigrateStep={hasLegacyDatabase()}
+      sqliteWarning={sqliteNoticeApplies()}
     />
   );
 }

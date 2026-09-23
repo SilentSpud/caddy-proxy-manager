@@ -1,5 +1,5 @@
 /**
- * Copying a vetted legacy SQLite database into PostgreSQL.
+ * Copying a vetted legacy SQLite database into the current database, PostgreSQL or SQLite.
  *
  * Four things make this more than a row-for-row copy, and all four are derived from the schema
  * rather than from a list someone has to keep in step with it:
@@ -21,6 +21,7 @@ import { Database } from "bun:sqlite";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import { is, sql } from "drizzle-orm";
 import db from "../db";
+import { activeSchema, schemaDialect } from "../db/schema";
 import * as schema from "../db/schema.pg";
 import { createRekeyer, LegacySecretError, type Rekeyer } from "./legacy-secrets";
 import {
@@ -60,6 +61,7 @@ type Reference = {
 
 type Described = {
   key: string;
+  /** Read for its shape only; rows are written to the active backend's table of the same key. */
   table: PgTable;
   name: string;
   columns: Array<{ name: string; isBoolean: boolean }>;
@@ -224,7 +226,7 @@ function clearedColumns(table: Described, included: Set<string>): Set<string> {
 }
 
 /**
- * Copy the chosen groups from `sqlitePath` into the connected PostgreSQL database.
+ * Copy the chosen groups from `sqlitePath` into the connected database.
  *
  * The destination is expected to be empty - this runs during setup, before anything else has been
  * created - so rows keep their ids and conflicts are skipped rather than merged. Merging two
@@ -311,7 +313,7 @@ export async function importLegacyDatabase(
         // `returning` so the count is rows actually written: onConflictDoNothing silently drops
         // duplicates, and reporting the batch size would claim work a re-run did not do.
         const inserted = await db
-          .insert(table.table)
+          .insert(activeSchema[table.key as keyof typeof activeSchema] as PgTable)
           // biome-ignore lint/suspicious/noExplicitAny: the row shape is per-table, and this loop is generic over all thirty
           .values(batch as any)
           .onConflictDoNothing()
@@ -319,7 +321,8 @@ export async function importLegacyDatabase(
         copied += inserted.length;
       }
 
-      if (table.serialColumn) {
+      // SQLite's AUTOINCREMENT already counts explicit ids.
+      if (table.serialColumn && schemaDialect === "postgres") {
         await resyncSequence(table.name, table.serialColumn);
       }
 

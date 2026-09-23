@@ -12,6 +12,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
+import { databaseDialect, resolveSqlitePath } from "../db/dialect";
 import { MIGRATION_GROUPS, type MigrationGroupId } from "./selection";
 
 /**
@@ -142,6 +143,16 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** The SQLite file this deployment runs on, which sits in /app/data like the legacy ones do. */
+function activeDatabaseFile(): string | null {
+  if (databaseDialect(process.env) !== "sqlite") return null;
+  try {
+    return resolveSqlitePath(process.env.DATABASE_URL?.trim() ?? "");
+  } catch {
+    return null;
+  }
+}
+
 function candidateFiles(): string[] {
   const pinned = process.env.LEGACY_SQLITE_PATH?.trim();
   if (pinned) {
@@ -179,7 +190,9 @@ export function scanForLegacyDatabases(): LegacyScan {
   const candidates: LegacyCandidate[] = [];
   const rejected: LegacyRejection[] = [];
 
+  const active = activeDatabaseFile();
   for (const path of candidateFiles()) {
+    if (path === active) continue;
     const result = inspectLegacyDatabase(path);
     if ("reason" in result) {
       rejected.push(result);

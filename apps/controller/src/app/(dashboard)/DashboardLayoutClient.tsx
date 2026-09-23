@@ -28,6 +28,10 @@ import { MoreDrawer } from "@/src/components/mobile/MoreDrawer";
 import { DESTINATION_ICONS } from "@/src/components/mobile/nav-icons";
 import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
 import { formatAppVersion } from "@/src/lib/app-version";
+import {
+  SQLITE_NOTICE_COOKIE,
+  SQLITE_NOTICE_DISMISS_SECONDS,
+} from "@/src/lib/sqlite-notice-cookie";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import {
   type Destination,
@@ -134,6 +138,7 @@ export default function DashboardLayoutClient({
   avatar,
   appName,
   demoMode = false,
+  sqliteNotice = false,
   updateAvailable,
   stagedKeys,
   morePins,
@@ -144,6 +149,8 @@ export default function DashboardLayoutClient({
   appName: string;
   /** DEMO_MODE is on, so nothing saved here reaches a Caddy. */
   demoMode?: boolean;
+  /** A real instance on SQLite, and this browser has not dismissed the warning lately. */
+  sqliteNotice?: boolean;
   /** A newer release exists in the registry. Surfaced beside the version it replaces. */
   updateAvailable: boolean;
   /** Settings keys this operator has staged, so the settings rail can mark their sections. */
@@ -214,13 +221,26 @@ export default function DashboardLayoutClient({
     </>
   ) : null;
   const content = <div className="cpm-mobile-content">{children}</div>;
-  // Not dismissable: a visitor who forgets they are in a demo will wonder why their site is down.
+  // The demo banner is not dismissable: a visitor who forgets they are in a demo will wonder why
+  // their site is down. The SQLite one is, for a while - see src/lib/sqlite-notice.ts.
   const banner = demoMode ? (
     <Banner
       status="info"
       container="section"
       title={t("demoBannerTitle")}
       description={t("demoBannerDescription")}
+    />
+  ) : sqliteNotice ? (
+    <Banner
+      status="warning"
+      container="section"
+      title={t("sqliteBannerTitle")}
+      description={t("sqliteBannerDescription")}
+      isDismissable
+      onDismiss={() => {
+        // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store is Chromium-only; see ThemeModeProvider
+        document.cookie = `${SQLITE_NOTICE_COOKIE}=1; path=/; max-age=${SQLITE_NOTICE_DISMISS_SECONDS}; SameSite=Lax`;
+      }}
     />
   ) : undefined;
 

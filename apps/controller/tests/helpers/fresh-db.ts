@@ -9,11 +9,11 @@ export type ReloadedDb = {
 /**
  * Re-evaluate the database layer against whatever DATABASE_URL currently says.
  *
- * Three modules have to move together. src/lib/db.ts opens nothing itself - src/lib/db/connection.ts
- * creates the driver and runs migrations - and src/lib/db/schema.ts re-exports the table objects
- * connection.ts handed that driver. Putting a `?fresh=` suffix on db.ts alone reuses the cached
- * connection and schema, so the "reloaded" module would still be pointed at whichever database the
- * very first import opened, holding that dialect's tables.
+ * Three modules have to move together. src/lib/db/schema.ts picks its dialect's tables from
+ * DATABASE_URL, src/lib/db/connection.ts creates the driver (and refuses a schema of the other
+ * dialect), and src/lib/db.ts runs the migrations. Putting a `?fresh=` suffix on db.ts alone reuses
+ * the cached connection and schema, so the "reloaded" module would still be pointed at whichever
+ * database the very first import opened, holding that dialect's tables.
  *
  * All three are re-evaluated here, in dependency order, and the plain specifiers are pointed at the
  * new copies so the live bindings other modules already read through are rewritten too.
@@ -26,13 +26,13 @@ export type ReloadedDb = {
  * __MIGRATIONS_RAN__ globals before calling.
  */
 export async function reloadDbModule(): Promise<ReloadedDb> {
-  const connection = await import(`@/src/lib/db/connection${fresh()}`);
-  vi.mock('@/src/lib/db/connection', () => ({ ...connection }));
-
   const schema = (await import(
     `@/src/lib/db/schema${fresh()}`
   )) as typeof import('@/src/lib/db/schema');
   vi.mock('@/src/lib/db/schema', () => ({ ...schema }));
+
+  const connection = await import(`@/src/lib/db/connection${fresh()}`);
+  vi.mock('@/src/lib/db/connection', () => ({ ...connection }));
 
   const dbModule = (await import(`@/src/lib/db${fresh()}`)) as typeof import('@/src/lib/db');
   vi.mock('@/src/lib/db', () => ({ ...dbModule }));

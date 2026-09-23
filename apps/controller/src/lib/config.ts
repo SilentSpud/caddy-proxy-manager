@@ -129,7 +129,7 @@ function resolveAdminCredentials(): { username: string | null; password: string 
   if (!username) errors.push("ADMIN_USERNAME must be set alongside ADMIN_PASSWORD");
   if (!password) {
     errors.push("ADMIN_PASSWORD must be set alongside ADMIN_USERNAME");
-  } else if (isRuntimeProduction) {
+  } else if (isRuntimeProduction && process.env.DEMO_MODE?.trim().toLowerCase() !== "true") {
     // Runtime only: the production build imports this module with whatever the image carries, and
     // a placeholder there must not fail the build.
     if (password === DEFAULT_ADMIN_PASSWORD) {
