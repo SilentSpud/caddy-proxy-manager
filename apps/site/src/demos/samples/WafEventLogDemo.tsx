@@ -11,9 +11,13 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { useTranslations } from "next-intl";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
-import { SearchField } from "@cpm/controller/src/components/ui/SearchField";
+import {
+  UrlPowerSearch,
+  type UrlSearchField,
+} from "@cpm/controller/src/components/ui/UrlPowerSearch";
 import { Timestamp } from "@cpm/controller/src/components/ui/Timestamp";
 import { DemoSurface } from "../DemoSurface";
+import { useSearchParams } from "../shims/next-navigation";
 
 type Event = {
   id: number;
@@ -29,6 +33,8 @@ type Event = {
   ruleMessage: string;
   matchedData: string;
 };
+
+const titleCase = (value: string) => value.charAt(0) + value.slice(1).toLowerCase();
 
 const SEVERITY_VARIANTS = {
   CRITICAL: "error",
@@ -285,7 +291,7 @@ function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
 
 function WafEventLogDemoContent() {
   const t = useTranslations("waf");
-  const [search, setSearch] = useState("");
+  const params = useSearchParams();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Phone-only, as on the page: search waits behind its icon, and an event replaces the list.
   const isNarrow = useMediaQuery("(max-width: 767px)");
@@ -299,15 +305,58 @@ function WafEventLogDemoContent() {
     if (searchOpen) searchWrapRef.current?.querySelector("input")?.focus();
   }, [searchOpen]);
 
+  // The same parameters the page's server reads, answered here off the rows above.
+  const query = params.toString();
   const rows = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return EVENTS;
-    return EVENTS.filter((event) =>
-      `${event.host} ${event.clientIp} ${event.uri} ${event.ruleId} ${event.ruleMessage}`
-        .toLowerCase()
-        .includes(needle),
+    const filter = new URLSearchParams(query);
+    const needle = filter.get("search")?.trim().toLowerCase();
+    const host = filter.get("host");
+    const ip = filter.get("ip");
+    const rule = filter.get("rule");
+    const action = filter.get("action");
+    const severity = filter.get("severity");
+    return EVENTS.filter(
+      (event) =>
+        (!needle ||
+          `${event.host} ${event.clientIp} ${event.uri} ${event.ruleMessage}`
+            .toLowerCase()
+            .includes(needle)) &&
+        (!host || event.host === host) &&
+        (!ip || event.clientIp === ip) &&
+        (!rule || String(event.ruleId) === rule) &&
+        (!action || event.blocked === (action === "blocked")) &&
+        (!severity || event.severity === severity.toUpperCase()),
     );
-  }, [search]);
+  }, [query]);
+  const filtered = rows.length !== EVENTS.length;
+  const filterFields: UrlSearchField[] = [
+    { param: "search", label: t("filterText"), kind: "text" },
+    {
+      param: "host",
+      label: t("host"),
+      kind: "enum",
+      values: [...new Set(EVENTS.map((event) => event.host))]
+        .sort()
+        .map((host) => ({ value: host, label: host })),
+    },
+    { param: "ip", label: t("clientIp"), kind: "exact" },
+    { param: "rule", label: t("ruleId"), kind: "exact" },
+    {
+      param: "action",
+      label: t("action"),
+      kind: "enum",
+      values: [
+        { value: "blocked", label: t("blocked") },
+        { value: "detected", label: t("detected") },
+      ],
+    },
+    {
+      param: "severity",
+      label: t("severity"),
+      kind: "enum",
+      values: Object.keys(SEVERITY_VARIANTS).map((value) => ({ value, label: titleCase(value) })),
+    },
+  ];
   const selected = rows.find((event) => event.id === selectedId) ?? null;
 
   const columns: Column<Event>[] = [
@@ -336,7 +385,9 @@ function WafEventLogDemoContent() {
       id: "severity",
       label: "Severity",
       width: 100,
-      render: (r) => <Badge variant={SEVERITY_VARIANTS[r.severity]} label={r.severity} />,
+      render: (r) => (
+        <Badge variant={SEVERITY_VARIANTS[r.severity]} label={titleCase(r.severity)} />
+      ),
     },
     {
       id: "host",
@@ -418,15 +469,16 @@ function WafEventLogDemoContent() {
             applied so the filter never hides. */}
       <div
         ref={searchWrapRef}
-        className={searchOpen || search ? undefined : "cpm-desktop-only"}
-        style={{ maxWidth: 480 }}
+        className={searchOpen || filtered ? undefined : "cpm-desktop-only"}
+        style={{ maxWidth: 640 }}
       >
-        <SearchField
-          value={search}
-          onChange={setSearch}
+        <UrlPowerSearch
+          name="WafEvents"
+          fields={filterFields}
           width="100%"
           placeholder={t("eventsSearchPlaceholder")}
           label={t("searchWafEvents")}
+          resultCount={rows.length}
         />
       </div>
 

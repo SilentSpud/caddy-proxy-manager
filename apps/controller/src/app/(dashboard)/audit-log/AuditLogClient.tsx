@@ -1,13 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Card } from "@astryxdesign/core/Card";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable, type Column } from "@/components/ui/DataTable";
-import { SearchField } from "@/components/ui/SearchField";
+import { UrlPowerSearch } from "@/components/ui/UrlPowerSearch";
 import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { StatTiles } from "@/components/ui/StatTiles";
 import { ActivityStrip, type ActivityBucket } from "@/components/ui/ActivityStrip";
@@ -26,7 +24,12 @@ type EventRow = {
 type Props = {
   events: EventRow[];
   pagination: { total: number; page: number; perPage: number };
-  initialSearch: string;
+  /** What the filter menus offer. Resources and actions are stored identifiers, shown as they are. */
+  filterOptions: {
+    users: { value: string; label: string }[];
+    resources: string[];
+    actions: string[];
+  };
   /** 24 hourly buckets covering the last day of the whole log, search or no search. */
   activity: ActivityBucket[];
   summary: { events: number; actors: number; entityTypes: number };
@@ -35,43 +38,11 @@ type Props = {
 export default function AuditLogClient({
   events,
   pagination,
-  initialSearch,
+  filterOptions,
   activity,
   summary,
 }: Props) {
   const t = useTranslations("auditLog");
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [searchTerm, setSearchTerm] = useState(initialSearch);
-  useEffect(() => {
-    setSearchTerm(initialSearch);
-  }, [initialSearch]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const updateSearch = useCallback(
-    (value: string) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        if (value.trim()) {
-          params.set("search", value.trim());
-        } else {
-          params.delete("search");
-        }
-        params.delete("page"); // reset to page 1 on new search
-        router.push(`${pathname}?${params.toString()}`);
-      }, 400);
-    },
-    [router, pathname, searchParams],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
-
   const columns: Column<EventRow>[] = [
     {
       id: "created_at",
@@ -171,13 +142,27 @@ export default function AuditLogClient({
           </Card>
         }
         search={
-          <SearchField
-            value={searchTerm}
-            onChange={(next) => {
-              setSearchTerm(next);
-              updateSearch(next);
-            }}
+          <UrlPowerSearch
+            name="AuditLog"
+            label={t("searchLabel")}
             placeholder={t("searchAuditLog")}
+            resultCount={pagination.total}
+            fields={[
+              { param: "search", label: t("event"), kind: "text" },
+              { param: "user", label: t("user"), kind: "enum", values: filterOptions.users },
+              {
+                param: "resource",
+                label: t("resource"),
+                kind: "enum",
+                values: filterOptions.resources.map((value) => ({ value, label: value })),
+              },
+              {
+                param: "action",
+                label: t("action"),
+                kind: "enum",
+                values: filterOptions.actions.map((value) => ({ value, label: value })),
+              },
+            ]}
           />
         }
       />

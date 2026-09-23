@@ -44,6 +44,7 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
 import { SearchField } from "@/components/ui/SearchField";
+import { UrlPowerSearch, type UrlSearchField } from "@/components/ui/UrlPowerSearch";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { nativeAttrs } from "@/components/ui/native-input-attrs";
 import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/src/lib/caddy-waf";
@@ -71,7 +72,8 @@ type Props = {
   events: WafEvent[];
   stats: WafEventStats;
   pagination: { total: number; page: number; perPage: number };
-  initialSearch: string;
+  /** Every domain a proxy host serves, offered by the host filter. */
+  hostOptions: string[];
   initialRange: "all" | "24h" | "7d" | "30d" | "custom";
   initialFrom: number | null;
   initialTo: number | null;
@@ -205,6 +207,11 @@ const SEVERITY_VARIANTS: Record<string, "error" | "warning" | "info"> = {
 };
 
 /* ── Chips ───────────────────────────────────────────────────────────────── */
+/** Coraza writes severities in capitals; they read as shouting beside the other badges. */
+function severityLabel(severity: string): string {
+  return severity.charAt(0).toUpperCase() + severity.slice(1).toLowerCase();
+}
+
 function SeverityChip({ severity }: { severity: string | null }) {
   const emptyValue = useEmptyValue();
   if (!severity) {
@@ -215,7 +222,7 @@ function SeverityChip({ severity }: { severity: string | null }) {
     );
   }
   const upper = severity.toUpperCase();
-  return <Badge variant={SEVERITY_VARIANTS[upper] ?? "neutral"} label={upper} />;
+  return <Badge variant={SEVERITY_VARIANTS[upper] ?? "neutral"} label={severityLabel(upper)} />;
 }
 
 function BlockedChip({ blocked }: { blocked: boolean }) {
@@ -959,7 +966,7 @@ export default function WafEventsClient({
   events,
   stats,
   pagination,
-  initialSearch,
+  hostOptions,
   initialRange,
   initialFrom,
   initialTo,
@@ -978,7 +985,6 @@ export default function WafEventsClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState("events");
-  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [range, setRange] = useState<RangeOption>(initialRange);
   const [customFrom, setCustomFrom] = useState(pickerValue(initialFrom, timeZone));
   const [customTo, setCustomTo] = useState(pickerValue(initialTo, timeZone));
@@ -1016,6 +1022,37 @@ export default function WafEventsClient({
   // reach Caddy, so the form says so up front rather than accepting a rule set that does nothing.
   const wafModuleDisabledReason = useDisabledReason("waf");
 
+  const filterFields: UrlSearchField[] = [
+    { param: "search", label: t("filterText"), kind: "text" },
+    {
+      param: "host",
+      label: t("host"),
+      kind: "enum",
+      values: hostOptions.map((host) => ({ value: host, label: host })),
+    },
+    { param: "ip", label: t("clientIp"), kind: "exact" },
+    { param: "rule", label: t("ruleId"), kind: "exact" },
+    {
+      param: "action",
+      label: t("action"),
+      kind: "enum",
+      values: [
+        { value: "blocked", label: t("blocked") },
+        { value: "detected", label: t("detected") },
+      ],
+    },
+    {
+      param: "severity",
+      label: t("severity"),
+      kind: "enum",
+      values: Object.keys(SEVERITY_VARIANTS).map((value) => ({
+        value,
+        label: severityLabel(value),
+      })),
+    },
+  ];
+  const hasFilters = filterFields.some((field) => searchParams.has(field.param));
+
   const rangeOptions: { value: RangeOption; label: string }[] = [
     { value: "all", label: t("rangeAllTime") },
     { value: "24h", label: "24h" },
@@ -1038,39 +1075,10 @@ export default function WafEventsClient({
   ];
 
   useEffect(() => {
-    setSearchTerm(initialSearch);
-  }, [initialSearch]);
-  useEffect(() => {
     setRange(initialRange);
     setCustomFrom(pickerValue(initialFrom, timeZone));
     setCustomTo(pickerValue(initialTo, timeZone));
   }, [initialRange, initialFrom, initialTo, timeZone]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const updateSearch = useCallback(
-    (value: string) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        if (value.trim()) {
-          params.set("search", value.trim());
-        } else {
-          params.delete("search");
-        }
-        params.delete("page");
-        router.push(`${pathname}?${params.toString()}`);
-      }, 400);
-    },
-    [router, pathname, searchParams],
-  );
-
-  useEffect(
-    () => () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    },
-    [],
-  );
-
   const pushRange = useCallback(
     (nextRange: RangeOption, nextFrom?: string, nextTo?: string) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -1165,7 +1173,7 @@ export default function WafEventsClient({
     {
       id: "blocked",
       label: t("action"),
-      width: 90,
+      width: 120,
       render: (r) => <BlockedChip blocked={r.blocked} />,
     },
     {
@@ -1312,7 +1320,7 @@ export default function WafEventsClient({
       </TabList>
 
       {tab === "events" && (
-        <VStack gap={4}>
+        <VStack gap={6}>
           <div className="cpm-desktop-only">
             <StatsBar stats={stats} />
           </div>
@@ -1322,13 +1330,14 @@ export default function WafEventsClient({
           <VStack gap={3}>
             {/* The range on the left and search at the far right, one row. On a phone the chip
                 takes the range's place, and search wraps under it once opened. */}
-            <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
+            {/* Top-aligned: the search bar's bottom margin would pull a centred range down. */}
+            <HStack justify="between" vAlign="start" gap={3} wrap="wrap">
               {/* Was five buttons whose "selected" state read only as a filled
                   variant; SegmentedControl exposes the choice as a radio group. */}
               <div className="cpm-desktop-only">
                 <SegmentedControl
                   label={t("timeRange")}
-                  size="sm"
+                  size="md"
                   value={range}
                   onChange={handleRangeChange}
                 >
@@ -1350,17 +1359,15 @@ export default function WafEventsClient({
                   auto margin keeps it right-aligned when it wraps onto a line of its own. */}
               <div
                 ref={searchWrapRef}
-                className={searchOpen || searchTerm ? undefined : "cpm-desktop-only"}
-                style={{ flex: "1 1 240px", maxWidth: 480, marginInlineStart: "auto" }}
+                className={searchOpen || hasFilters ? undefined : "cpm-desktop-only"}
+                style={{ flex: "1 1 240px", maxWidth: 640, marginInlineStart: "auto" }}
               >
-                <SearchField
-                  value={searchTerm}
-                  onChange={(v) => {
-                    setSearchTerm(v);
-                    updateSearch(v);
-                  }}
-                  placeholder={t("eventsSearchPlaceholder")}
+                <UrlPowerSearch
+                  name="WafEvents"
                   label={t("searchWafEvents")}
+                  placeholder={t("eventsSearchPlaceholder")}
+                  resultCount={pagination.total}
+                  fields={filterFields}
                   width="100%"
                 />
               </div>

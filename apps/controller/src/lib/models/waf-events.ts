@@ -10,10 +10,11 @@ import {
   type WafEventStats,
   type TopWafRule,
   type TopWafRuleWithHosts,
+  type WafEventFilter,
 } from "../clickhouse/client";
 import { isConnectionError } from "../net-errors";
 
-export type { WafEvent, WafEventStats, TopWafRule, TopWafRuleWithHosts };
+export type { WafEvent, WafEventStats, TopWafRule, TopWafRuleWithHosts, WafEventFilter };
 
 const EMPTY_WAF_STATS: WafEventStats = {
   total: 0,
@@ -49,19 +50,23 @@ async function withWafAnalyticsFallback<T>(
   }
 }
 
-export async function countWafEvents(search?: string, from?: number, to?: number): Promise<number> {
+export async function countWafEvents(
+  filter?: string | WafEventFilter,
+  from?: number,
+  to?: number,
+): Promise<number> {
   return withWafAnalyticsFallback("countWafEvents", 0, () =>
-    queryWafCountWithSearch(search, from, to),
+    queryWafCountWithSearch(filter, from, to),
   );
 }
 
 export async function getWafEventStats(
-  search?: string,
+  filter?: string | WafEventFilter,
   from?: number,
   to?: number,
 ): Promise<WafEventStats> {
   return withWafAnalyticsFallback("getWafEventStats", EMPTY_WAF_STATS, () =>
-    queryWafEventStatsWithSearch(search, from, to),
+    queryWafEventStatsWithSearch(filter, from, to),
   );
 }
 
@@ -95,11 +100,11 @@ export async function getWafRuleMessages(
 export async function listWafEvents(
   limit = 50,
   offset = 0,
-  search?: string,
+  filter?: string | WafEventFilter,
   from?: number,
   to?: number,
 ): Promise<WafEvent[]> {
   return withWafAnalyticsFallback("listWafEvents", [], () =>
-    queryWafEvents(limit, offset, search, from, to),
+    queryWafEvents(limit, offset, filter, from, to),
   );
 }

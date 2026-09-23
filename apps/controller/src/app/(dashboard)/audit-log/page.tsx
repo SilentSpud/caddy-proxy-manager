@@ -4,6 +4,8 @@ import {
   countAuditEvents,
   auditActivityByHour,
   auditActivitySummary,
+  auditFilterOptions,
+  type AuditEventFilter,
 } from "@/src/lib/models/audit";
 import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
@@ -14,7 +16,13 @@ import { getFormatter, getTranslations } from "next-intl/server";
 const PER_PAGE = 50;
 
 interface PageProps {
-  searchParams: Promise<{ page?: string; search?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    user?: string;
+    resource?: string;
+    action?: string;
+  }>;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -24,9 +32,16 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function AuditLogPage({ searchParams }: PageProps) {
   await requireAdmin();
-  const { page: pageParam, search: searchParam } = await searchParams;
-  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-  const search = searchParam?.trim() || undefined;
+  const params = await searchParams;
+  const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+  const userId = parseInt(params.user ?? "", 10);
+  const filter: AuditEventFilter = {
+    search: params.search?.trim() || undefined,
+    // "system" is the actor with no user row; anything else unparseable is no filter at all.
+    userId: params.user === "system" ? null : Number.isInteger(userId) ? userId : undefined,
+    entityType: params.resource?.trim() || undefined,
+    action: params.action?.trim() || undefined,
+  };
   const offset = (page - 1) * PER_PAGE;
 
   // The strip and the tiles describe the last 24 hours of the whole log, deliberately ignoring the
@@ -34,12 +49,13 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const sinceIso = since.toISOString();
 
-  const [events, total, users, activity, summary] = await Promise.all([
-    listAuditEvents(PER_PAGE, offset, search),
-    countAuditEvents(search),
+  const [events, total, users, activity, summary, options] = await Promise.all([
+    listAuditEvents(PER_PAGE, offset, filter),
+    countAuditEvents(filter),
     listUsers(),
     auditActivityByHour(sinceIso).catch(() => []),
     auditActivitySummary(sinceIso).catch(() => ({ events: 0, actors: 0, entityTypes: 0 })),
+    auditFilterOptions(),
   ]);
 
   // Fill the gaps the query leaves out, so the strip always has 24 bars and a quiet hour reads as
@@ -82,7 +98,14 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
           : t("systemActor"),
       }))}
       pagination={{ total, page, perPage: PER_PAGE }}
-      initialSearch={search ?? ""}
+      filterOptions={{
+        users: [
+          { value: "system", label: t("systemActor") },
+          ...users.map((user) => ({ value: String(user.id), label: user.name ?? user.email })),
+        ],
+        resources: options.entityTypes,
+        actions: options.actions,
+      }}
       activity={buckets}
       summary={summary}
     />
