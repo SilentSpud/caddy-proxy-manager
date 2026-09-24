@@ -51,12 +51,15 @@ function Measure({ aside, children }: { aside: boolean; children: ReactNode }) {
 
 export default function SettingsFrame({
   sectionId,
+  title,
   staged,
   aside = true,
   children,
 }: {
   /** The section being shown, or null on the overview. */
   sectionId: string | null;
+  /** For a page that is not a section, such as the history: its name in place of the overview's. */
+  title?: string;
   staged: StagedView;
   /** Whether this page draws a list of its blocks beside the column, which the measure allows for. */
   aside?: boolean;
@@ -64,7 +67,7 @@ export default function SettingsFrame({
 }) {
   return (
     <VStack gap={0} height="fill">
-      <SettingsHeader sectionId={sectionId} staged={staged} aside={aside} />
+      <SettingsHeader sectionId={sectionId} title={title} staged={staged} aside={aside} />
       {/*
         No scrolling of its own. The app shell's content area is what scrolls, and an
         `overflow: auto` here becomes the scrollport every `position: sticky` inside this frame is
@@ -80,10 +83,12 @@ export default function SettingsFrame({
 
 function SettingsHeader({
   sectionId,
+  title,
   staged,
   aside,
 }: {
   sectionId: string | null;
+  title?: string;
   staged: StagedView;
   aside: boolean;
 }) {
@@ -116,14 +121,16 @@ function SettingsHeader({
                 {group ? (
                   <BreadcrumbItem isCurrent>{settingsGroupLabel(t, group)}</BreadcrumbItem>
                 ) : (
-                  <BreadcrumbItem isCurrent>{t("homeOverview")}</BreadcrumbItem>
+                  <BreadcrumbItem isCurrent>{title ?? t("homeOverview")}</BreadcrumbItem>
                 )}
               </Breadcrumbs>
             </div>
             {/* The title alone: a page carries several blocks now, and an environment variable
               beside the title would claim it configures all of them. Each block renders its own
               tokens, and a variable that sets one field renders next to that field. */}
-            <Heading level={1}>{item ? settingsSectionName(t, item) : t("homeOverview")}</Heading>
+            <Heading level={1}>
+              {item ? settingsSectionName(t, item) : (title ?? t("homeOverview"))}
+            </Heading>
           </VStack>
 
           <HStack gap={2} vAlign="center" style={{ flexShrink: 0 }}>

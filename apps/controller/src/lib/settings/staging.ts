@@ -88,7 +88,7 @@ export async function discardAllStaged(userId: number): Promise<void> {
  * serialized forms is what tells us whether a write is a no-op, and re-serializing a parsed value
  * could differ from what is stored by key order alone.
  */
-async function storedValues(keys: string[]): Promise<Map<string, string>> {
+export async function storedValues(keys: string[]): Promise<Map<string, string>> {
   const rows = await db
     .select({ key: settings.key, value: settings.value })
     .from(settings)

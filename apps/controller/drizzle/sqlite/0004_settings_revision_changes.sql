@@ -1,0 +1,1 @@
+ALTER TABLE `settings_revisions` ADD `changes` text;

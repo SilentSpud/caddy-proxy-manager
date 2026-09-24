@@ -11,7 +11,7 @@ import { settings, settingsRevisions } from "../db/schema";
 import { desc, sql } from "drizzle-orm";
 import { applyCaddyConfig, buildCaddyDocument } from "../caddy";
 import { withSettingsUpdateLock } from "../settings-update-lock";
-import { discardAllStaged, listStagedSettings, stagedOverlay } from "./staging";
+import { discardAllStaged, listStagedSettings, stagedOverlay, storedValues } from "./staging";
 import { withStagedReads } from "./staging-context";
 import { domainError } from "../domain-error";
 
@@ -25,7 +25,12 @@ export type RevisionRow = {
   outcome: "applied" | "failed";
   error: string | null;
   appliedAt: string;
+  /** Whether the row holds its values. One written before they were recorded can be neither compared nor restored. */
+  recorded: boolean;
 };
+
+/** A key's serialized value either side of an apply; `before` is null for a key that had no row. */
+export type RevisionChange = { before: string | null; after: string };
 
 /** `error` is what the revision stores; `cause` is what the action renders, in the reader's language. */
 export type ApplyOutcome =
@@ -70,6 +75,7 @@ export async function applyStagedSettings(
     }
 
     const now = nowIso();
+    const previous = await storedValues(staged.map((entry) => entry.key));
     // One statement for the set; keys are unique per operator, which a multi-row upsert requires.
     await db
       .insert(settings)
@@ -100,6 +106,14 @@ export async function applyStagedSettings(
         appliedByName,
         summary: keys.join(", "),
         keys: JSON.stringify(keys),
+        changes: JSON.stringify(
+          Object.fromEntries(
+            staged.map((entry): [string, RevisionChange] => [
+              entry.key,
+              { before: previous.get(entry.key) ?? null, after: entry.value },
+            ]),
+          ),
+        ),
         outcome: error ? "failed" : "applied",
         error,
         appliedAt: now,
@@ -113,8 +127,8 @@ export async function applyStagedSettings(
   });
 }
 
-/** The most recent applies, newest first. Drives the header pill and the review sheet's history. */
-export async function recentRevisions(limit = 3): Promise<RevisionRow[]> {
+/** The most recent applies, newest first. Drives the header pill, the review sheet and the history page. */
+export async function recentRevisions(limit = 3, offset = 0): Promise<RevisionRow[]> {
   const rows = await db
     .select({
       id: settingsRevisions.id,
@@ -124,16 +138,37 @@ export async function recentRevisions(limit = 3): Promise<RevisionRow[]> {
       outcome: settingsRevisions.outcome,
       error: settingsRevisions.error,
       appliedAt: settingsRevisions.appliedAt,
+      changes: settingsRevisions.changes,
     })
     .from(settingsRevisions)
     .orderBy(desc(settingsRevisions.id))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 
-  return rows.map((row) => ({
+  return rows.map(({ changes, ...row }) => ({
     ...row,
     keys: parseRevisionKeys(row.keys),
     outcome: row.outcome === "failed" ? "failed" : "applied",
+    recorded: parseRevisionChanges(changes) !== null,
   }));
+}
+
+/** Null for a row that predates the column, or one whose JSON cannot be read. */
+export function parseRevisionChanges(raw: string | null): Map<string, RevisionChange> | null {
+  if (raw === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const changes = new Map<string, RevisionChange>();
+    for (const [key, value] of Object.entries(parsed)) {
+      const { before, after } = (value ?? {}) as Record<string, unknown>;
+      if (typeof after !== "string" || (before !== null && typeof before !== "string")) return null;
+      changes.set(key, { before, after });
+    }
+    return changes;
+  } catch {
+    return null;
+  }
 }
 
 /** An unreadable column yields no keys, and the sheet falls back to the stored summary. */

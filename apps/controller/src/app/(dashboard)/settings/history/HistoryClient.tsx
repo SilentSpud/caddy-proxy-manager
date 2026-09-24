@@ -1,0 +1,330 @@
+"use client";
+
+/**
+ * Every applied revision, a comparison between any two, and the way back to an earlier one.
+ *
+ * Restoring stages rather than applies, so the page hands off to the header's Review & apply: the
+ * operator sees what going back does to the Caddy config before it reaches Caddy, exactly as for an
+ * edit made by hand.
+ */
+
+import { useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Pagination } from "@astryxdesign/core/Pagination";
+import { Selector } from "@astryxdesign/core/Selector";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { Text } from "@astryxdesign/core/Text";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { useFormatter, useTranslations } from "next-intl";
+import { Timestamp } from "@/src/components/ui/Timestamp";
+import type { RevisionRow } from "@/src/lib/settings/apply";
+import type { ConfigDiff } from "@/src/lib/settings/config-diff";
+import type { RevisionComparison } from "@/src/lib/settings/revisions";
+import { stagedChangeLabel } from "@/src/lib/settings/section-keys";
+import type { StagedView } from "@/src/lib/settings/staged-view";
+import { restoreRevisionAction } from "../actions";
+import SettingsFrame from "../SettingsFrame";
+import { DiffView, revisionSummary } from "../StagedChanges";
+
+type Props = {
+  staged: StagedView;
+  revisions: RevisionRow[];
+  page: number;
+  perPage: number;
+  total: number;
+  ids: number[];
+  latest: number;
+  restorableFrom: number;
+  selection: { from: number; to: number } | null;
+  comparison: RevisionComparison | null;
+};
+
+export default function HistoryClient(props: Props) {
+  const t = useTranslations("settings");
+  const { revisions, selection, latest } = props;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const navigate = (changes: Record<string, number>) => {
+    const next = new URLSearchParams(searchParams.toString());
+    for (const [name, value] of Object.entries(changes)) next.set(name, String(value));
+    router.push(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+
+  return (
+    <SettingsFrame sectionId={null} title={t("history.title")} staged={props.staged}>
+      <VStack gap={5}>
+        <Text type="supporting" color="secondary">
+          {t("history.subtitle")}
+        </Text>
+
+        {latest === 0 ? (
+          <Banner status="info" title={t("history.empty")} />
+        ) : (
+          <>
+            <Card padding={0}>
+              <VStack gap={0} data-testid="revision-list">
+                <HStack gap={2} vAlign="center" padding={4}>
+                  <Heading level={3}>{t("history.listTitle")}</Heading>
+                </HStack>
+                {revisions.map((revision) => (
+                  <RevisionListRow
+                    key={revision.id}
+                    revision={revision}
+                    latest={latest}
+                    isSelected={selection?.to === revision.id}
+                    onView={() =>
+                      navigate({
+                        to: revision.id,
+                        from: props.ids.find((id) => id < revision.id) ?? 0,
+                      })
+                    }
+                  />
+                ))}
+                {props.total > props.perPage && (
+                  <HStack justify="center" padding={3}>
+                    <Pagination
+                      page={props.page}
+                      pageSize={props.perPage}
+                      totalItems={props.total}
+                      onChange={(page: number) => navigate({ page })}
+                    />
+                  </HStack>
+                )}
+              </VStack>
+            </Card>
+
+            {selection && (
+              <ComparisonCard
+                ids={props.ids}
+                selection={selection}
+                comparison={props.comparison}
+                latest={latest}
+                restorableFrom={props.restorableFrom}
+                onSelect={navigate}
+              />
+            )}
+          </>
+        )}
+      </VStack>
+    </SettingsFrame>
+  );
+}
+
+function RevisionListRow({
+  revision,
+  latest,
+  isSelected,
+  onView,
+}: {
+  revision: RevisionRow;
+  latest: number;
+  isSelected: boolean;
+  onView: () => void;
+}) {
+  const t = useTranslations("settings");
+  const format = useFormatter();
+  return (
+    <>
+      <Divider />
+      <div
+        style={{
+          padding: "var(--spacing-3) var(--spacing-4)",
+          background: isSelected ? "var(--color-background-muted)" : undefined,
+        }}
+        data-testid={`revision-${revision.id}`}
+      >
+        <HStack gap={3} vAlign="center">
+          <Text type="code" size="sm" color="secondary">
+            #{revision.id}
+          </Text>
+          <VStack gap={0} style={{ flexGrow: 1, minWidth: 0 }}>
+            <Text type="label" maxLines={1}>
+              {revisionSummary(t, format, revision)}
+            </Text>
+            <Text type="supporting" color="secondary">
+              {t("history.appliedBy", {
+                name: revision.appliedByName ?? t("history.unknownUser"),
+              })}{" "}
+              · <Timestamp value={revision.appliedAt} style="dateTimeShort" />
+            </Text>
+          </VStack>
+          {revision.id === latest && <Badge variant="success" label={t("history.current")} />}
+          {revision.outcome === "failed" && (
+            <Tooltip content={revision.error ?? ""}>
+              <Badge variant="error" label={t("history.failed")} />
+            </Tooltip>
+          )}
+          {!revision.recorded && (
+            <Tooltip content={t("history.notRecordedHelp")}>
+              <Badge label={t("history.notRecorded")} />
+            </Tooltip>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            label={t("history.view")}
+            onClick={onView}
+            isDisabled={isSelected}
+          />
+        </HStack>
+      </div>
+    </>
+  );
+}
+
+function ComparisonCard({
+  ids,
+  selection,
+  comparison,
+  latest,
+  restorableFrom,
+  onSelect,
+}: {
+  ids: number[];
+  selection: { from: number; to: number };
+  comparison: RevisionComparison | null;
+  latest: number;
+  restorableFrom: number;
+  onSelect: (changes: Record<string, number>) => void;
+}) {
+  const t = useTranslations("settings");
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const options = ids.map((id) => ({
+    value: String(id),
+    label: t("history.revisionOption", { id }),
+  }));
+  const fromOptions = [...options, { value: "0", label: t("history.initial") }];
+  const { from, to } = selection;
+  const canRestore = to >= 1 && to < latest && to >= restorableFrom;
+
+  const restore = () => {
+    setResult(null);
+    startTransition(async () => {
+      const outcome = await restoreRevisionAction(to);
+      setResult({ ok: outcome.success, message: outcome.message ?? "" });
+      router.refresh();
+    });
+  };
+
+  return (
+    <Card padding={4}>
+      <VStack gap={4} data-testid="revision-comparison">
+        <HStack gap={3} vAlign="end" wrap="wrap">
+          <Heading level={3}>{t("history.compareTitle")}</Heading>
+          <div style={{ flexGrow: 1 }} />
+          <Selector
+            label={t("history.compareFrom")}
+            size="sm"
+            options={fromOptions}
+            value={String(from)}
+            onChange={(value) => onSelect({ from: Number(value) })}
+          />
+          <Selector
+            label={t("history.compareTo")}
+            size="sm"
+            options={options}
+            value={String(to)}
+            onChange={(value) => onSelect({ to: Number(value) })}
+          />
+        </HStack>
+
+        {from === to ? (
+          <Banner status="info" title={t("history.same")} />
+        ) : (
+          <Text type="supporting" color="secondary">
+            {from === 0
+              ? t("history.comparisonSubtitleInitial", { to })
+              : t("history.comparisonSubtitle", { from, to })}
+          </Text>
+        )}
+
+        {canRestore && (
+          <HStack gap={3} vAlign="center">
+            <Text type="supporting" color="secondary" style={{ flexGrow: 1 }}>
+              {t("history.restoreHelp", { id: to })}
+            </Text>
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("history.restore", { id: to })}
+              onClick={restore}
+              isDisabled={pending}
+              data-testid="restore-revision"
+            />
+          </HStack>
+        )}
+        {result && <Banner status={result.ok ? "success" : "error"} title={result.message} />}
+
+        {comparison && <ComparisonBody comparison={comparison} />}
+      </VStack>
+    </Card>
+  );
+}
+
+function ComparisonBody({ comparison }: { comparison: RevisionComparison }) {
+  const t = useTranslations("settings");
+  if (comparison.keys === null) {
+    return <Banner status="warning" title={t("history.notComparable")} />;
+  }
+  if (comparison.keys.length === 0) {
+    return <Banner status="info" title={t("history.noChanges")} />;
+  }
+
+  return (
+    <VStack gap={4}>
+      <Heading level={4}>{t("history.settingsTitle")}</Heading>
+      {comparison.keys.map((entry) => (
+        <VStack key={entry.key} gap={2}>
+          <DiffHeading title={stagedChangeLabel(t, entry)} diff={entry.diff} code={entry.key} />
+          <DiffView lines={entry.diff.lines} />
+        </VStack>
+      ))}
+
+      <Divider />
+      {comparison.config === null ? (
+        <Banner status="warning" title={t("history.configFailed")} />
+      ) : (
+        <VStack gap={2}>
+          <DiffHeading title={t("history.configTitle")} diff={comparison.config} />
+          {comparison.config.unchanged ? (
+            <Banner status="info" title={t("reviewNoConfigChange")} />
+          ) : (
+            <DiffView lines={comparison.config.lines} />
+          )}
+          <Text type="supporting" color="secondary">
+            {t("history.configNote")} {t("reviewSecretsMasked")}
+          </Text>
+        </VStack>
+      )}
+    </VStack>
+  );
+}
+
+function DiffHeading({ title, diff, code }: { title: string; diff: ConfigDiff; code?: string }) {
+  const t = useTranslations("settings");
+  return (
+    <HStack gap={2} vAlign="center">
+      <Heading level={5}>{title}</Heading>
+      {code && (
+        <Text type="code" size="xsm" color="secondary">
+          {code}
+        </Text>
+      )}
+      <div style={{ flexGrow: 1 }} />
+      <Text type="supporting" color="secondary">
+        {t("reviewDiffStat", { added: diff.added, removed: diff.removed })}
+      </Text>
+    </HStack>
+  );
+}
