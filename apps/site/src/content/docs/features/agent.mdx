@@ -45,7 +45,7 @@ the command that fixes it.
 ## A different host
 
 An agent elsewhere cannot read that volume, so it pairs with a code you carry. Generate one under
-**Settings → Agents** - six letters, valid five minutes, single use, at most five wrong guesses a
+**Settings → Agent** - six letters, valid five minutes, single use, at most five wrong guesses a
 minute per address - then run on the agent's host:
 
 ```bash
@@ -67,15 +67,16 @@ can pass `--yes` instead.
 
 A bare host means `https://`. Plain `http://` works towards a private address with a warning and is
 refused towards a public one unless `CONTROLLER_ALLOW_INSECURE_HTTP=true`, because the secret
-travels over this link. The two exchange a secret, stored encrypted on both sides, and the code is
-never used again. An agent that is already paired re-pairs only with a code from **Re-pair** on its
-row. `CONTROLLER_URL` and `PAIRING_CODE` do the same without a terminal.
+travels over this link. The two exchange a secret - encrypted at rest on the controller, kept in the agent's own state
+volume - and the code is never used again. An agent that is already paired re-pairs only with a code from **Re-pair** on its
+row. `CONTROLLER_URL` and `PAIRING_CODE` do the same without a terminal, on an agent that is not
+yet paired; a stored pairing wins over them.
 
 ## Fleets
 
-Any number of Caddy hosts can serve one configuration. Every apply lands on all of them or none,
-and names the host that refused - a partial apply would leave two hosts disagreeing about what the
-proxy is, which is worse than a failed one.
+Any number of Caddy hosts can serve one configuration. Every apply goes to all of them, and if
+any host refuses the config or cannot be reached the apply fails and names it - the change is not
+recorded as applied until every host has it, so the disagreement is visible rather than silent.
 
 Hosts can also be pinned to specific agents, so one machine serves a subset rather than everything.
 

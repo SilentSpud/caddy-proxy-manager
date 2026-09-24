@@ -58,7 +58,7 @@ its own upstreams, load balancing and health checks.
 ## Redirects and rewrites
 
 Per-host redirect rules with a status of 301, 302, 307 or 308 - 307 and 308 preserve the request
-method, which matters for anything but a GET. Path prefix rewriting happens before the request
+method, which matters for anything but a GET. A path prefix can be prepended before the request
 reaches the upstream.
 
 <Demo title="Redirects and path rewrites">
@@ -80,5 +80,6 @@ because a single pinned address cannot carry more than one SNI name.
 
 ## Headers
 
-Request and response headers can be added, replaced or removed per host. The host header is
-forwarded by default, which is what most applications behind a proxy expect.
+The host header is forwarded by default, which is what most applications behind a proxy expect.
+Other request and response headers are set through the host's advanced configuration fields, which
+take raw Caddy JSON and are admin-only.

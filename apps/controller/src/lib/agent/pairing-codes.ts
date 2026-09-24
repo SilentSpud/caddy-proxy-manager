@@ -167,7 +167,7 @@ export function redeemRepairCode(
     return {
       ok: false,
       error:
-        "This agent is already paired. Use Re-pair on its row in Settings → Agents to get a code for it.",
+        "This agent is already paired. Use Re-pair on its row in Settings → Agent to get a code for it.",
     };
   }
   return redeem(live, submitted, now, () => {

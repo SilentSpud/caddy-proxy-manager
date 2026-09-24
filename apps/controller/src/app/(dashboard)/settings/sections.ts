@@ -172,6 +172,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             name: "Agent",
             desc: "The service that recreates and rebuilds the Caddy container",
             env: ["CONTROLLER_URL", "AGENT_MODE", "PAIRING_CODE", "CADDY_API_URL"],
+            envSearch: ["CADDY_MONITOR_ENABLED"],
           },
         ],
       },

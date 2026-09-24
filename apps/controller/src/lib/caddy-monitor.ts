@@ -14,7 +14,6 @@
 
 import type { ConnectedAgent } from "./agent/registry";
 import { connectedAgents } from "./agent/registry";
-import { config } from "./config";
 import {
   applyCaddyConfig,
   applyCaddyConfigToAgent,
@@ -149,8 +148,24 @@ export function noteStartupApply(now = Date.now()): void {
   });
 }
 
+/**
+ * Whether the operator wants drift re-applied at all. Read on every pass rather than when the
+ * monitor starts, so switching it off in Settings takes effect without a restart. Off is for a
+ * controller sharing a Caddy it does not own, where two monitors would push their own idea of the
+ * config at each other. Imported lazily like `updates.ts` does: the registry pulls in the settings
+ * store, which the tests mock after this module is loaded.
+ */
+async function monitorEnabled(): Promise<boolean> {
+  const [registry, { getSetting }] = await Promise.all([
+    import("./settings/registry"),
+    import("./settings/resolve"),
+  ]);
+  return getSetting(registry.caddyMonitorEnabled);
+}
+
 /** One pass over every Caddy. Exported so tests can drive it with no delay before the re-apply. */
 export async function checkCaddyHealth(reapplyDelayMs = REAPPLY_DELAY): Promise<void> {
+  if (!(await monitorEnabled())) return;
   const now = Date.now();
   const current = targets();
   const live = new Set(current.map((target) => target.key));
@@ -162,12 +177,6 @@ export async function checkCaddyHealth(reapplyDelayMs = REAPPLY_DELAY): Promise<
 
 /** Start monitoring Caddy health. */
 export function startCaddyMonitoring(): void {
-  if (!config.caddyMonitorEnabled) {
-    console.log(
-      "[CaddyMonitor] Disabled (CADDY_MONITOR_ENABLED=false); this controller does not own the Caddy it points at",
-    );
-    return;
-  }
   if (isMonitoring) {
     console.log("[CaddyMonitor] Already monitoring");
     return;

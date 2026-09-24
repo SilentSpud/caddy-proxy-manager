@@ -31,7 +31,7 @@ Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
 release - so it runs from wherever it is unpacked, and no clone is needed.
 
 ```bash
-VERSION=v3.2.1   # the release you downloaded
+VERSION=v3.3.0   # the release you downloaded
 mkdir caddy-proxy-manager && cd caddy-proxy-manager
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 
@@ -237,7 +237,7 @@ from inside the image - the runtime has no shell HTTP client to call instead.
 - **Location Rules** - Path-based routing to different upstreams per proxy host (e.g. `/api/*` to one backend, `/ws/*` to another)
 - **Redirect & Rewrite** - Per-host redirect rules (301/302/307/308) and path prefix rewriting
 - **Forward Auth Portal** - Built-in identity provider for protecting proxy hosts without an external IdP. Credential and OAuth login portal, user groups with membership management, per-host access control by user or group, and excluded paths that bypass authentication
-- **WAF** - Web Application Firewall powered by Coraza with optional OWASP Core Rule Set (SQLi, XSS, LFI, RCE). Per-host enable/disable, global and per-host rule suppression, plugins from the CRS plugin registry, custom SecLang directives, and a searchable event log with severity and blocked/detected classification
+- **WAF** - Web Application Firewall powered by Coraza with optional OWASP Core Rule Set (SQLi, XSS, LFI, RCE). Per-host enable/disable, global and per-host rule suppression, named rule presets, plugins from the CRS plugin registry, custom SecLang directives checked by the editor and by a real Caddy before they are saved, and a searchable event log with severity and blocked/detected classification
 - **Analytics** - Live traffic charts, protocol breakdown, country map, top user agents, and blocked request log with configurable time ranges
 - **Geo Blocking** - Block or allow traffic by country, continent, ASN, CIDR range, or exact IP per proxy host. Allow rules override block rules. Fail-closed mode, custom response codes/bodies, and trusted proxy support
 - **Access Lists** - Multi-account HTTP basic auth protection (bcrypt-hashed) assignable per proxy host
@@ -258,11 +258,11 @@ from inside the image - the runtime has no shell HTTP client to call instead.
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, ClouDNS, and RFC2136 (BIND/TSIG). Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults)
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
-- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format - plus everything that used to be in `.env`, stored in the database and editable without a restart
+- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored
 - **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
 - **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported - accounts, hosts, certificates and settings. Secrets encrypted with the old installation's `SESSION_SECRET` are re-encrypted under this deployment's own, so the old key is entered once and never needed again. Ends with a backup of the old file and a paste-ready command to clear the migrated variables out of `.env`
-- **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. Every apply lands on all of them or none, and names the host that refused
-- **Update Check** - Settings reports when a newer release has been published to the registry this deployment pulls from. The only request the app makes to the internet on its own, and it can be switched off
+- **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. An apply that any host refuses fails and names it
+- **Update Check** - Settings reports when a newer release has been published to the registry this deployment pulls from. It can be switched off; the only other requests the app makes to the internet on its own are the CRS plugin registry check and the GeoIP downloads, each with a switch of its own
 - **Audit Log** - Searchable configuration change history with user attribution and pagination
 - **Search & Pagination** - Server-side search and pagination on all data tables
 - **Dark Mode** - Full dark/light theme support with system preference detection
@@ -287,6 +287,29 @@ Each field on the Settings page shows which layer its current value came from.
 
 A stored value that no longer validates - because a range was tightened, say - is ignored with a
 warning and falls through to the environment and the default, rather than taking the app down.
+
+### Staging, review and history
+
+Saving a settings form does not reach Caddy. It stages the change, and the header of every settings
+screen shows how many changes are pending and in which sections, because one change set spans
+them all: DNS edited on one page and geo blocking on another is one apply, not two. The staged set
+is yours - another administrator's pending edits are neither shown nor applied with yours.
+
+**Review & apply** lists the staged changes and the diff of the Caddy config they would produce,
+rendered from the staged values, with credentials masked. Applying writes them to the database and
+reloads Caddy once. Settings that do not touch the Caddy config say so instead of showing a diff.
+**Discard** drops the set, or one change at a time from the review sheet. A few forms save straight
+away instead, because their real work is not a settings write - a Caddy rebuild, starting
+ClickHouse, the favicon, and the instance, sign-in and agent fields that never reach the Caddy
+config.
+
+Every apply is a **revision**, recording each committed key's value before and after and who
+applied it, whether it succeeded or Caddy refused the config. **Settings → History** lists them
+newest first; pick any two to see which settings differ and the Caddy config diff between them,
+rendered against today's hosts so only the settings differ between the two sides. **Restore**
+stages the values a revision had, on top of anything already pending, and goes through the same
+review - history only ever grows. Revisions applied before values were recorded are listed but can
+be neither compared nor restored.
 
 #### Getting back in: `SETTINGS_ENV_OVERRIDE`
 
@@ -328,7 +351,7 @@ it win even then.
 | Application name - sidebar, login card, page-title suffix | `APP_NAME` | `Caddy Proxy Manager` |
 | Public URL. OAuth redirect URIs are built from it, so it must match what the provider has registered | `BASE_URL` | `http://localhost:3000` |
 | Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy-admin:2019` |
-| Re-apply this controller's configuration to a Caddy that drifted away from it (restarted onto an old or default config). Turn it off on a controller pointed at a Caddy it does not own, or two of them fight over the configuration | `CADDY_MONITOR_ENABLED` | `true` |
+| Re-apply this controller's configuration to a Caddy that drifted away from it (restarted onto an old or default config). Under **Settings → Agent**, checked on every pass so it takes effect without a restart. Turn it off on a controller pointed at a Caddy it does not own, or two of them fight over the configuration | `CADDY_MONITOR_ENABLED` | `true` |
 | Pinned as `admin.listen` in a config the controller loads with no agent in between, as the agent pins every config it forwards. Must match the `caddy` service's value | `CADDY_ADMIN_LISTEN` | `caddy-admin:2019` in `docker-compose.yml`, else unset (sent as built) |
 | Gravatar fallback for user icons. Off keeps every avatar lookup off the network | `AVATAR_GRAVATAR` | `true` |
 | Internal forward-auth address Caddy dials. Derived from the container network when empty | `FORWARD_AUTH_INTERNAL_URL` | Derived |
@@ -547,7 +570,7 @@ A pre-3.0 database is not opened in place, even though it is also SQLite - see
 
 ### Upgrading from PostgreSQL 17
 
-The bundled `postgres` service moved from 17 to 18 during the 3.0 beta. A major version cannot read
+The bundled `postgres` service moved from 17 to 18 during the 3.0 release candidates. A major version cannot read
 another's data files, so if your `docker-compose.yml` still says `image: postgres:17-alpine`, this
 upgrade is a dump and restore. Getting the order wrong loses nothing: 18 refuses to start on a
 volume holding a 17 cluster, and the data stays put. If you already updated the compose file, put
@@ -849,7 +872,7 @@ Every agent - the one in the same stack included - fetches its own copy from the
 
 ## Analytics
 
-Analytics uses a bundled ClickHouse instance for storing and querying traffic events and WAF events. Data is retained for **30 days** by default via ClickHouse's TTL. Change the window with the `CLICKHOUSE_RETENTION_DAYS` environment variable - on the next startup the existing tables' TTL is migrated to the new value and expired data is purged.
+Analytics uses a bundled ClickHouse instance for storing and querying traffic events and WAF events. Data is retained for **30 days** by default via ClickHouse's TTL. Change the window under **Settings → Observability → Analytics** (`CLICKHOUSE_RETENTION_DAYS` until a value is stored) - on the next startup the existing tables' TTL is migrated to the new value and expired data is purged.
 
 ### Enabling and disabling analytics
 
@@ -892,14 +915,13 @@ enabled, and no data is collected.
 
 The WAF is powered by [Coraza](https://coraza.io/) and integrates the OWASP Core Rule Set.
 
-Enable globally in **WAF → Settings**, then optionally override per proxy host. Two modes:
-
-- **Block** - requests matching rules are rejected with 403
-- **Detect** - requests are logged but not blocked
+Enable globally in **WAF → Settings**, then optionally override per proxy host. Matching requests are rejected with 403; a detection-only mode, in which they are logged and allowed through, is available through the API (`waf.mode` set to `DetectionOnly`).
 
 **OWASP CRS** covers SQLi, XSS, LFI, RCE, and more (enabled by default when WAF is on).
 
 **Rule suppression** - suppress noisy rules globally or per host from the event detail drawer or the Suppressed Rules tab.
+
+**Rule presets** - an application that trips the CRS usually needs the same exclusions everywhere it runs. Write them once under a name in **WAF → Presets**, then select the preset globally in **WAF → Settings** or per host in its WAF card (added to the global ones in merge mode, replacing them in override mode). Editing a preset changes every host that selects it; one still selected cannot be deleted.
 
 **CRS plugins** - install plugins from the [OWASP CRS plugin registry](https://github.com/coreruleset/plugin-registry), or registries of your own, under **WAF → Plugins**, then select them globally or per host. The registries are re-read on a schedule and every plugin checked, so ones Caddy cannot load (Lua scripts, data files, ModSecurity-only rules) are marked unsupported before anyone tries. The controller fetches from GitHub, so it needs outbound HTTPS to `api.github.com` and `raw.githubusercontent.com`; an optional GitHub token raises the API rate limit.
 
@@ -908,6 +930,8 @@ Enable globally in **WAF → Settings**, then optionally override per proxy host
 ```text
 SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"
 ```
+
+Directives are checked twice before they are stored, because Coraza compiles every WAF while Caddy loads its config and one refused rule would stop every host's config from loading. The editor marks what Coraza would refuse as you type - unknown variables, operators and actions, malformed or duplicate rules, regular expressions Go's RE2 cannot compile - and blocks the save on an error. On save the agent then has Caddy validate the WAFs the change produces, in a short-lived network-less container from the Caddy image and without loading them, which catches what only a merged config shows: rule ids colliding with the CRS or between the global settings and a host. The error names the host and quotes Coraza. The second check needs a paired agent whose Caddy container exists; without one the save goes ahead on the first check alone.
 
 ---
 
@@ -973,9 +997,9 @@ the command that fixes it. The agent never changes a permission itself.
 Everything a proxy serves - hosts, certificates, access lists, published ports, compiled-in
 plugins - belongs to this controller's database, not to any host. What each agent runs is computed
 from that database and sent to it: **a document per agent**, not one for the fleet. A change is
-applied to every agent or to none - if one rejects the config or cannot be reached, the whole apply
-fails and names that agent, rather than leaving one proxy serving the new configuration and another
-serving the old.
+sent to every agent at once - if one rejects the config or cannot be reached, the whole apply
+fails and names that agent. A host that already accepted keeps the new config, so the failure is
+reported rather than hidden, and the next successful apply brings the fleet back together.
 
 **Assigning hosts to agents.** Each proxy host and layer-4 host has an *Agents* section listing
 every paired agent. Tick none and the host is served by all of them, which is what every host did
@@ -1032,7 +1056,7 @@ serve. Reach the dashboard on `:3000` to complete it, and Caddy starts on its ow
 
 An agent on another host cannot mount that volume, so it pairs with a code you carry.
 
-Generate one under **Settings → Agents**. It is six letters, valid for five minutes and works once.
+Generate one under **Settings → Agent**. It is six letters, valid for five minutes and works once.
 Wrong guesses are limited to five a minute per client address and 200 per code. Then, on the
 agent's host:
 
@@ -1102,7 +1126,7 @@ no opinion about it: the agent only needs an outbound route to `CONTROLLER_URL`.
 This path is tested - an agent reaching its controller across a real tailnet pairs, streams, and
 serves exactly as it does on a flat network.
 
-Pairing is unchanged: generate a code under **Settings → Agents** and run
+Pairing is unchanged: generate a code under **Settings → Agent** and run
 
 ```bash
 docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host https://cpm-controller.tailnet-1234.ts.net --code ABCDEF
@@ -1687,8 +1711,8 @@ Contributions welcome:
 
 ## Support
 
+- **Documentation:** [silentspud.github.io/caddy-proxy-manager](https://silentspud.github.io/caddy-proxy-manager/)
 - **Issues:** [GitHub Issues](https://github.com/silentspud/caddy-proxy-manager/issues) for bugs and feature requests
-- **Discussions:** [GitHub Discussions](https://github.com/silentspud/caddy-proxy-manager/discussions) for questions and ideas
 
 ---
 

@@ -1,0 +1,55 @@
+---
+title: Settings
+description: Where configuration lives, how a value is resolved, and how a change is staged, reviewed, applied and - if need be - restored.
+---
+
+Most configuration is stored in the database and edited on the **Settings** page. The environment
+holds only what has to be read before the database can be: the session key, the connection string,
+and what Docker Compose itself needs. The full list of both is in the
+[README](https://github.com/SilentSpud/caddy-proxy-manager#configuration).
+
+## How a value is resolved
+
+**Stored value → environment variable → default**, in that order. Until a deployment has been
+through setup nothing is stored, so every setting resolves from the variable it always did and an
+upgrade changes nothing. Once a value is saved it wins, and the variable can come out of `.env`.
+Each field shows which layer its current value came from, and the Settings overview marks the
+ones still set in the environment.
+
+A stored value that no longer validates is ignored with a warning and falls through to the next
+layer, rather than taking the app down.
+
+`SETTINGS_ENV_OVERRIDE` names variables that override a stored value instead of only filling in for
+a missing one. It exists for the two settings that can lock you out of the instance holding them -
+OIDC-only mode saved on before OAuth works, and a public URL that no longer matches the registered
+redirect URI. Set it, restart, fix the value in Settings, and take the variable off the list.
+
+## Staging and review
+
+Saving a form does not reach Caddy. It stages the change, and the header of every settings screen
+says how many changes are pending and in which sections, because one change set spans them all:
+DNS edited on one page and geo blocking on another is one apply, not two. The staged set belongs
+to the account that made it - another administrator's pending edits are neither shown nor applied
+with yours.
+
+**Review & apply** lists what is staged and shows the diff of the Caddy config it would produce,
+rendered from the staged values with credentials masked. Settings that do not touch the Caddy
+config say so instead. Any change can be undone from the sheet, or the whole set discarded.
+Applying writes the values to the database and reloads Caddy once, however many forms were
+touched. A few forms save straight away instead, because their real work is not a settings write:
+a Caddy rebuild, starting ClickHouse, the favicon, and the instance, sign-in and agent fields that
+never reach the Caddy config.
+
+## History and restore
+
+Every apply is a revision. It records each committed key's value before and after, who applied it,
+and whether Caddy accepted the config - a refused apply is kept too, marked failed. The review
+sheet shows the most recent ones; **Settings → History** lists them all, newest first.
+
+Pick any two revisions to compare. The page shows which settings differ and the Caddy config diff
+between them, rendered against today's hosts so that only the settings differ between the two
+sides. **Restore** stages the values a revision had, on top of anything already pending, and sends
+them through the same review as any other change - so the config diff is seen before anything
+reaches Caddy, and history only ever grows.
+
+Revisions applied before values were recorded are listed but cannot be compared or restored.

@@ -1523,7 +1523,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     if (!tailscale?.serve && meta.tailscale?.serve && meta.tailscale.tailnet_only) {
       console.warn(
         `Skipping proxy host "${row.name}": it is set to serve only on the tailnet, but Tailscale ` +
-          "is not usable. Enable it in Settings → Tailscale and make sure the Tailscale module is " +
+          "is not usable. Enable it in Settings → Network → Tailscale and make sure the Tailscale module is " +
           "in Settings → Caddy Build, then rebuild Caddy.",
       );
       continue;

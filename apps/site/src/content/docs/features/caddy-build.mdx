@@ -15,7 +15,7 @@ did before this page existed.
 
 ## Choosing modules
 
-Each supported plugin has a toggle: Layer 4, Tailscale, Request Blocker, Coraza WAF, and every DNS
+Each supported plugin has a toggle: Layer 4 Proxy, Tailscale, Request Blocker, Coraza WAF, and every DNS
 provider. Turning one off does two things:
 
 - **The app stops generating config that uses it, immediately.** The handler simply stops being
@@ -34,7 +34,8 @@ provider. Turning one off does two things:
 
 A module still being used cannot be switched off. The save is refused and names what is using it -
 "3 enabled L4 proxy hosts need the Layer 4 Proxy module". That check covers global and per-host WAF
-and geo blocking, enabled L4 hosts, and every DNS provider with credentials on file. Turn the
+and geo blocking, enabled L4 hosts, hosts served on the tailnet, and every DNS provider with
+credentials on file. Turn the
 feature off first.
 
 Per-host **custom Caddyfile** snippets cannot be checked the same way: they are free-form text, and
