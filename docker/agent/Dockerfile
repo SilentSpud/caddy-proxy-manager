@@ -58,6 +58,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=builder /app/apps/agent/dist/cpm-agent /app/cpm-agent
+# The documented `docker exec ... cpm-agent --pair` needs it on PATH; nothing else puts it there.
+ENV PATH="/app:${PATH}"
 
 # Its own user, not root - though that is no boundary: through docker-socket-proxy the agent can
 # create a privileged container, so it is host-root-equivalent and this image stays minimal. Nothing

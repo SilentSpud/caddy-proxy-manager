@@ -134,6 +134,7 @@ services:
       OAUTH_ADMIN_GROUP: ${OAUTH_ADMIN_GROUP:-}
       OAUTH_USER_GROUP: ${OAUTH_USER_GROUP:-}
       OAUTH_VIEWER_GROUP: ${OAUTH_VIEWER_GROUP:-}
+      OAUTH_OPERATOR_GROUP: ${OAUTH_OPERATOR_GROUP:-}
       OAUTH_DEFAULT_ROLE: ${OAUTH_DEFAULT_ROLE:-}
       OAUTH_SYNC_GROUPS: ${OAUTH_SYNC_GROUPS:-false}
 
@@ -162,6 +163,15 @@ services:
       GEOIPUPDATE_LICENSE_KEY: ${GEOIPUPDATE_LICENSE_KEY:-}
       # Hours between checks for newer databases. A Settings field; this is a first-start default.
       GEOIP_UPDATE_INTERVAL_HOURS: ${GEOIP_UPDATE_INTERVAL_HOURS:-24}
+
+      # Settings fields with a first-start default here, like the ones above.
+      FORWARD_AUTH_INTERNAL_URL: ${FORWARD_AUTH_INTERNAL_URL:-}
+      CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
+      # Variables that override a stored value, for getting back into a locked-out instance.
+      SETTINGS_ENV_OVERRIDE: ${SETTINGS_ENV_OVERRIDE:-}
+      # Pre-3.0 migration: which database the setup flow offers, and when legacy-key secrets expire.
+      LEGACY_SQLITE_PATH: ${LEGACY_SQLITE_PATH:-}
+      LEGACY_KEY_CUTOFF_DATE: ${LEGACY_KEY_CUTOFF_DATE:-}
     group_add:
       - "${CADDY_GID:-10000}"  # caddy's GID, so web can write /logs
     volumes:
