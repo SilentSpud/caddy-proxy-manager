@@ -16,13 +16,12 @@ is optional - everything else works without it.
 ## What you get
 
 - **Request volume** over a time range you pick, filterable by host.
-- **Protocol breakdown** - HTTP versions and TLS versions actually in use.
+- **Protocol breakdown** - the HTTP versions actually in use.
 - **A country map**, from the same GeoIP databases [geo blocking](../geo-blocking/) uses. Colour it
   by requests, blocked requests or unique IPs, and pick a country - on the map or in the table
   beside it - to see which hosts it reached, how they answered, and which user agents it sent.
 - **Top user agents**, which is usually how you notice a scraper.
-- **Blocked requests**, paginated and searchable, linking back to the [WAF](../waf/) rule or geo
-  rule that produced them.
+- **Blocked requests**, paginated, and the [WAF](../waf/) rules that fired most often.
 
 ## Turning it on
 
@@ -33,7 +32,7 @@ starts the container - nothing to change in `.env`, no compose profile to list, 
 Three things to expect:
 
 - **The first start pulls the ClickHouse image**, which takes a few minutes on a slow link. The save
-  returns immediately and the agent reports progress under **Settings → Agent**.
+  returns immediately, and the Analytics page fills in once ClickHouse is up.
 - **Turning it off stops the container but keeps the data.** History survives, and turning it back
   on picks up where it left off.
 - **Pick one owner.** Once credentials live in Settings, drop `clickhouse` from `COMPOSE_PROFILES`
@@ -49,8 +48,9 @@ CLICKHOUSE_PASSWORD=your-clickhouse-password   # openssl rand -base64 32
 
 ## Retention
 
-30 days by default, enforced by ClickHouse's own TTL. Change it with `CLICKHOUSE_RETENTION_DAYS`;
-on the next startup the existing tables' TTL is migrated and expired data is purged.
+30 days by default, enforced by ClickHouse's own TTL. Change it under **Settings → Observability →
+Analytics** (or `CLICKHOUSE_RETENTION_DAYS` until a value is stored); on the next startup the
+existing tables' TTL is migrated and expired data is purged.
 
 ## Disk writes
 

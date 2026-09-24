@@ -349,8 +349,9 @@ export const updateCheckEnabled = booleanSetting({
   group: "application",
   label: "Check for updates",
   description:
-    "Ask the registry below, a few times a day, whether a newer release has been published. The " +
-    "only request this app makes to the internet on its own; turn it off to make none.",
+    "Ask the registry below, a few times a day, whether a newer release has been published. Turn " +
+    "it off to make no such request; the CRS plugin registry check and GeoIP downloads have " +
+    "switches of their own.",
   default: true,
 });
 

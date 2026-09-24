@@ -74,6 +74,6 @@ you the command to restart it by hand.
   alongside them. Secrets are re-encrypted under this deployment's own key. Starting it asks for
   confirmation first, restating what will be copied: the rows keep their original identifiers in a
   database that has to be empty, the application restarts, and leaving the accounts behind means
-  nothing can sign in afterwards.
+  setup goes on to create a first administrator.
 - **A deployment that predates the flow.** If `ADMIN_USERNAME`/`ADMIN_PASSWORD` or `OAUTH_ENABLED`
   already configure a way in, setup is marked complete at startup and never shown.

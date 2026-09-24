@@ -58,7 +58,7 @@ export type AgentResult<T> =
 
 function noAgentError(): AgentUnavailableError {
   return new AgentUnavailableError(
-    "No agent is connected. Start the agent and pair it from Settings → Agents.",
+    "No agent is connected. Start the agent and pair it from Settings → Agent.",
   );
 }
 

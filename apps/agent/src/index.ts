@@ -48,7 +48,8 @@ const argv = yargs(hideBin(process.argv))
   })
   .option("host", {
     type: "string",
-    describe: "Controller address. A bare host is assumed to be http://",
+    describe:
+      "Controller address. A bare host means https://, except loopback and single-label names",
     defaultDescription: "$CONTROLLER_URL",
   })
   .option("port", {
