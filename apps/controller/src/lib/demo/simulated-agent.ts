@@ -149,7 +149,12 @@ export async function startSimulatedAgent(
   }
 
   function execute(command: AgentCommand): void {
-    settleResults(DEMO_AGENT_ID, [{ id: command.id, ok: true, response: caddy(command.request) }]);
+    // Never sent: this agent lists no capabilities. Accepted anyway, as the in-memory Caddy would.
+    const response =
+      command.kind === "caddy-validate"
+        ? { status: 200, text: "Valid configuration", headers: {} }
+        : caddy(command.request);
+    settleResults(DEMO_AGENT_ID, [{ id: command.id, ok: true, response }]);
   }
 
   const controllerName = await controllerDisplayName();

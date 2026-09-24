@@ -17,6 +17,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { CodeEditor } from "@/components/ui/CodeEditor";
+import { useSeclangIssues } from "@/components/ui/seclang-issues";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { Timestamp } from "@/components/ui/Timestamp";
@@ -202,6 +203,7 @@ function WafPresetDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [directives, setDirectives] = useState("");
+  const directiveIssues = useSeclangIssues(directives);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const formId = "waf-preset-form";
@@ -268,6 +270,7 @@ function WafPresetDialog({
             height="md"
             value={directives}
             onChange={setDirectives}
+            issues={directiveIssues}
             placeholder={t("presetDirectivesPlaceholder")}
             description={t("presetDirectivesHelp")}
           />

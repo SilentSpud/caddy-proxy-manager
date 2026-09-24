@@ -422,6 +422,9 @@ export async function getWafSettings(): Promise<WafSettings | null> {
 }
 
 export async function saveWafSettings(s: WafSettings): Promise<void> {
+  // Lazy: waf-dry-run reaches the models, which import this module.
+  const { assertWafLoads, wafCandidatesForGlobal } = await import("./waf-dry-run");
+  await assertWafLoads(await wafCandidatesForGlobal(s));
   await setSetting("waf", s);
 }
 

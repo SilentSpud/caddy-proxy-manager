@@ -11,7 +11,10 @@ import {
   filterCustomDirectives,
   findInvalidBodyLimitDirective,
   normalizeWafPresetIds,
+  seclangErrorDetails,
 } from "../caddy-waf";
+import { seclangErrors } from "../seclang";
+import { assertWafLoads, wafCandidatesSelecting } from "../waf-dry-run";
 import { getDashboardSettings, getWafSettings } from "../settings";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -84,7 +87,34 @@ function validateDirectives(directives: string): string {
       { status: 400 },
     );
   }
+  const lintErrors = seclangErrors(trimmed);
+  if (lintErrors.length > 0) {
+    throw domainError(
+      "wafPresetDirectivesInvalid",
+      { count: lintErrors.length, details: seclangErrorDetails(lintErrors) },
+      { status: 400 },
+    );
+  }
   return trimmed;
+}
+
+/**
+ * Has Caddy compile the preset on its own and in every WAF selecting it, with `directives` in
+ * place of what is stored. A new preset has no id yet and nothing selects it.
+ */
+async function assertPresetLoads(id: number | null, directives: string): Promise<void> {
+  const probeId = id ?? 0;
+  const presets = new Map(await getWafPresetDirectives()).set(probeId, directives);
+  const alone = {
+    enabled: true,
+    mode: "On" as const,
+    load_owasp_crs: false,
+    custom_directives: "",
+    preset_ids: [probeId],
+  };
+  const selecting =
+    id === null ? [] : await wafCandidatesSelecting((waf) => (waf.preset_ids ?? []).includes(id));
+  await assertWafLoads([{ target: { kind: "preset" }, waf: alone }, ...selecting], { presets });
 }
 
 async function validateName(name: string | undefined, exceptId: number | null): Promise<string> {
@@ -177,6 +207,7 @@ export async function createWafPreset(
 ): Promise<WafPreset> {
   const name = await validateName(input.name, null);
   const directives = validateDirectives(input.directives ?? "");
+  await assertPresetLoads(null, directives);
   const now = nowIso();
   const [record] = await db
     .insert(wafPresets)
@@ -213,6 +244,7 @@ export async function updateWafPreset(
   const name = input.name !== undefined ? await validateName(input.name, id) : existing.name;
   const directives =
     input.directives !== undefined ? validateDirectives(input.directives) : existing.directives;
+  if (directives !== existing.directives) await assertPresetLoads(id, directives);
   const description =
     input.description !== undefined ? input.description?.trim() || null : existing.description;
 

@@ -33,6 +33,7 @@ import { Field } from "@astryxdesign/core/Field";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { CodeEditor } from "@/components/ui/CodeEditor";
+import { useSeclangIssues } from "@/components/ui/seclang-issues";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
@@ -1016,6 +1017,7 @@ export default function WafEventsClient({
   const [wafCustomDirectives, setWafCustomDirectives] = useState(
     globalWaf?.custom_directives ?? "",
   );
+  const wafDirectiveIssues = useSeclangIssues(wafCustomDirectives, { crsLoaded: wafLoadOwaspCrs });
   const [wafPresetIds, setWafPresetIds] = useState<number[]>(globalWaf?.preset_ids ?? []);
   const [wafPluginIds, setWafPluginIds] = useState<number[]>(globalWaf?.plugin_ids ?? []);
   const [wafBodyLimitMb, setWafBodyLimitMb] = useState(bodyLimitMib(globalWaf?.request_body_limit));
@@ -1582,6 +1584,7 @@ export default function WafEventsClient({
                 height="sm"
                 value={wafCustomDirectives}
                 onChange={setWafCustomDirectives}
+                issues={wafDirectiveIssues}
                 // isReadOnly, not isDisabled: a disabled field submits nothing, and
                 // updateWafSettingsAction reads a missing value as an empty string, which would
                 // erase the stored directives.

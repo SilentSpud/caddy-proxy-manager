@@ -2,6 +2,7 @@
 import type { WafSettings } from "./settings";
 import type { WafHostConfig } from "./models/proxy-hosts";
 import { type DomainErrorCode, domainError, domainErrorMessage } from "./domain-error";
+import { type SeclangIssue, seclangDirectives, seclangErrors } from "./seclang";
 
 // ---------------------------------------------------------------------------
 // Request body limits
@@ -106,50 +107,6 @@ export function findInvalidBodyLimitDirective(
     if (match && !isValidBodyLimit(Number(match[2]))) return text;
   }
   return null;
-}
-
-/**
- * One directive as Coraza reads it: `text` is what its parser evaluates, `lines` the source lines
- * it came from, emitted verbatim. `text` is empty for a blank or comment line, and null for a
- * continuation or backtick block the input never closed.
- */
-type SeclangDirective = { text: string | null; lines: string[] };
-
-/**
- * Groups lines exactly as Coraza's parser does (internal/seclang/parser.go, v3.7): a trailing `\`
- * continues, a line ending in a backtick opens a block that a line starting with one closes, and a
- * comment line is skipped even mid-rule. The allowlist must judge what Coraza evaluates, or a rule
- * split across lines is checked in pieces.
- */
-function seclangDirectives(raw: string): SeclangDirective[] {
-  const out: SeclangDirective[] = [];
-  let buffer = "";
-  let pending: string[] = [];
-  let inBackticks = false;
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) {
-      if (pending.length > 0) pending.push(line);
-      else out.push({ text: "", lines: [line] });
-      continue;
-    }
-    pending.push(line);
-    if (!inBackticks && trimmed.endsWith("`")) inBackticks = true;
-    else if (inBackticks && trimmed.startsWith("`")) inBackticks = false;
-    if (inBackticks) {
-      buffer += `${trimmed}\n`;
-      continue;
-    }
-    if (trimmed.endsWith("\\")) {
-      buffer += trimmed.slice(0, -1);
-      continue;
-    }
-    out.push({ text: buffer + trimmed, lines: pending });
-    buffer = "";
-    pending = [];
-  }
-  if (pending.length > 0) out.push({ text: null, lines: pending });
-  return out;
 }
 
 /**
@@ -262,6 +219,19 @@ export function droppedWafDirectiveDetails(dropped: readonly DroppedWafDirective
   return dropped.map((entry) => `"${entry.line}" - ${domainErrorMessage(entry.reason, bounds)}`);
 }
 
+/**
+ * The "line N: why" list the validators put in their error for what the linter found. At most
+ * `limit`, since one typo early in a rule list can make every later line look wrong.
+ */
+export function seclangErrorDetails(issues: readonly SeclangIssue[], limit = 5): string[] {
+  return issues.slice(0, limit).map((issue) =>
+    domainErrorMessage("seclangIssueAt", {
+      line: String(issue.line),
+      reason: domainErrorMessage(issue.code, issue.params),
+    }),
+  );
+}
+
 /** Positive integers, deduplicated, in first-seen order - the order presets are emitted in. */
 export function normalizeWafPresetIds(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
@@ -291,9 +261,15 @@ export type CrsPluginRejectionReason =
   | "crsPluginRuleIdOutOfRange"
   | "crsPluginPersistentCollection"
   | "crsPluginUnbalancedQuotes"
-  | "crsPluginUnterminated";
+  | "crsPluginUnterminated"
+  | "crsPluginInvalidSeclang";
 
-export type CrsPluginRejection = { line: string; reason: CrsPluginRejectionReason };
+export type CrsPluginRejection = {
+  line: string;
+  reason: CrsPluginRejectionReason;
+  /** The linter's own reason, as a sentence, for `crsPluginInvalidSeclang`. */
+  params?: { reason: string };
+};
 
 /**
  * What a plugin may contain. Wider than the custom-directive allowlist, because rewriting CRS
@@ -336,41 +312,45 @@ export function findCrsPluginRejections(
   range: { start: number; end: number },
 ): CrsPluginRejection[] {
   const rejections: CrsPluginRejection[] = [];
-  for (const { text, lines } of seclangDirectives(raw.replace(/\r\n?/g, "\n"))) {
+  const normalized = raw.replace(/\r\n?/g, "\n");
+  /** Where the checks below refused a directive, so the linter does not name it a second time. */
+  const rejectedStarts = new Set<number>();
+  for (const { text, lines, start } of seclangDirectives(normalized)) {
     if (text === "") continue;
-    if (text === null) {
-      rejections.push({ line: lines.join("\n").trim(), reason: "crsPluginUnterminated" });
-      continue;
-    }
-    if (!PLUGIN_DIRECTIVE_PREFIXES.some((pattern) => pattern.test(text))) {
-      rejections.push({ line: text, reason: "crsPluginDirectiveNotAllowed" });
-      continue;
-    }
-    if (FILE_OPERATOR.test(text)) {
-      rejections.push({ line: text, reason: "crsPluginNeedsFile" });
-      continue;
-    }
-    if (/ctl\s*:\s*ruleEngine/i.test(text)) {
-      rejections.push({ line: text, reason: "crsPluginCtlRuleEngine" });
-      continue;
-    }
-    if (PERSISTENT_COLLECTION.test(text)) {
-      rejections.push({ line: text, reason: "crsPluginPersistentCollection" });
-      continue;
-    }
-    if (hasUnbalancedQuotes(text)) {
-      rejections.push({ line: text, reason: "crsPluginUnbalancedQuotes" });
-      continue;
-    }
-    for (const match of text.matchAll(RULE_ID)) {
-      const id = Number(match[1]);
-      if (id < range.start || id > range.end) {
-        rejections.push({ line: text, reason: "crsPluginRuleIdOutOfRange" });
-        break;
-      }
-    }
+    const reason = pluginDirectiveRejection(text, range);
+    if (!reason) continue;
+    rejections.push({ line: text ?? lines.join("\n").trim(), reason });
+    rejectedStarts.add(start);
+  }
+  const sourceLines = normalized.split("\n");
+  for (const issue of seclangErrors(normalized)) {
+    if (rejectedStarts.has(issue.line - 1)) continue;
+    rejections.push({
+      line: sourceLines[issue.line - 1].trim(),
+      reason: "crsPluginInvalidSeclang",
+      params: { reason: domainErrorMessage(issue.code, issue.params) },
+    });
   }
   return rejections;
+}
+
+function pluginDirectiveRejection(
+  text: string | null,
+  range: { start: number; end: number },
+): CrsPluginRejectionReason | null {
+  if (text === null) return "crsPluginUnterminated";
+  if (!PLUGIN_DIRECTIVE_PREFIXES.some((pattern) => pattern.test(text))) {
+    return "crsPluginDirectiveNotAllowed";
+  }
+  if (FILE_OPERATOR.test(text)) return "crsPluginNeedsFile";
+  if (/ctl\s*:\s*ruleEngine/i.test(text)) return "crsPluginCtlRuleEngine";
+  if (PERSISTENT_COLLECTION.test(text)) return "crsPluginPersistentCollection";
+  if (hasUnbalancedQuotes(text)) return "crsPluginUnbalancedQuotes";
+  for (const match of text.matchAll(RULE_ID)) {
+    const id = Number(match[1]);
+    if (id < range.start || id > range.end) return "crsPluginRuleIdOutOfRange";
+  }
+  return null;
 }
 
 /**

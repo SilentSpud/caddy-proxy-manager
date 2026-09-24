@@ -163,7 +163,16 @@ export type AgentStatus = {
    * identity (anything but Linux).
    */
   logAccess?: LogAccessReport;
+  /**
+   * Command kinds this agent runs beyond `caddy-admin`. Undefined from an agent older than the
+   * field, which the controller must read as none: an older agent answers an unknown kind with
+   * nothing at all, and the caller would wait out the whole command timeout.
+   */
+  capabilities?: AgentCapability[];
 };
+
+export const AGENT_CAPABILITIES = ["caddy-validate"] as const;
+export type AgentCapability = (typeof AGENT_CAPABILITIES)[number];
 
 /**
  * - `unreadable`: the agent cannot read a log it parses, so those events are silently skipped.
@@ -243,6 +252,19 @@ export type CaddyAdminProxyResponse = {
  * them produces megabytes. Well above anything realistic, and still bounded.
  */
 export const MAX_CADDY_CONFIG_BYTES = 8 * 1024 * 1024;
+
+/**
+ * A config for the agent to run `caddy validate` on, with its own Caddy's binary, without loading
+ * it. Caddy's admin API has no dry run, and Coraza only compiles a WAF while provisioning - so this
+ * is the one way to learn whether a directive loads before every host's config depends on it.
+ *
+ * The answer comes back as a `CaddyAdminProxyResponse`: status 200 when Caddy accepted it, 422
+ * when it refused, and `text` the transcript `caddy validate` printed either way.
+ */
+export type CaddyValidateRequest = { config: string };
+
+/** Status `caddy-validate` answers with for a config Caddy refused. */
+export const CADDY_VALIDATE_REFUSED_STATUS = 422;
 
 // ─── Fleet configuration ─────────────────────────────────────────────────────
 
@@ -512,9 +534,11 @@ export type AgentDesiredState = {
 export type AgentCommand = {
   /** Correlates the result. Opaque to the agent. */
   id: string;
-  kind: "caddy-admin";
-  request: CaddyAdminProxyRequest;
-};
+} & (
+  | { kind: "caddy-admin"; request: CaddyAdminProxyRequest }
+  /** Only sent to an agent listing it in `AgentStatus.capabilities`. */
+  | { kind: "caddy-validate"; request: CaddyValidateRequest }
+);
 
 /** Everything the controller can push down the stream. */
 export type AgentServerEvent =

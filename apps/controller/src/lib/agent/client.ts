@@ -30,6 +30,7 @@ import {
   type ConnectedAgent,
   connectedAgents,
   dispatchCaddyAdmin,
+  dispatchCaddyValidate,
 } from "./registry";
 
 export class AgentUnavailableError extends Error {
@@ -206,6 +207,28 @@ export async function caddyAdminViaAgent(
     return await dispatchCaddyAdmin(agent.agentId, request);
   } catch (error) {
     if (error instanceof AgentNotConnectedError) throw noAgentError();
+    if (error instanceof AgentCommandError)
+      throw new AgentRequestError(error.message, error.status);
+    throw error;
+  }
+}
+
+/**
+ * `caddy validate` on the first attached agent able to run it, or null when none is.
+ *
+ * Any one will do: the answer only decides whether a save goes ahead, and never ends up in a config.
+ */
+export async function caddyValidateViaAgent(
+  config: string,
+): Promise<CaddyAdminProxyResponse | null> {
+  const agent = connectedAgents().find((candidate) =>
+    candidate.status?.capabilities?.includes("caddy-validate"),
+  );
+  if (!agent) return null;
+  try {
+    return await dispatchCaddyValidate(agent.agentId, { config });
+  } catch (error) {
+    if (error instanceof AgentNotConnectedError) return null;
     if (error instanceof AgentCommandError)
       throw new AgentRequestError(error.message, error.status);
     throw error;

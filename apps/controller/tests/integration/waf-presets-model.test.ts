@@ -2,10 +2,12 @@
  * Integration: src/lib/models/waf-presets.ts against a real database - validation, the in-use
  * guard on delete, and the Caddy re-apply an edit to a selected preset triggers.
  */
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { createTestDb, currentDb, type TestDb } from '../helpers/db';
 import { proxyHosts, users } from '../../src/lib/db/schema';
+import type { DomainError } from '../../src/lib/domain-error';
+import { type CaddyValidator, setCaddyValidator } from '../../src/lib/waf-dry-run';
 
 let db: TestDb;
 let globalWaf: { preset_ids?: number[] } | null = null;
@@ -177,5 +179,82 @@ describe('getWafPresetUsage / assertWafPresetIdsExist', () => {
     const a = await createWafPreset({ name: 'A', directives: RULE }, userId);
     await assertWafPresetIdsExist([a.id]);
     await expect(assertWafPresetIdsExist([a.id, 4242])).rejects.toThrow('4242');
+  });
+});
+
+describe('Coraza checks', () => {
+  const refusal = (candidate: number) =>
+    `Error: loading http app module: provision http: server candidate_${candidate}: setting up route handlers: route 0: loading handler modules: position 0: loading module 'waf': provision http.handlers.waf: invalid WAF config from string: failed to compile the directive "secrule": duplicated rule id 9700`;
+
+  let restore: CaddyValidator | null = null;
+  afterEach(() => {
+    if (restore) setCaddyValidator(restore);
+    restore = null;
+  });
+
+  it('refuses what the linter knows Coraza will not load, before asking Caddy', async () => {
+    const seen: string[] = [];
+    restore = setCaddyValidator(async (config) => {
+      seen.push(config);
+      return { status: 200, text: '' };
+    });
+    const error = await createWafPreset(
+      { name: 'Typo', directives: 'SecRule ARGS "@rxx a" "id:1,deny"' },
+      userId,
+    ).catch((e: unknown) => e);
+    expect((error as DomainError).code).toBe('wafPresetDirectivesInvalid');
+    expect((error as DomainError).message).toContain('line 1:');
+    expect(seen).toEqual([]);
+    expect(await listWafPresets()).toEqual([]);
+  });
+
+  it('refuses a preset Caddy will not load, and stores nothing', async () => {
+    const seen: string[] = [];
+    restore = setCaddyValidator(async (config) => {
+      seen.push(config);
+      return { status: 422, text: refusal(0) };
+    });
+    const error = await createWafPreset({ name: 'Bad', directives: RULE }, userId).catch(
+      (e: unknown) => e,
+    );
+    expect((error as DomainError).code).toBe('wafDryRunRejectedPreset');
+    expect(seen[0]).toContain('id:9700');
+    expect(await listWafPresets()).toEqual([]);
+  });
+
+  it('names the host an edit would break, and skips the dry run when the rules did not change', async () => {
+    const preset = await createWafPreset({ name: 'Shared', directives: RULE }, userId);
+    // With the CRS, so its WAF is not the preset-alone one the dry run already compiles.
+    const now = new Date().toISOString();
+    await db.insert(proxyHosts).values({
+      name: 'shop',
+      domains: JSON.stringify(['shop.test']),
+      upstreams: JSON.stringify(['app:80']),
+      meta: JSON.stringify({
+        waf: { enabled: true, load_owasp_crs: true, preset_ids: [preset.id] },
+      }),
+      createdAt: now,
+      updatedAt: now,
+    });
+    const seen: string[] = [];
+    restore = setCaddyValidator(async (config) => {
+      seen.push(config);
+      return { status: 422, text: refusal(1) };
+    });
+
+    const edited = RULE.replace('@rx x', '@rx y');
+    const error = await updateWafPreset(preset.id, { directives: edited }, userId).catch(
+      (e: unknown) => e,
+    );
+    expect((error as DomainError).code).toBe('wafDryRunRejectedHost');
+    expect((error as DomainError).params.name).toBe('shop');
+    // The preset alone, then the host selecting it - each with the edit, not the stored text.
+    const servers = JSON.parse(seen[0]).apps.http.servers;
+    expect(Object.keys(servers)).toEqual(['candidate_0', 'candidate_1']);
+    expect(seen[0]).toContain('@rx y');
+    expect((await listWafPresets())[0].directives).toBe(RULE);
+
+    await updateWafPreset(preset.id, { name: 'Renamed' }, userId);
+    expect(seen).toHaveLength(1);
   });
 });

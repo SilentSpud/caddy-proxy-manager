@@ -29,13 +29,25 @@ import {
   useState,
 } from "react";
 import { Field } from "@astryxdesign/core/Field";
-import { HStack } from "@astryxdesign/core/Stack";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { ensureHighlightStyles } from "@astryxdesign/core/CodeBlock";
 import { useTranslations } from "next-intl";
 import { LANGUAGE_LABELS, tokenizeCode, type CodeEditorLanguage } from "./code-syntax";
 
 export type { CodeEditorLanguage };
+
+/** A problem with one line, from a linter: marks its number and is listed under the editor. */
+export type CodeEditorIssue = {
+  /** 1-based. */
+  line: number;
+  severity: "error" | "warning";
+  message: string;
+};
+
+/** Listed under the editor; past this the list says how many more rather than growing the form. */
+const MAX_LISTED_ISSUES = 6;
 
 /** Editor heights, matching the three sizes the forms ask for. */
 const HEIGHTS = { sm: 160, md: 288, lg: 384 } as const;
@@ -86,6 +98,8 @@ export type CodeEditorProps = {
   isFooterHidden?: boolean;
   /** Floats over the editor's bottom corner, clear of the scrollbar: a Save button, say. */
   overlay?: ReactNode;
+  /** Marked in the gutter and listed under the editor, in line order. */
+  issues?: readonly CodeEditorIssue[];
 };
 
 /**
@@ -116,12 +130,15 @@ function Line({
   tokens,
   number,
   isPlaceholder = false,
+  marker,
 }: {
   text: string;
   tokens: { type: string; start: number; end: number }[];
   number: number;
   /** Dims the text but not the number, so an empty field still shows where line 1 is. */
   isPlaceholder?: boolean;
+  /** Colours the number; the list under the editor says why, in words. */
+  marker?: CodeEditorIssue["severity"];
 }) {
   const parts = [];
   let at = 0;
@@ -147,7 +164,8 @@ function Line({
           left: `${PAD_X - GUTTER}px`,
           width: `${GUTTER - PAD_X * 2}px`,
           textAlign: "right",
-          color: "var(--color-text-secondary)",
+          color: marker ? `var(--color-${marker})` : "var(--color-text-secondary)",
+          fontWeight: marker ? 700 : undefined,
           userSelect: "none",
         }}
       >
@@ -179,6 +197,7 @@ export function CodeEditor({
   isFlush,
   isFooterHidden,
   overlay,
+  issues = [],
 }: CodeEditorProps) {
   const t = useTranslations("ui");
   const inputID = useId();
@@ -197,6 +216,14 @@ export function CodeEditor({
     [showsPlaceholder, placeholder, value],
   );
   const tokenLines = useMemo(() => tokenizeCode(value, language), [value, language]);
+  /** The worst severity on each line: an error outranks a warning on the same line. */
+  const markers = useMemo(() => {
+    const byLine = new Map<number, CodeEditorIssue["severity"]>();
+    for (const issue of issues) {
+      if (byLine.get(issue.line) !== "error") byLine.set(issue.line, issue.severity);
+    }
+    return byLine;
+  }, [issues]);
 
   /**
    * Where the caret has to end up once the indent below has been through the parent's state and
@@ -303,6 +330,7 @@ export function CodeEditor({
                     tokens={showsPlaceholder ? [] : (tokenLines[index] ?? [])}
                     number={index + 1}
                     isPlaceholder={showsPlaceholder}
+                    marker={showsPlaceholder ? undefined : markers.get(index + 1)}
                   />
                 ))}
               </code>
@@ -346,6 +374,30 @@ export function CodeEditor({
         </div>
         {overlay && <div className="cpm-code-editor-overlay">{overlay}</div>}
       </div>
+
+      {issues.length > 0 && (
+        <VStack gap={1} role="list" aria-label={t("codeEditor.issuesLabel")}>
+          {issues.slice(0, MAX_LISTED_ISSUES).map((issue, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: two issues can share a line and a message
+            <HStack key={index} gap={2} align="center" role="listitem">
+              <StatusDot
+                variant={issue.severity}
+                label={t(
+                  issue.severity === "error" ? "codeEditor.errorLabel" : "codeEditor.warningLabel",
+                )}
+              />
+              <Text type="body" size="xsm">
+                {t("codeEditor.issueAt", { line: String(issue.line), message: issue.message })}
+              </Text>
+            </HStack>
+          ))}
+          {issues.length > MAX_LISTED_ISSUES && (
+            <Text type="body" size="xsm" color="secondary">
+              {t("codeEditor.moreIssues", { count: issues.length - MAX_LISTED_ISSUES })}
+            </Text>
+          )}
+        </VStack>
+      )}
 
       {/* The keyboard hint is what makes Tab-to-indent discoverable, so it says so in the open
           rather than only through `aria-keyshortcuts`. */}

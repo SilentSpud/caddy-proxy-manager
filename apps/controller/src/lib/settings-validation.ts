@@ -6,7 +6,10 @@ import {
   filterCustomDirectives,
   findInvalidBodyLimitDirective,
   isValidBodyLimit,
+  seclangErrorDetails,
 } from "./caddy-waf";
+import { domainErrorMessage } from "./domain-error";
+import { seclangErrors } from "./seclang";
 import { normalizeDefaultResponseSettings } from "./caddy-default-response";
 import { normalizeTailscaleSettings } from "./caddy-tailscale";
 import { getProviderDefinition, isValidDnsDuration } from "./dns-providers";
@@ -508,6 +511,16 @@ function validateWaf(value: Record<string, unknown>): void {
   if (dropped.length > 0) {
     invalid(
       `waf.custom_directives has ${dropped.length} line(s) that would be dropped and never sent to Caddy: ${droppedWafDirectiveDetails(dropped).join(", ")}. Remove or rewrite them for them to take effect.`,
+    );
+  }
+  // Past the allowlist, a line can still be one Coraza refuses, and that fails every host's config.
+  const lintErrors = seclangErrors(directives, { crsLoaded: value.load_owasp_crs === true });
+  if (lintErrors.length > 0) {
+    invalid(
+      domainErrorMessage("wafDirectivesInvalid", {
+        count: lintErrors.length,
+        details: seclangErrorDetails(lintErrors),
+      }),
     );
   }
   if (value.excluded_rule_ids !== undefined)

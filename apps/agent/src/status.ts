@@ -6,7 +6,12 @@
  * a closure inside the request handler, back when the controller asked for it.
  */
 
-import type { AgentStatus, ManagedServiceName, ManagedServicesStatus } from "@cpm/shared";
+import {
+  AGENT_CAPABILITIES,
+  type AgentStatus,
+  type ManagedServiceName,
+  type ManagedServicesStatus,
+} from "@cpm/shared";
 import { accessLogPresent } from "./analytics/log-parser";
 import { analyticsEnabled } from "./analytics/relay";
 import { checkLogAccess } from "./analytics/log-access";
@@ -52,5 +57,6 @@ export async function buildStatus({ config, store, docker }: StatusDeps): Promis
     },
     // The files only matter while the agent is parsing them; the directory is Caddy's either way.
     logAccess: checkLogAccess(config.caddyContainerName, analyticsEnabled()),
+    capabilities: [...AGENT_CAPABILITIES],
   };
 }

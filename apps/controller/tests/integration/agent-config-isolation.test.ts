@@ -56,8 +56,13 @@ const BENIGN = adapted([{ handle: [{ handler: 'static_response', body: 'benign-s
 
 function loadsOn(agent: FakeAgent): string[] {
   return agent.requests
-    .filter((entry) => entry.kind === 'command' && entry.command?.request.path === '/load')
-    .map((entry) => entry.command?.request.body ?? '');
+    .flatMap((entry) =>
+      entry.kind === 'command' && entry.command?.kind === 'caddy-admin'
+        ? [entry.command.request]
+        : [],
+    )
+    .filter((request) => request.path === '/load')
+    .map((request) => request.body ?? '');
 }
 
 async function waitFor(condition: () => boolean, timeoutMs = 5_000): Promise<void> {

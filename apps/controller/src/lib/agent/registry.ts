@@ -28,6 +28,7 @@ import {
   type AgentStatus,
   type CaddyAdminProxyRequest,
   type CaddyAdminProxyResponse,
+  type CaddyValidateRequest,
 } from "@cpm/shared";
 
 /** One attached agent. */
@@ -302,13 +303,32 @@ export function dispatchCaddyAdmin(
   agentId: string,
   request: CaddyAdminProxyRequest,
 ): Promise<CaddyAdminProxyResponse> {
+  return dispatch(agentId, { kind: "caddy-admin", request });
+}
+
+/**
+ * Ask one agent to run `caddy validate` on a config. Only for an agent whose status lists the
+ * `caddy-validate` capability: an older one never answers, and this would wait out the timeout.
+ */
+export function dispatchCaddyValidate(
+  agentId: string,
+  request: CaddyValidateRequest,
+): Promise<CaddyAdminProxyResponse> {
+  return dispatch(agentId, { kind: "caddy-validate", request });
+}
+
+type CommandBody =
+  | { kind: "caddy-admin"; request: CaddyAdminProxyRequest }
+  | { kind: "caddy-validate"; request: CaddyValidateRequest };
+
+function dispatch(agentId: string, body: CommandBody): Promise<CaddyAdminProxyResponse> {
   const connection = connections.get(agentId);
   if (!connection) {
     return Promise.reject(new AgentNotConnectedError("That agent is not connected."));
   }
 
   const commandId = `${agentId}:${randomUUID()}`;
-  const command: AgentCommand = { id: commandId, kind: "caddy-admin", request };
+  const command: AgentCommand = { id: commandId, ...body };
 
   return new Promise<CaddyAdminProxyResponse>((resolve, reject) => {
     const timer = setTimeout(() => {
