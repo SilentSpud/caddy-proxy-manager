@@ -104,12 +104,22 @@ export function parseCrsRegistry(json: unknown): CrsRegistryEntry[] {
  * Adds the operator's GitHub token to API requests, lifting the unauthenticated limit of 60 an
  * hour to 5,000. Never sent anywhere but api.github.com: a custom registry lives elsewhere.
  */
+/** By parsed host: a prefix test would pass `https://api.github.com.example.test/`. */
+function isGitHubApi(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.host === "api.github.com";
+  } catch {
+    return false;
+  }
+}
+
 export function withGitHubToken(fetcher: Fetcher, token: string | null): Fetcher {
   if (!token) return fetcher;
   return (input, init) =>
     fetcher(
       input,
-      input.startsWith(`${GITHUB_API}/`)
+      isGitHubApi(input)
         ? {
             ...init,
             headers: {
@@ -126,7 +136,7 @@ async function get(fetcher: Fetcher, url: string, accept?: string): Promise<Resp
     return await fetcher(url, {
       headers: {
         "User-Agent": "caddy-proxy-manager",
-        ...(url.startsWith(GITHUB_API)
+        ...(isGitHubApi(url)
           ? {
               Accept: accept ?? "application/vnd.github+json",
               "X-GitHub-Api-Version": "2022-11-28",
@@ -157,13 +167,33 @@ function failed(url: string, response: Response): never {
   );
 }
 
+/**
+ * Counted as it streams, since Content-Length is the sender's claim and may be absent: a registry
+ * is any URL an admin adds, so an endless body must not reach memory whole.
+ */
 async function readText(url: string, response: Response): Promise<string> {
-  const declared = Number(response.headers.get("content-length") ?? 0);
-  const text = declared > MAX_FILE_BYTES ? null : await response.text();
-  if (text === null || text.length > MAX_FILE_BYTES) {
-    throw domainError("crsPluginFetchFailed", { url, reason: "too large" }, { status: 400 });
+  const tooLarge = () =>
+    domainError("crsPluginFetchFailed", { url, reason: "too large" }, { status: 400 });
+  if (Number(response.headers.get("content-length") ?? 0) > MAX_FILE_BYTES) {
+    await response.body?.cancel();
+    throw tooLarge();
   }
-  return text.replace(/\r\n?/g, "\n");
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  if (response.body) {
+    const reader = response.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_FILE_BYTES) {
+        await reader.cancel();
+        throw tooLarge();
+      }
+      chunks.push(value);
+    }
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks)).replace(/\r\n?/g, "\n");
 }
 
 /** Reads a registry.json. Callers keep the result; see crs-plugins/sync.ts. */

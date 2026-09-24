@@ -206,3 +206,33 @@ describe('checkCrsPluginSupport', () => {
     );
   });
 });
+
+describe('fetch hardening', () => {
+  it('sends the token only to api.github.com itself, not a host that starts the same', async () => {
+    const seen: Record<string, string | undefined> = {};
+    const fetcher = withGitHubToken(async (input, init) => {
+      seen[input] = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      return new Response('{}');
+    }, 'ghp_secret');
+    await fetcher('https://api.github.com.example.test/repos/a/b/releases/latest');
+    await fetcher('https://api.github.com/repos/a/b/releases/latest');
+    expect(seen['https://api.github.com.example.test/repos/a/b/releases/latest']).toBeUndefined();
+    expect(seen['https://api.github.com/repos/a/b/releases/latest']).toBe('Bearer ghp_secret');
+  });
+
+  it('stops reading a body with no Content-Length once it passes the limit', async () => {
+    let sent = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        sent += 64 * 1024;
+        controller.enqueue(new Uint8Array(64 * 1024).fill(32));
+      },
+    });
+    const url = 'https://registry.example.test/huge.json';
+    expect(await codeOf(fetchCrsRegistry(async () => new Response(endless), url))).toBe(
+      'crsPluginFetchFailed',
+    );
+    // Cut off just past the 2 MiB limit, not read to the end.
+    expect(sent).toBeLessThan(3 * 1024 * 1024);
+  });
+});

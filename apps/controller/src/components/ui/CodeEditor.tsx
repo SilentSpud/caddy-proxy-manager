@@ -99,6 +99,9 @@ function useScrollbarWidth(scroller: RefObject<HTMLDivElement | null>): number {
     if (!el) return;
     const measure = () => setWidth(el.offsetWidth - el.clientWidth);
     measure();
+    // Without it the width is measured once; floated content then only risks sitting on a
+    // scrollbar that appears later.
+    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     if (el.firstElementChild) observer.observe(el.firstElementChild);
