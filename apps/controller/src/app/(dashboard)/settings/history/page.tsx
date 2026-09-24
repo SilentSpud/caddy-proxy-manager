@@ -4,6 +4,8 @@ import {
   compareRevisions,
   countRevisions,
   oldestRestorable,
+  previousRevisionId,
+  revisionExists,
   revisionIds,
 } from "@/src/lib/settings/revisions";
 import { stagedView } from "@/src/lib/settings/staged-view";
@@ -51,11 +53,15 @@ export default async function SettingsHistoryPage({
   const revisions = await recentRevisions(PER_PAGE, (page - 1) * PER_PAGE);
 
   const latest = ids[0] ?? 0;
-  const known = new Set([0, ...ids]);
-  // By default the latest revision against the one before it: "what did the last apply do".
+  // By default the latest revision against the one before it: "what did the last apply do". Checked
+  // against the table rather than `ids`, which is capped and would lose an older revision's link.
   const to = readId(params.to) ?? latest;
-  const from = readId(params.from) ?? ids.find((id) => id < to) ?? 0;
-  const valid = latest > 0 && known.has(to) && known.has(from) && from !== to;
+  const from = readId(params.from) ?? (await previousRevisionId(to));
+  const [toExists, fromExists] = await Promise.all([
+    revisionExists(to),
+    from === 0 ? true : revisionExists(from),
+  ]);
+  const valid = toExists && fromExists && from !== to;
   const comparison = valid ? await compareRevisions(from, to) : null;
 
   return (

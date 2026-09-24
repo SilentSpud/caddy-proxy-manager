@@ -52,9 +52,13 @@ export default function HistoryClient(props: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const navigate = (changes: Record<string, number>) => {
+  /** `null` drops a parameter, so the server picks its default. */
+  const navigate = (changes: Record<string, number | null>) => {
     const next = new URLSearchParams(searchParams.toString());
-    for (const [name, value] of Object.entries(changes)) next.set(name, String(value));
+    for (const [name, value] of Object.entries(changes)) {
+      if (value === null) next.delete(name);
+      else next.set(name, String(value));
+    }
     router.push(`${pathname}?${next.toString()}`, { scroll: false });
   };
 
@@ -80,12 +84,9 @@ export default function HistoryClient(props: Props) {
                     revision={revision}
                     latest={latest}
                     isSelected={selection?.to === revision.id}
-                    onView={() =>
-                      navigate({
-                        to: revision.id,
-                        from: props.ids.find((id) => id < revision.id) ?? 0,
-                      })
-                    }
+                    // Only `to`: the server finds the revision before it, which the capped id list
+                    // may not hold for an old page.
+                    onView={() => navigate({ to: revision.id, from: null })}
                   />
                 ))}
                 {props.total > props.perPage && (
@@ -193,19 +194,21 @@ function ComparisonCard({
   comparison: RevisionComparison | null;
   latest: number;
   restorableFrom: number;
-  onSelect: (changes: Record<string, number>) => void;
+  onSelect: (changes: Record<string, number | null>) => void;
 }) {
   const t = useTranslations("settings");
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const options = ids.map((id) => ({
+  const { from, to } = selection;
+  // The selection can be older than the capped id list, from a paged row or a shared link.
+  const optionIds = [...new Set([...ids, from, to])].filter((id) => id > 0).sort((a, b) => b - a);
+  const options = optionIds.map((id) => ({
     value: String(id),
     label: t("history.revisionOption", { id }),
   }));
   const fromOptions = [...options, { value: "0", label: t("history.initial") }];
-  const { from, to } = selection;
   const canRestore = to >= 1 && to < latest && to >= restorableFrom;
 
   const restore = () => {

@@ -37,7 +37,12 @@ vi.mock('../../src/lib/caddy', () => ({
 
 import { applyStagedSettings, recentRevisions } from '../../src/lib/settings/apply';
 import { listStagedSettings, stageWrites } from '../../src/lib/settings/staging';
-import { compareRevisions, stageRevisionRestore } from '../../src/lib/settings/revisions';
+import {
+  compareRevisions,
+  previousRevisionId,
+  revisionExists,
+  stageRevisionRestore,
+} from '../../src/lib/settings/revisions';
 import { applyCaddyConfig } from '../../src/lib/caddy';
 import { DomainError } from '../../src/lib/domain-error';
 import * as schema from '../../src/lib/db/schema';
@@ -177,6 +182,24 @@ describe('revision version control', () => {
       code: 'revisionNotRecorded',
     });
     expect((await compareRevisions(0, first + 1)).keys).toBeNull();
+  });
+
+  it('finds the revision before one across gaps in the ids, and 0 before the first', async () => {
+    const first = await apply({ general: { defaultDomain: 'a.test' } });
+    await ctx.db.insert(schema.settingsRevisions).values({
+      id: first + 5,
+      appliedBy: null,
+      appliedByName: 'Admin',
+      summary: 'waf',
+      keys: JSON.stringify(['waf']),
+      outcome: 'applied',
+      error: null,
+      appliedAt: new Date().toISOString(),
+    });
+    expect(await previousRevisionId(first + 5)).toBe(first);
+    expect(await previousRevisionId(first)).toBe(0);
+    expect(await revisionExists(first + 5)).toBe(true);
+    expect(await revisionExists(first + 1)).toBe(false);
   });
 
   it('refuses a revision that does not exist', async () => {

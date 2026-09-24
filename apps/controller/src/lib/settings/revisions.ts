@@ -10,7 +10,7 @@
 
 import db from "../db";
 import { settingsRevisions } from "../db/schema";
-import { and, asc, count, desc, gt, isNull, lte, max } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull, lt, lte, max } from "drizzle-orm";
 import { buildCaddyDocument } from "../caddy";
 import { domainError } from "../domain-error";
 import { type RevisionChange, parseRevisionChanges } from "./apply";
@@ -53,6 +53,23 @@ export async function revisionIds(limit = 500): Promise<number[]> {
     .orderBy(desc(settingsRevisions.id))
     .limit(limit);
   return rows.map((row) => row.id);
+}
+
+/** The revision before `id`, or 0 when `id` is the first. Ids are serial, not contiguous. */
+export async function previousRevisionId(id: number): Promise<number> {
+  const [row] = await db
+    .select({ id: max(settingsRevisions.id) })
+    .from(settingsRevisions)
+    .where(lt(settingsRevisions.id, id));
+  return Number(row?.id ?? 0);
+}
+
+export async function revisionExists(id: number): Promise<boolean> {
+  const [row] = await db
+    .select({ total: count() })
+    .from(settingsRevisions)
+    .where(eq(settingsRevisions.id, id));
+  return Number(row?.total ?? 0) > 0;
 }
 
 /**
