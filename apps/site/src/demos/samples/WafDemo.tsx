@@ -8,11 +8,17 @@ const PRESETS = [
   { id: 3, name: "Immich", description: "Upload exclusions" },
 ];
 
-/** Seeded as a host that has been through detect mode and come out with one exclusion and a preset. */
+const PLUGINS = [
+  { id: 1, name: "wordpress-rule-exclusions", description: "CRS rule exclusions for WordPress" },
+  { id: 2, name: "nextcloud-rule-exclusions", description: "CRS rule exclusions for Nextcloud" },
+  { id: 3, name: "phpmyadmin-rule-exclusions", description: null },
+];
+
+/** Seeded as a host that has been through detect mode and come out with one exclusion, a preset and a plugin. */
 export default function WafDemo() {
   return (
     <DemoSurface>
-      <WafPresetOptionsProvider presets={PRESETS}>
+      <WafPresetOptionsProvider presets={PRESETS} plugins={PLUGINS}>
         <WafFields
           value={{
             enabled: true,
@@ -21,6 +27,7 @@ export default function WafDemo() {
             waf_mode: "merge",
             excluded_rule_ids: [942100],
             preset_ids: [1],
+            plugin_ids: [2],
             custom_directives:
               'SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,pass,nolog,ctl:ruleRemoveById=942100"\n',
           }}

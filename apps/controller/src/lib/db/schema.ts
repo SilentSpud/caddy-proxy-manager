@@ -57,4 +57,5 @@ export const {
   groupIdpMappings,
   groupGrants,
   wafPresets,
+  crsPlugins,
 } = activeSchema;

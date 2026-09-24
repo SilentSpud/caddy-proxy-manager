@@ -105,7 +105,8 @@ import {
 import { buildRoleMaps } from "./models/mtls-roles";
 import { getAccessRulesForHosts } from "./models/mtls-access-rules";
 import { getWafPresetDirectives } from "./models/waf-presets";
-import { buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
+import { getCrsPluginRules } from "./models/crs-plugins";
+import { type CrsPluginRules, buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
 import {
   type CaddyModuleAvailability,
@@ -971,6 +972,8 @@ type CaddyBuildContext = {
   globalWaf?: WafSettings | null;
   /** waf_presets id -> directives. */
   wafPresets?: ReadonlyMap<number, string>;
+  /** crs_plugins id -> rule files. */
+  crsPlugins?: ReadonlyMap<number, CrsPluginRules>;
   /**
    * Which plugin-backed features the running binary can serve. Caddy validates a posted config as a
    * whole, so one handler naming an uncompiled module takes every host offline.
@@ -1538,7 +1541,12 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     const effectiveWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
     if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off" && wafUsable) {
       handlers.unshift(
-        buildWafHandlerEntry(effectiveWaf, Boolean(row.allowWebsocket), context.wafPresets),
+        buildWafHandlerEntry(
+          effectiveWaf,
+          Boolean(row.allowWebsocket),
+          context.wafPresets,
+          context.crsPlugins,
+        ),
       );
     }
 
@@ -3297,6 +3305,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     globalGeoBlock,
     globalWaf,
     wafPresets,
+    crsPluginRules,
     trustedProxiesSettings,
     moduleAvailability,
     defaultResponseSettings,
@@ -3314,6 +3323,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     getGeoBlockSettings(),
     getWafSettings(),
     getWafPresetDirectives(),
+    getCrsPluginRules(),
     getTrustedProxiesSettings(),
     getCaddyModuleAvailability(agentRowId),
     getDefaultResponseSettings(),
@@ -3388,6 +3398,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     globalGeoBlock: effectiveGlobalGeoBlock,
     globalWaf,
     wafPresets,
+    crsPlugins: crsPluginRules,
     moduleAvailability,
     tailscale: tailscaleRuntime,
     adaptVia: options.adaptVia,

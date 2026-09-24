@@ -20,6 +20,7 @@ import { listUsers } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
 import { listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
 import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/WafPresetOptions";
+import { listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins";
 import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
@@ -87,6 +88,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     allUsers,
     allGroups,
     wafPresets,
+    crsPlugins,
   ] = await Promise.all([
     listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, enabled),
     countProxyHosts(search, visibleIds, enabled),
@@ -104,6 +106,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     listUsers().catch(() => []),
     listGroups().catch(() => []),
     listWafPresets(),
+    listCrsPlugins(),
   ]);
 
   // Only the hosts on this page: the map is for the edit dialog, and loading the fleet's whole
@@ -150,7 +153,10 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   }));
 
   return (
-    <WafPresetOptionsProvider presets={wafPresets.map(toWafPresetOption)}>
+    <WafPresetOptionsProvider
+      presets={wafPresets.map(toWafPresetOption)}
+      plugins={crsPlugins.map(toCrsPluginOption)}
+    >
       <ProxyHostsClient
         hosts={hosts}
         certificates={certificates.map(toCertificatePickerOption)}

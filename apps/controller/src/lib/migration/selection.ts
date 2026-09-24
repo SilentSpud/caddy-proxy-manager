@@ -137,9 +137,9 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     // but neither can hold anything worth importing: staging arrived after the source databases
     // this flow reads, so both are always empty in one, and a half-applied change set belongs to
     // the operator who staged it on the old instance rather than to the new one.
-    // waf_presets is here because the WAF settings select them; a host selecting one it lost
-    // still emits the rest of its rules.
-    tables: ["settings", "settings_staged", "settings_revisions", "waf_presets"],
+    // waf_presets and crs_plugins are here because the WAF settings select them; a host selecting
+    // one it lost still emits the rest of its rules.
+    tables: ["settings", "settings_staged", "settings_revisions", "waf_presets", "crs_plugins"],
     requires: [],
   },
   {

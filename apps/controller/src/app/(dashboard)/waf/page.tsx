@@ -14,6 +14,7 @@ import { withStagedReads } from "@/src/lib/settings/staging-context";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { getWafPresetUsage, listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
 import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/WafPresetOptions";
+import { getCrsPluginUsage, listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins";
 import { requireAdmin } from "@/src/lib/auth";
 import { strictId } from "@/src/lib/strict-id";
 import type { Metadata } from "next";
@@ -91,15 +92,18 @@ export default async function WafPage({ searchParams }: PageProps) {
   // against this operator's staged set. Otherwise a staged edit looks discarded after a reload.
   const overlay = await stagedOverlay(Number(session.user.id));
 
-  const [events, total, stats, globalWaf, hosts, presets, presetUsage] = await Promise.all([
-    listWafEvents(PER_PAGE, offset, filter, from, to),
-    countWafEvents(filter, from, to),
-    getWafEventStats(filter, from, to),
-    withStagedReads(overlay, () => getWafSettings()),
-    listProxyHosts(),
-    listWafPresets(),
-    withStagedReads(overlay, () => getWafPresetUsage()),
-  ]);
+  const [events, total, stats, globalWaf, hosts, presets, presetUsage, plugins, pluginUsage] =
+    await Promise.all([
+      listWafEvents(PER_PAGE, offset, filter, from, to),
+      countWafEvents(filter, from, to),
+      getWafEventStats(filter, from, to),
+      withStagedReads(overlay, () => getWafSettings()),
+      listProxyHosts(),
+      listWafPresets(),
+      withStagedReads(overlay, () => getWafPresetUsage()),
+      listCrsPlugins(),
+      withStagedReads(overlay, () => getCrsPluginUsage()),
+    ]);
 
   const globalExcludedIds = globalWaf?.excluded_rule_ids ?? [];
   const globalExcludedMessages = await getWafRuleMessages(globalExcludedIds);
@@ -113,7 +117,10 @@ export default async function WafPage({ searchParams }: PageProps) {
   }
 
   return (
-    <WafPresetOptionsProvider presets={presets.map(toWafPresetOption)}>
+    <WafPresetOptionsProvider
+      presets={presets.map(toWafPresetOption)}
+      plugins={plugins.map(toCrsPluginOption)}
+    >
       <WafEventsClient
         events={events}
         stats={stats}
@@ -135,6 +142,24 @@ export default async function WafPage({ searchParams }: PageProps) {
             description: preset.description,
             directives: preset.directives,
             updatedAt: preset.updatedAt,
+            usedGlobally: usage?.global ?? false,
+            usedByDashboard: usage?.dashboard ?? false,
+            hostCount: usage?.hosts.length ?? 0,
+          };
+        })}
+        plugins={plugins.map((plugin) => {
+          const usage = pluginUsage.get(plugin.id);
+          return {
+            id: plugin.id,
+            name: plugin.name,
+            description: plugin.description,
+            repository: plugin.repository,
+            version: plugin.version,
+            ruleIdStart: plugin.ruleIdStart,
+            ruleIdEnd: plugin.ruleIdEnd,
+            configRules: plugin.configRules,
+            configOverride: plugin.configOverride,
+            updatedAt: plugin.updatedAt,
             usedGlobally: usage?.global ?? false,
             usedByDashboard: usage?.dashboard ?? false,
             hostCount: usage?.hosts.length ?? 0,

@@ -10,6 +10,7 @@ import {
   CORAZA_MAX_BODY_LIMIT,
   droppedWafDirectiveDetails,
   filterCustomDirectives,
+  findCrsPluginRejections,
   findInvalidBodyLimitDirective,
   parseBodyLimitMib,
   resolveEffectiveWaf,
@@ -766,6 +767,165 @@ describe('resolveEffectiveWaf - presets', () => {
 
   it('a host without its own config inherits the global presets', () => {
     expect(resolveEffectiveWaf(global, null)?.preset_ids).toEqual([1, 2]);
+  });
+});
+
+describe('buildWafHandler - CRS plugins', () => {
+  const plugins = new Map([
+    [
+      1,
+      {
+        config: 'SecAction "id:9507010,phase:1,pass,nolog"',
+        before: 'SecRule ARGS "@rx one" "id:9507100,phase:1,pass,nolog"',
+        after: '',
+      },
+    ],
+    [
+      2,
+      {
+        config: 'SecAction "id:9508010,phase:1,pass,nolog"',
+        before: 'SecRule ARGS "@rx two" "id:9508100,phase:1,pass,nolog"',
+        after: 'SecRuleUpdateTargetById 942100 "!ARGS:two"',
+      },
+    ],
+  ]);
+  const presets = new Map([[5, 'SecRule ARGS "@rx p" "id:9601,pass,nolog"']]);
+
+  it('loads configs, then befores, then the CRS rules, then afters', () => {
+    const directives = buildWafHandler(
+      { ...baseWaf, load_owasp_crs: true, plugin_ids: [2, 1], preset_ids: [5] },
+      presets,
+      plugins,
+    ).directives as string;
+    const at = (needle: string) => directives.indexOf(needle);
+    expect(at('@crs-setup.conf.example')).toBeLessThan(at('id:9508010'));
+    expect(at('id:9508010')).toBeLessThan(at('id:9507010'));
+    expect(at('id:9507010')).toBeLessThan(at('id:9508100'));
+    expect(at('id:9508100')).toBeLessThan(at('id:9507100'));
+    expect(at('id:9507100')).toBeLessThan(at('id:9601'));
+    expect(at('id:9601')).toBeLessThan(at('@owasp_crs/*.conf'));
+    expect(at('@owasp_crs/*.conf')).toBeLessThan(at('SecRuleUpdateTargetById 942100'));
+    expect(at('SecRuleUpdateTargetById 942100')).toBeLessThan(at('SecRuleEngine On'));
+  });
+
+  it('leaves plugins out without the CRS, since they tune its rules', () => {
+    const directives = buildWafHandler({ ...baseWaf, plugin_ids: [1] }, new Map(), plugins)
+      .directives as string;
+    expect(directives).not.toContain('id:9507');
+  });
+
+  it('emits a plugin once, and nothing for an unknown id', () => {
+    const directives = buildWafHandler(
+      { ...baseWaf, load_owasp_crs: true, plugin_ids: [1, 1, 99] },
+      new Map(),
+      plugins,
+    ).directives as string;
+    expect(directives.split('id:9507100').length).toBe(2);
+  });
+
+  it('merge mode adds the host plugins to the global ones; override uses the host alone', () => {
+    const global = { ...baseWaf, plugin_ids: [1, 2] };
+    expect(resolveEffectiveWaf(global, { enabled: true, plugin_ids: [2, 3] })?.plugin_ids).toEqual([
+      1, 2, 3,
+    ]);
+    expect(
+      resolveEffectiveWaf(global, { enabled: true, waf_mode: 'override', plugin_ids: [3] })
+        ?.plugin_ids,
+    ).toEqual([3]);
+  });
+});
+
+describe('findCrsPluginRejections', () => {
+  const range = { start: 9507000, end: 9507999 };
+
+  it('accepts what registered plugins use', () => {
+    const plugin = [
+      '# comment',
+      'SecRule REQUEST_FILENAME "@endsWith /wp-login.php" \\',
+      '    "id:9507101,phase:2,pass,nolog,ctl:ruleRemoveTargetById=920273;ARGS:pwd,chain"',
+      '    SecRule ARGS:action "@streq resetpass" "t:none"',
+      'SecAction "id:9507020,phase:1,pass,nolog,setvar:tx.x=1"',
+      'SecMarker "END-WORDPRESS"',
+      'SecRuleUpdateTargetById 942100 "!ARGS:content"',
+      'SecRuleRemoveById 942200',
+    ].join('\n');
+    expect(findCrsPluginRejections(plugin, range)).toEqual([]);
+  });
+
+  it('refuses a rule that reads a file, which an inlined plugin does not have', () => {
+    const [rejection] = findCrsPluginRejections(
+      'SecRule TX:0 "@inspectFile fake-bot.lua" "id:9507110,phase:1,deny"',
+      range,
+    );
+    expect(rejection.reason).toBe('crsPluginNeedsFile');
+    expect(
+      findCrsPluginRejections('SecRule ARGS "@pmFromFile x.data" "id:9507111,deny"', range)[0]
+        .reason,
+    ).toBe('crsPluginNeedsFile');
+  });
+
+  it('refuses a rule id outside the registered range, but not a ctl target id', () => {
+    expect(
+      findCrsPluginRejections('SecRule ARGS "@rx x" "id:942100,phase:1,pass"', range)[0].reason,
+    ).toBe('crsPluginRuleIdOutOfRange');
+    expect(
+      findCrsPluginRejections(
+        'SecRule ARGS "@rx x" "id:9507200,phase:1,pass,ctl:ruleRemoveById=942100"',
+        range,
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses engine and file directives, and ctl:ruleEngine', () => {
+    const reasons = findCrsPluginRejections(
+      [
+        'Include /etc/passwd',
+        'SecRuleEngine Off',
+        'SecAuditLog /tmp/x',
+        'SecRule ARGS "@rx x" "id:9507300,phase:1,pass,ctl: ruleEngine=Off"',
+      ].join('\n'),
+      range,
+    ).map((rejection) => rejection.reason);
+    expect(reasons).toEqual([
+      'crsPluginDirectiveNotAllowed',
+      'crsPluginDirectiveNotAllowed',
+      'crsPluginDirectiveNotAllowed',
+      'crsPluginCtlRuleEngine',
+    ]);
+  });
+
+  it('refuses what Coraza cannot compile: persistent collections and unbalanced quotes', () => {
+    const reasons = (text: string) =>
+      findCrsPluginRejections(text, range).map((rejection) => rejection.reason);
+    expect(reasons('SecRule IP:DOS_BLOCK "@eq 1" "id:9507400,phase:1,deny"')).toEqual([
+      'crsPluginPersistentCollection',
+    ]);
+    expect(reasons('SecRule ARGS|&SESSION:x "@eq 1" "id:9507401,phase:1,deny"')).toEqual([
+      'crsPluginPersistentCollection',
+    ]);
+    expect(reasons('SecAction "id:9507402,phase:1,pass,setvar:ip.counter=+1"')).toEqual([
+      'crsPluginPersistentCollection',
+    ]);
+    // google-oauth2 1.0.0 leaves its action list open before a chain.
+    expect(reasons('SecRule TX:X "@eq 1" "id:9507403,phase:2,pass,chain')).toEqual([
+      'crsPluginUnbalancedQuotes',
+    ]);
+    // An escaped quote inside a message is not one.
+    expect(
+      reasons(String.raw`SecRule ARGS "@rx x" "id:9507404,phase:1,pass,msg:'a \" b'"`),
+    ).toEqual([]);
+    // REMOTE_ADDR and TX.ip-like names are not the IP collection.
+    expect(
+      reasons(
+        'SecRule REMOTE_ADDR "@ipMatch 10.0.0.0/8" "id:9507405,phase:1,pass,setvar:tx.ip_ok=1"',
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a directive left open, which would swallow what follows it', () => {
+    expect(
+      findCrsPluginRejections('SecRule ARGS "@rx x" \\', range).map((entry) => entry.reason),
+    ).toEqual(['crsPluginUnterminated']);
   });
 });
 
