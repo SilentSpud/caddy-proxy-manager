@@ -15,12 +15,14 @@ import {
   filterCustomDirectives,
   findInvalidBodyLimitDirective,
   isValidBodyLimit,
+  normalizeWafPluginIds,
   normalizeWafPresetIds,
 } from "../caddy-waf";
 import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
 import { agentIdsForHost, setHostAgents } from "./host-agents";
 import { assertWafPresetIdsExist } from "./waf-presets";
+import { assertCrsPluginIdsExist } from "./crs-plugins";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -153,6 +155,7 @@ export type WafHostConfig = {
   custom_directives?: string;
   excluded_rule_ids?: number[];
   preset_ids?: number[];
+  plugin_ids?: number[];
   waf_mode?: WafMode;
   // Request body limits in bytes; unset inherits the global WAF setting.
   // Coraza rejects anything above 1 GiB at config-load time.
@@ -435,6 +438,10 @@ function validateWafMeta(waf: WafHostConfig): WafHostConfig {
     // undefined rather than [] so an emptied selection leaves the stored JSON as it was before presets.
     const presetIds = normalizeWafPresetIds(waf.preset_ids);
     waf = { ...waf, preset_ids: presetIds.length > 0 ? presetIds : undefined };
+  }
+  if (waf.plugin_ids !== undefined) {
+    const pluginIds = normalizeWafPluginIds(waf.plugin_ids);
+    waf = { ...waf, plugin_ids: pluginIds.length > 0 ? pluginIds : undefined };
   }
   // Safe to echo: findInvalidBodyLimitDirective only ever returns a line that
   // matched `<known directive name> <digits>`, never free-form user text.
@@ -3016,6 +3023,7 @@ export async function assertProxyHostOptionsStorable(options: {
   }
   await assertTailscaleServable(options.meta);
   await assertWafPresetIdsExist(parseMeta(options.meta).waf?.preset_ids);
+  await assertCrsPluginIdsExist(parseMeta(options.meta).waf?.plugin_ids);
 }
 
 function parseProxyHost(row: ProxyHostRow): ProxyHost {
@@ -3211,6 +3219,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   const meta = buildMeta({}, input);
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
+  await assertCrsPluginIdsExist(parseMeta(meta).waf?.plugin_ids);
   const [record] = await db
     .insert(proxyHosts)
     .values({
@@ -3351,6 +3360,7 @@ export async function updateProxyHost(
   const meta = buildMeta(existingMeta, input);
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
+  await assertCrsPluginIdsExist(parseMeta(meta).waf?.plugin_ids);
 
   const now = nowIso();
   await db

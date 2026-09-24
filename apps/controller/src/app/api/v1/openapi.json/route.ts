@@ -28,6 +28,11 @@ const spec = {
       name: "WAF Presets",
       description: "Named SecLang rule sets the global WAF settings and each host select by id",
     },
+    {
+      name: "CRS Plugins",
+      description:
+        "Plugins from the OWASP CRS plugin registry, installed at a release and selected by id like presets",
+    },
     { name: "Forward Auth", description: "Forward auth sessions and per-host access control" },
     { name: "Audit Log", description: "Audit log" },
     { name: "Caddy", description: "Caddy server operations" },
@@ -1348,6 +1353,274 @@ const spec = {
         },
       },
     },
+    "/api/v1/crs-plugins": {
+      get: {
+        tags: ["CRS Plugins"],
+        summary: "List installed CRS plugins",
+        operationId: "listCrsPlugins",
+        responses: {
+          "200": {
+            description: "Installed plugins",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/CrsPlugin" } },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      post: {
+        tags: ["CRS Plugins"],
+        summary: "Install a CRS plugin",
+        description:
+          "Fetches the plugin's latest release from GitHub. Refused when a rule needs a Lua script or data file, uses a directive outside the plugin allowlist, or defines a rule id outside the plugin's registered range.",
+        operationId: "installCrsPlugin",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name"],
+                properties: {
+                  name: { type: "string", description: "The registry's plugin name" },
+                  registry: {
+                    type: "string",
+                    description:
+                      "The id of the registry listing it. Needed only when several registries list the name.",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Plugin installed",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/CrsPlugin" } } },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { description: "No plugin of that name in the registry" },
+          "409": { description: "Already installed" },
+        },
+      },
+    },
+    "/api/v1/crs-plugins/registry": {
+      get: {
+        tags: ["CRS Plugins"],
+        summary: "List the CRS plugin registries' plugins",
+        description:
+          "Every configured registry's public entries, from the last read: a registry not read yet is read now. Each carries the verdict of the last check and the id it is installed under.",
+        operationId: "listCrsRegistry",
+        responses: {
+          "200": {
+            description: "Registry entries",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      registryId: { type: "string" },
+                      registryName: { type: "string" },
+                      name: { type: "string" },
+                      repository: { type: "string", format: "uri" },
+                      type: { type: "string", enum: ["official", "3rd-party"] },
+                      status: {
+                        type: "string",
+                        enum: ["tested", "being-tested", "untested", "draft"],
+                      },
+                      license: { type: "string" },
+                      ruleIdStart: { type: "integer" },
+                      ruleIdEnd: { type: "integer" },
+                      installedId: { type: ["integer", "null"] },
+                      unsupported: {
+                        type: ["string", "null"],
+                        enum: [
+                          "files",
+                          "engine",
+                          "compile",
+                          "ruleIds",
+                          "noRules",
+                          "directives",
+                          null,
+                        ],
+                        description:
+                          "Why the last check found it cannot install here, or null: installable, or not checked yet",
+                      },
+                      checkedVersion: {
+                        type: ["string", "null"],
+                        description: "The release the verdict is for",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/crs-plugins/registry/settings": {
+      get: {
+        tags: ["CRS Plugins"],
+        summary: "Get the CRS plugin registry settings",
+        operationId: "getCrsRegistrySettings",
+        responses: {
+          "200": {
+            description: "Registry settings",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/CrsRegistrySettings" } },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      put: {
+        tags: ["CRS Plugins"],
+        summary: "Update the CRS plugin registry settings",
+        description:
+          "Fields left out keep their value. A change of registries or token starts a check in the background.",
+        operationId: "updateCrsRegistrySettings",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  registries: {
+                    type: "array",
+                    maxItems: 10,
+                    description:
+                      "The full list. An entry without an id is new; a registry left out is removed.",
+                    items: {
+                      type: "object",
+                      required: ["name", "url"],
+                      properties: {
+                        id: { type: ["string", "null"] },
+                        name: { type: "string", maxLength: 64 },
+                        url: { type: "string", format: "uri", description: "https only" },
+                      },
+                    },
+                  },
+                  refreshIntervalHours: {
+                    type: "integer",
+                    minimum: 0,
+                    maximum: 720,
+                    description: "0 checks only on demand",
+                  },
+                  githubToken: {
+                    type: "string",
+                    description: "Write-only. An empty string removes the stored token.",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Settings as saved",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/CrsRegistrySettings" } },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/crs-plugins/registry/check": {
+      post: {
+        tags: ["CRS Plugins"],
+        summary: "Check the CRS plugin registries now",
+        description:
+          "Re-reads every registry and checks each plugin's latest release the way an install would, answering once the pass is done. Only releases not checked before are fetched. The checks are static: whether Coraza compiles a plugin is not tested.",
+        operationId: "checkCrsRegistry",
+        responses: {
+          "200": { description: "The pass's outcome and the listing it produced" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/crs-plugins/{id}": {
+      get: {
+        tags: ["CRS Plugins"],
+        summary: "Get an installed CRS plugin",
+        operationId: "getCrsPlugin",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": {
+            description: "Plugin details",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/CrsPlugin" } } },
+          },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["CRS Plugins"],
+        summary: "Edit a CRS plugin's configuration",
+        description:
+          "Replaces the plugin's -config file. null or an empty string restores the upstream one. Applies the Caddy config when anything selects the plugin.",
+        operationId: "setCrsPluginConfig",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["config"],
+                properties: { config: { type: ["string", "null"] } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Configuration saved",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/CrsPlugin" } } },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      delete: {
+        tags: ["CRS Plugins"],
+        summary: "Uninstall a CRS plugin",
+        description: "Refused with 409 while the global settings or any host still select it.",
+        operationId: "uninstallCrsPlugin",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": { $ref: "#/components/responses/Ok" },
+          "404": { $ref: "#/components/responses/NotFound" },
+          "409": { description: "The plugin is still selected" },
+        },
+      },
+    },
+    "/api/v1/crs-plugins/{id}/update": {
+      post: {
+        tags: ["CRS Plugins"],
+        summary: "Update a CRS plugin to its latest release",
+        description: "A no-op when it is current. An edited configuration is kept.",
+        operationId: "updateCrsPlugin",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": {
+            description: "Plugin as now installed",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/CrsPlugin" } } },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
     "/api/v1/mtls-roles": {
       get: {
         tags: ["mTLS Roles"],
@@ -2092,6 +2365,12 @@ const spec = {
             items: { type: "integer" },
             description:
               "WAF preset ids, loaded ahead of the CRS rules. Merge mode adds them to the global selection; override replaces it.",
+          },
+          plugin_ids: {
+            type: "array",
+            items: { type: "integer" },
+            description:
+              "Installed CRS plugin ids, loaded only with the CRS. Merge mode adds them to the global selection; override replaces it.",
           },
           waf_mode: {
             type: "string",
@@ -3054,6 +3333,11 @@ const spec = {
             items: { type: "integer" },
             description: "WAF preset ids, loaded ahead of the CRS rules on every host",
           },
+          plugin_ids: {
+            type: "array",
+            items: { type: "integer" },
+            description: "Installed CRS plugin ids, loaded on every host with the CRS on",
+          },
           request_body_limit: {
             type: "integer",
             minimum: 1024,
@@ -3111,6 +3395,48 @@ const spec = {
           updatedAt: { type: "string", format: "date-time" },
         },
         required: ["id", "name", "directives", "createdAt", "updatedAt"],
+      },
+      CrsRegistrySettings: {
+        type: "object",
+        properties: {
+          registries: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                url: { type: "string", format: "uri" },
+              },
+            },
+          },
+          refreshIntervalHours: { type: "integer" },
+          hasGithubToken: { type: "boolean" },
+        },
+      },
+      CrsPlugin: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          name: { type: "string" },
+          repository: { type: "string", format: "uri" },
+          version: { type: "string", description: "Release tag, or commit for an untagged plugin" },
+          description: { type: ["string", "null"] },
+          ruleIdStart: { type: "integer" },
+          ruleIdEnd: { type: "integer" },
+          configRules: { type: "string" },
+          beforeRules: { type: "string" },
+          afterRules: { type: "string" },
+          configOverride: { type: ["string", "null"] },
+          fileNames: {
+            type: "array",
+            items: { type: "string" },
+            description: "The plugins/ rule files the installed release shipped",
+          },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+        required: ["id", "name", "repository", "version", "createdAt", "updatedAt"],
       },
       MtlsRole: {
         type: "object",

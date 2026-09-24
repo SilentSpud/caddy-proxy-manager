@@ -422,6 +422,34 @@ export const wafPresets = sqliteTable(
   }),
 );
 
+// CRS plugins installed from the plugin registry, pinned to the release they were fetched at. The
+// rule files are stored rather than fetched per apply, so a config build never waits on GitHub.
+export const crsPlugins = sqliteTable(
+  "crs_plugins",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    repository: text("repository").notNull(),
+    version: text("version").notNull(),
+    description: text("description"),
+    ruleIdStart: integer("ruleIdStart").notNull(),
+    ruleIdEnd: integer("ruleIdEnd").notNull(),
+    configRules: text("configRules").notNull(),
+    beforeRules: text("beforeRules").notNull(),
+    afterRules: text("afterRules").notNull(),
+    // The operator's edit of the -config file; null runs the upstream one. Survives an update.
+    configOverride: text("configOverride"),
+    // JSON array of the plugins/ files the release had, for display; the rules are stored by kind.
+    fileNames: text("fileNames").notNull().default("[]"),
+    createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("crs_plugins_name_unique").on(table.name),
+  }),
+);
+
 export const mtlsCertificateRoles = sqliteTable(
   "mtls_certificate_roles",
   {

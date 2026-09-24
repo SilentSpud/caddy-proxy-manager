@@ -27,7 +27,11 @@ import {
   PATH_BLOCK_STATUS_CODES,
   sanitizeErrorPageRules,
 } from "@/src/lib/models/proxy-hosts";
-import { normalizeWafPresetIds, parseBodyLimitMib } from "@/src/lib/caddy-waf";
+import {
+  normalizeWafPluginIds,
+  normalizeWafPresetIds,
+  parseBodyLimitMib,
+} from "@/src/lib/caddy-waf";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { getCloudflareSettings, type GeoBlockSettings } from "@/src/lib/settings";
 import {
@@ -526,6 +530,8 @@ export function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null
     : [];
   const rawPresets = formData.get("wafPresetIds");
   const preset_ids = rawPresets ? normalizeWafPresetIds(JSON.parse(rawPresets as string)) : [];
+  const rawPlugins = formData.get("wafPluginIds");
+  const plugin_ids = rawPlugins ? normalizeWafPluginIds(JSON.parse(rawPlugins as string)) : [];
 
   if (!enabled) {
     return { waf: { enabled: false, waf_mode: wafMode } };
@@ -553,6 +559,7 @@ export function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null
       custom_directives: customDirectives,
       excluded_rule_ids,
       ...(preset_ids.length > 0 ? { preset_ids } : {}),
+      ...(plugin_ids.length > 0 ? { plugin_ids } : {}),
       waf_mode: wafMode,
       ...(requestBodyLimit !== undefined ? { request_body_limit: requestBodyLimit } : {}),
       ...(requestBodyInMemoryLimit !== undefined

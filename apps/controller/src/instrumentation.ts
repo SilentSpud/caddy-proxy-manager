@@ -175,6 +175,15 @@ export async function register() {
       console.error("Failed to start the GeoIP updater:", error);
     }
 
+    // Reads the CRS plugin registries and checks their plugins on the configured interval.
+    const { startCrsRegistryUpdater } = await import("./lib/crs-plugins/sync");
+    const { installedCrsPluginRepositories } = await import("./lib/models/crs-plugins");
+    try {
+      startCrsRegistryUpdater(installedCrsPluginRepositories);
+    } catch (error) {
+      console.error("Failed to start the CRS plugin registry updater:", error);
+    }
+
     process.on("SIGTERM", () => {
       closeClickHouse();
     });

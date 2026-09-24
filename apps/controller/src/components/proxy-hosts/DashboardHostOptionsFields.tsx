@@ -40,7 +40,11 @@ import { SettingsToggles } from "./SettingsToggles";
 import { TailscaleFields, type TailscaleHostDefaults } from "./TailscaleFields";
 import { UpstreamDnsResolutionFields } from "./UpstreamDnsResolutionFields";
 import { WafFields } from "./WafFields";
-import { type WafPresetOption, WafPresetOptionsProvider } from "./WafPresetOptions";
+import {
+  type WafPluginOption,
+  type WafPresetOption,
+  WafPresetOptionsProvider,
+} from "./WafPresetOptions";
 
 /** Everything the option fields need besides the values themselves. */
 export type DashboardHostOptionsData = {
@@ -55,6 +59,7 @@ export type DashboardHostOptionsData = {
   agents: AgentOption[];
   tailscaleDefaults: TailscaleHostDefaults;
   wafPresets: WafPresetOption[];
+  wafPlugins: WafPluginOption[];
 };
 
 export function DashboardHostOptionsFields({ data }: { data: DashboardHostOptionsData }) {
@@ -109,7 +114,7 @@ export function DashboardHostOptionsFields({ data }: { data: DashboardHostOption
           geoblock_mode: view.geoblockMode,
         }}
       />
-      <WafPresetOptionsProvider presets={data.wafPresets}>
+      <WafPresetOptionsProvider presets={data.wafPresets} plugins={data.wafPlugins}>
         <WafFields value={view.waf} />
       </WafPresetOptionsProvider>
       <MtlsFields

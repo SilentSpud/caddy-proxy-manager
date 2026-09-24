@@ -53,6 +53,7 @@ import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-cer
 import { toCertificatePickerOption } from "@/src/lib/certificate-api";
 import type { DashboardHostOptionsData } from "@/src/components/proxy-hosts/DashboardHostOptionsFields";
 import { listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
+import { listCrsPlugins, toCrsPluginOption } from "@/src/lib/models/crs-plugins";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -169,15 +170,23 @@ export default async function SettingsSectionPage({
   // section: the section is route-derived, and every other section would pay for lists it never shows.
   let dashboardOptions: DashboardHostOptionsData | null = null;
   if (section === "dashboard") {
-    const [certificates, caCertificates, accessLists, mtlsRoles, issuedClientCerts, wafPresets] =
-      await Promise.all([
-        listCertificates(),
-        listCaCertificates(),
-        listAccessLists(),
-        listMtlsRoles().catch(() => []),
-        listIssuedClientCertificates().catch(() => []),
-        listWafPresets(),
-      ]);
+    const [
+      certificates,
+      caCertificates,
+      accessLists,
+      mtlsRoles,
+      issuedClientCerts,
+      wafPresets,
+      crsPlugins,
+    ] = await Promise.all([
+      listCertificates(),
+      listCaCertificates(),
+      listAccessLists(),
+      listMtlsRoles().catch(() => []),
+      listIssuedClientCertificates().catch(() => []),
+      listWafPresets(),
+      listCrsPlugins(),
+    ]);
     dashboardOptions = {
       view: dashboardHostFormView(dashboardSettings.options),
       certificates: certificates.map(toCertificatePickerOption),
@@ -186,6 +195,7 @@ export default async function SettingsSectionPage({
       mtlsRoles,
       issuedClientCerts,
       wafPresets: wafPresets.map(toWafPresetOption),
+      wafPlugins: crsPlugins.map(toCrsPluginOption),
       authentikDefaults: authentik,
       forwardAuthDefaults: forwardAuth,
       agents: agentOptions,

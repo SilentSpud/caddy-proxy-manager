@@ -270,6 +270,109 @@ export function normalizeWafPresetIds(value: unknown): number[] {
   ];
 }
 
+/** Same shape as preset ids; plugins are emitted in this order within each CRS slot. */
+export const normalizeWafPluginIds = normalizeWafPresetIds;
+
+// ---------------------------------------------------------------------------
+// CRS plugins
+// ---------------------------------------------------------------------------
+
+/** An installed CRS plugin's three files, as the builder emits them. */
+export type CrsPluginRules = { config: string; before: string; after: string };
+
+/**
+ * Why a CRS plugin file cannot be loaded. A code for the same reason the custom-directive ones are:
+ * the sentence lives in the catalog.
+ */
+export type CrsPluginRejectionReason =
+  | "crsPluginDirectiveNotAllowed"
+  | "crsPluginNeedsFile"
+  | "crsPluginCtlRuleEngine"
+  | "crsPluginRuleIdOutOfRange"
+  | "crsPluginPersistentCollection"
+  | "crsPluginUnbalancedQuotes"
+  | "crsPluginUnterminated";
+
+export type CrsPluginRejection = { line: string; reason: CrsPluginRejectionReason };
+
+/**
+ * What a plugin may contain. Wider than the custom-directive allowlist, because rewriting CRS
+ * rules' targets from an -after file is what an exclusion plugin is for; every registered plugin
+ * uses only SecRule, SecAction, SecMarker and SecRuleUpdateTargetById.
+ */
+const PLUGIN_DIRECTIVE_PREFIXES = [
+  /^SecRule\s/,
+  /^SecAction\s/,
+  /^SecMarker\s/,
+  /^SecRuleRemoveBy(?:Id|Tag)\s/,
+  /^SecRuleUpdateTargetBy(?:Id|Tag)\s/,
+];
+
+/** Operators that read a file next to the rule, which an inlined plugin does not have. */
+const FILE_OPERATOR = /@(?:inspectFile|pmFromFile|pmf|ipMatchFromFile|ipMatchF|geoLookup)\b/i;
+
+/**
+ * ModSecurity's persistent collections - read as a variable, written by setvar, or opened by
+ * initcol. Coraza refuses to compile the rule, as dos-protection-modsecurity shows.
+ */
+const PERSISTENT_COLLECTION =
+  /^SecRule\s+(?:\S*\|)?[!&]*(?:IP|SESSION|USER|GLOBAL|RESOURCE)(?::|\s)|setvar\s*:\s*'?(?:ip|session|user|global|resource)\.|\binitcol\s*:/i;
+
+/** Double quotes outside a backslash escape. An odd count is google-oauth2's unclosed action list. */
+function hasUnbalancedQuotes(text: string): boolean {
+  return (text.match(/(?<!\\)"/g)?.length ?? 0) % 2 === 1;
+}
+
+/** `id:123`, not `ctl:ruleRemoveById=123`: a rule's own id, the one the registry range bounds. */
+const RULE_ID = /(?:^|[\s"',])id\s*:\s*'?(\d+)/g;
+
+/**
+ * Checks one plugin file before it is stored and again before it is emitted. Coraza compiles every
+ * host's rules as Caddy loads the config, so a plugin it cannot compile takes the whole config down
+ * - which is also why the registry's range is enforced: a duplicate rule id is such a failure.
+ */
+export function findCrsPluginRejections(
+  raw: string,
+  range: { start: number; end: number },
+): CrsPluginRejection[] {
+  const rejections: CrsPluginRejection[] = [];
+  for (const { text, lines } of seclangDirectives(raw.replace(/\r\n?/g, "\n"))) {
+    if (text === "") continue;
+    if (text === null) {
+      rejections.push({ line: lines.join("\n").trim(), reason: "crsPluginUnterminated" });
+      continue;
+    }
+    if (!PLUGIN_DIRECTIVE_PREFIXES.some((pattern) => pattern.test(text))) {
+      rejections.push({ line: text, reason: "crsPluginDirectiveNotAllowed" });
+      continue;
+    }
+    if (FILE_OPERATOR.test(text)) {
+      rejections.push({ line: text, reason: "crsPluginNeedsFile" });
+      continue;
+    }
+    if (/ctl\s*:\s*ruleEngine/i.test(text)) {
+      rejections.push({ line: text, reason: "crsPluginCtlRuleEngine" });
+      continue;
+    }
+    if (PERSISTENT_COLLECTION.test(text)) {
+      rejections.push({ line: text, reason: "crsPluginPersistentCollection" });
+      continue;
+    }
+    if (hasUnbalancedQuotes(text)) {
+      rejections.push({ line: text, reason: "crsPluginUnbalancedQuotes" });
+      continue;
+    }
+    for (const match of text.matchAll(RULE_ID)) {
+      const id = Number(match[1]);
+      if (id < range.start || id > range.end) {
+        rejections.push({ line: text, reason: "crsPluginRuleIdOutOfRange" });
+        break;
+      }
+    }
+  }
+  return rejections;
+}
+
 /**
  * Effective WAF settings for a host: null host → global as-is; `enabled === false` → opt out;
  * `waf_mode === "override"` → host only; `"merge"` (default) → host over global.
@@ -293,6 +396,7 @@ export function resolveEffectiveWaf(
       custom_directives: host.custom_directives ?? "",
       excluded_rule_ids: host.excluded_rule_ids,
       preset_ids: host.preset_ids,
+      plugin_ids: host.plugin_ids,
       request_body_limit: host.request_body_limit,
       request_body_in_memory_limit: host.request_body_in_memory_limit,
       request_body_limit_action: host.request_body_limit_action,
@@ -312,6 +416,7 @@ export function resolveEffectiveWaf(
         .join("\n"),
       excluded_rule_ids: [...(global.excluded_rule_ids ?? []), ...(host.excluded_rule_ids ?? [])],
       preset_ids: [...new Set([...(global.preset_ids ?? []), ...(host.preset_ids ?? [])])],
+      plugin_ids: [...new Set([...(global.plugin_ids ?? []), ...(host.plugin_ids ?? [])])],
       // Body limits are scalars, not lists: the host value wins when set,
       // otherwise the global one applies.
       request_body_limit: host.request_body_limit ?? global.request_body_limit,
@@ -329,6 +434,7 @@ export function resolveEffectiveWaf(
       custom_directives: host.custom_directives ?? "",
       excluded_rule_ids: host.excluded_rule_ids,
       preset_ids: host.preset_ids,
+      plugin_ids: host.plugin_ids,
       request_body_limit: host.request_body_limit,
       request_body_in_memory_limit: host.request_body_in_memory_limit,
       request_body_limit_action: host.request_body_limit_action,
@@ -354,6 +460,7 @@ export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
 export function buildWafHandler(
   waf: WafSettings,
   presets: ReadonlyMap<number, string> = new Map(),
+  plugins: ReadonlyMap<number, CrsPluginRules> = new Map(),
 ): Record<string, unknown> {
   const parts: string[] = [];
 
@@ -368,7 +475,19 @@ export function buildWafHandler(
     parts.push("Include @coraza.conf-recommended", "Include @crs-setup.conf.example");
   }
 
-  // Where CRS 4 loads a plugin's -before file: after crs-setup, ahead of the rules. A runtime
+  // CRS 4's plugin order: every -config, then every -before, the rules, then every -after. Plugins
+  // tune and exclude CRS rules, so without the CRS they are left out. An unknown id is a plugin
+  // uninstalled under a stale selection, and emits nothing.
+  const selectedPlugins = waf.load_owasp_crs
+    ? [...new Set(waf.plugin_ids ?? [])].flatMap((id) => plugins.get(id) ?? [])
+    : [];
+  const pluginPart = (file: keyof CrsPluginRules) => {
+    for (const plugin of selectedPlugins) if (plugin[file].trim()) parts.push(plugin[file].trim());
+  };
+  pluginPart("config");
+  pluginPart("before");
+
+  // Presets sit with the plugins' -before files: after crs-setup, ahead of the rules. A runtime
   // exclusion (ctl:ruleRemove*) only works on rules that have not run yet. An unknown id is a
   // preset deleted under a stale selection, and emits nothing.
   for (const id of new Set(waf.preset_ids ?? [])) {
@@ -377,6 +496,7 @@ export function buildWafHandler(
   }
 
   if (waf.load_owasp_crs) parts.push("Include @owasp_crs/*.conf");
+  pluginPart("after");
 
   // Runtime-validate excluded_rule_ids are positive integers
   if (waf.excluded_rule_ids?.length) {
@@ -499,8 +619,9 @@ export function buildWafHandlerEntry(
   waf: WafSettings,
   allowWebsocket = false,
   presets: ReadonlyMap<number, string> = new Map(),
+  plugins: ReadonlyMap<number, CrsPluginRules> = new Map(),
 ): Record<string, unknown> {
-  const wafHandler = buildWafHandler(waf, presets);
+  const wafHandler = buildWafHandler(waf, presets, plugins);
   if (!allowWebsocket) return wafHandler;
   return {
     handler: "subroute",

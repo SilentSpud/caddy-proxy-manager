@@ -237,7 +237,7 @@ from inside the image - the runtime has no shell HTTP client to call instead.
 - **Location Rules** - Path-based routing to different upstreams per proxy host (e.g. `/api/*` to one backend, `/ws/*` to another)
 - **Redirect & Rewrite** - Per-host redirect rules (301/302/307/308) and path prefix rewriting
 - **Forward Auth Portal** - Built-in identity provider for protecting proxy hosts without an external IdP. Credential and OAuth login portal, user groups with membership management, per-host access control by user or group, and excluded paths that bypass authentication
-- **WAF** - Web Application Firewall powered by Coraza with optional OWASP Core Rule Set (SQLi, XSS, LFI, RCE). Per-host enable/disable, global and per-host rule suppression, custom SecLang directives, and a searchable event log with severity and blocked/detected classification
+- **WAF** - Web Application Firewall powered by Coraza with optional OWASP Core Rule Set (SQLi, XSS, LFI, RCE). Per-host enable/disable, global and per-host rule suppression, plugins from the CRS plugin registry, custom SecLang directives, and a searchable event log with severity and blocked/detected classification
 - **Analytics** - Live traffic charts, protocol breakdown, country map, top user agents, and blocked request log with configurable time ranges
 - **Geo Blocking** - Block or allow traffic by country, continent, ASN, CIDR range, or exact IP per proxy host. Allow rules override block rules. Fail-closed mode, custom response codes/bodies, and trusted proxy support
 - **Access Lists** - Multi-account HTTP basic auth protection (bcrypt-hashed) assignable per proxy host
@@ -900,6 +900,8 @@ Enable globally in **WAF → Settings**, then optionally override per proxy host
 **OWASP CRS** covers SQLi, XSS, LFI, RCE, and more (enabled by default when WAF is on).
 
 **Rule suppression** - suppress noisy rules globally or per host from the event detail drawer or the Suppressed Rules tab.
+
+**CRS plugins** - install plugins from the [OWASP CRS plugin registry](https://github.com/coreruleset/plugin-registry), or registries of your own, under **WAF → Plugins**, then select them globally or per host. The registries are re-read on a schedule and every plugin checked, so ones Caddy cannot load (Lua scripts, data files, ModSecurity-only rules) are marked unsupported before anyone tries. The controller fetches from GitHub, so it needs outbound HTTPS to `api.github.com` and `raw.githubusercontent.com`; an optional GitHub token raises the API rate limit.
 
 **Custom directives** - any ModSecurity SecLang syntax is accepted, e.g.:
 

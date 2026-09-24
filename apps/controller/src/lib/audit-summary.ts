@@ -57,6 +57,44 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   ...lifecycle("group", "group", "group"),
   ...lifecycle("waf_preset", "WAF preset", "wafPreset"),
 
+  // models/crs-plugins.ts
+  {
+    entityType: "crs_plugin",
+    action: "create",
+    message: "crsPluginInstalled",
+    pattern: /^Installed CRS plugin (?<name>\S+) (?<version>.+)$/s,
+  },
+  {
+    entityType: "crs_plugin",
+    action: "update",
+    message: "crsPluginUpdated",
+    pattern: /^Updated CRS plugin (?<name>\S+) to (?<version>.+)$/s,
+  },
+  {
+    entityType: "crs_plugin",
+    action: "update",
+    message: "crsPluginConfigured",
+    pattern: /^Configured CRS plugin (?<name>.+)$/s,
+  },
+  {
+    entityType: "crs_plugin",
+    action: "update",
+    message: "crsPluginDisabled",
+    pattern: /^Disabled CRS plugin (?<name>\S+): Caddy refused to load it$/s,
+  },
+  {
+    entityType: "crs_plugin",
+    action: "update",
+    message: "crsPluginReenabled",
+    pattern: /^Re-enabled CRS plugin (?<name>.+)$/s,
+  },
+  {
+    entityType: "crs_plugin",
+    action: "delete",
+    message: "crsPluginUninstalled",
+    pattern: /^Uninstalled CRS plugin (?<name>.+)$/s,
+  },
+
   // users/actions.ts
   {
     entityType: "user",

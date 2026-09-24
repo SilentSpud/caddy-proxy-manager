@@ -1,0 +1,1 @@
+ALTER TABLE `crs_plugins` ADD `fileNames` text DEFAULT '[]' NOT NULL;

@@ -15,7 +15,11 @@ import {
   type DashboardHostSettings,
   checkDashboardDns,
 } from "@/src/lib/dashboard-host";
-import { normalizeWafPresetIds, parseBodyLimitMib } from "@/src/lib/caddy-waf";
+import {
+  normalizeWafPluginIds,
+  normalizeWafPresetIds,
+  parseBodyLimitMib,
+} from "@/src/lib/caddy-waf";
 import { parseDefaultResponseHeaders } from "@/src/lib/caddy-default-response";
 import {
   getSetting,
@@ -53,6 +57,7 @@ import {
 } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import { assertWafPresetIdsExist } from "@/src/lib/models/waf-presets";
+import { assertCrsPluginIdsExist } from "@/src/lib/models/crs-plugins";
 import { CADDY_MODULES, type CaddyCustomModule } from "@/src/lib/caddy-modules";
 import {
   applyCaddyBuild,
@@ -1751,6 +1756,12 @@ async function updateWafSettingsActionUnlocked(
         ? normalizeWafPresetIds(JSON.parse(rawPresets))
         : ((await getWafSettings())?.preset_ids ?? []);
     await assertWafPresetIdsExist(preset_ids);
+    const rawPlugins = formData.get("wafPluginIds");
+    const plugin_ids =
+      typeof rawPlugins === "string"
+        ? normalizeWafPluginIds(JSON.parse(rawPlugins))
+        : ((await getWafSettings())?.plugin_ids ?? []);
+    await assertCrsPluginIdsExist(plugin_ids);
 
     const requestBodyLimit = parseBodyLimitMib(
       formData.get("wafRequestBodyLimitMb"),
@@ -1781,6 +1792,7 @@ async function updateWafSettingsActionUnlocked(
       custom_directives: customDirectives,
       excluded_rule_ids,
       ...(preset_ids.length > 0 ? { preset_ids } : {}),
+      ...(plugin_ids.length > 0 ? { plugin_ids } : {}),
       ...(requestBodyLimit !== undefined ? { request_body_limit: requestBodyLimit } : {}),
       ...(requestBodyInMemoryLimit !== undefined
         ? { request_body_in_memory_limit: requestBodyInMemoryLimit }

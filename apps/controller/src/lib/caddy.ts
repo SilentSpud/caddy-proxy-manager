@@ -105,7 +105,9 @@ import {
 import { buildRoleMaps } from "./models/mtls-roles";
 import { getAccessRulesForHosts } from "./models/mtls-access-rules";
 import { getWafPresetDirectives } from "./models/waf-presets";
-import { buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
+import { getCrsPluginRules } from "./models/crs-plugins";
+import { loadWithCrsPluginRecovery } from "./crs-plugins/recovery";
+import { type CrsPluginRules, buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
 import {
   type CaddyModuleAvailability,
@@ -116,7 +118,12 @@ import {
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { FORWARD_AUTH_PROXY_PROOF_HEADER, getForwardAuthProxyProof } from "./forward-auth-trust";
 import { decryptSecret } from "./secret";
-import { CaddyApplyError, describeCaddyRejection, logCaddyApplyFailure } from "./caddy-apply-error";
+import {
+  CaddyApplyError,
+  describeCaddyRejection,
+  describeWafRejection,
+  logCaddyApplyFailure,
+} from "./caddy-apply-error";
 import { currentStagingScope } from "./settings/staging-context";
 
 const CERTS_DIR = process.env.CERTS_DIRECTORY || join(process.cwd(), "data", "certs");
@@ -971,6 +978,8 @@ type CaddyBuildContext = {
   globalWaf?: WafSettings | null;
   /** waf_presets id -> directives. */
   wafPresets?: ReadonlyMap<number, string>;
+  /** crs_plugins id -> rule files. */
+  crsPlugins?: ReadonlyMap<number, CrsPluginRules>;
   /**
    * Which plugin-backed features the running binary can serve. Caddy validates a posted config as a
    * whole, so one handler naming an uncompiled module takes every host offline.
@@ -1538,7 +1547,12 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     const effectiveWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
     if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off" && wafUsable) {
       handlers.unshift(
-        buildWafHandlerEntry(effectiveWaf, Boolean(row.allowWebsocket), context.wafPresets),
+        buildWafHandlerEntry(
+          effectiveWaf,
+          Boolean(row.allowWebsocket),
+          context.wafPresets,
+          context.crsPlugins,
+        ),
       );
     }
 
@@ -3297,6 +3311,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     globalGeoBlock,
     globalWaf,
     wafPresets,
+    crsPluginRules,
     trustedProxiesSettings,
     moduleAvailability,
     defaultResponseSettings,
@@ -3314,6 +3329,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     getGeoBlockSettings(),
     getWafSettings(),
     getWafPresetDirectives(),
+    getCrsPluginRules(),
     getTrustedProxiesSettings(),
     getCaddyModuleAvailability(agentRowId),
     getDefaultResponseSettings(),
@@ -3388,6 +3404,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     globalGeoBlock: effectiveGlobalGeoBlock,
     globalWaf,
     wafPresets,
+    crsPlugins: crsPluginRules,
     moduleAvailability,
     tailscale: tailscaleRuntime,
     adaptVia: options.adaptVia,
@@ -3596,6 +3613,7 @@ function assertCaddyAccepted(response: { status: number; text: string }, who: st
       ? `Caddy rejected configuration${where}: ${reason}`
       : `Caddy rejected configuration${where}`,
     "CADDY_REJECTED",
+    describeWafRejection(response.text),
   );
 }
 
@@ -3667,7 +3685,11 @@ export async function applyCaddyConfig() {
   if (currentStagingScope()?.suppressApply) {
     return;
   }
+  // A CRS plugin Coraza will not build is switched off rather than left to fail every apply.
+  await loadWithCrsPluginRecovery(loadEveryAgent);
+}
 
+async function loadEveryAgent(): Promise<void> {
   const { broadcastCaddyAdmin, listAgentTargets } = await import("./agent/client");
   const targets = await listAgentTargets();
 
@@ -3746,7 +3768,7 @@ export async function applyCaddyConfigToAgent(agent: {
   name: string;
 }): Promise<void> {
   if (currentStagingScope()?.suppressApply) return;
-  await loadOne(agent, agent.name);
+  await loadWithCrsPluginRecovery(() => loadOne(agent, agent.name));
 }
 
 /**

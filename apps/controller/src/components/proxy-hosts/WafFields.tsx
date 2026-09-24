@@ -15,6 +15,7 @@ import type { WafHostConfig } from "@/lib/models/proxy-hosts";
 import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/lib/caddy-waf";
 import { WafRuleExclusions } from "./WafRuleExclusions";
 import { WafPresetPicker } from "./WafPresetPicker";
+import { WafPluginPicker } from "./WafPluginPicker";
 import { WafQuickTemplates } from "./WafQuickTemplates";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { CodeEditor } from "@/components/ui/CodeEditor";
@@ -49,6 +50,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
   const [loadCrs, setLoadCrs] = useState(value?.load_owasp_crs ?? true);
   const [customDirectives, setCustomDirectives] = useState(value?.custom_directives ?? "");
   const [presetIds, setPresetIds] = useState<number[]>(value?.preset_ids ?? []);
+  const [pluginIds, setPluginIds] = useState<number[]>(value?.plugin_ids ?? []);
   const [bodyLimitMb, setBodyLimitMb] = useState(bodyLimitMib(value?.request_body_limit));
   const [inMemoryLimitMb, setInMemoryLimitMb] = useState(
     bodyLimitMib(value?.request_body_in_memory_limit),
@@ -72,6 +74,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
       <input type="hidden" name="wafLoadOwaspCrs" value={loadCrs ? "on" : ""} />
       <input type="hidden" name="wafCustomDirectives" value={customDirectives} />
       <input type="hidden" name="wafPresetIds" value={JSON.stringify(presetIds)} />
+      <input type="hidden" name="wafPluginIds" value={JSON.stringify(pluginIds)} />
       <input type="hidden" name="wafRequestBodyLimitMb" value={bodyLimitMb ?? ""} />
       <input type="hidden" name="wafRequestBodyInMemoryLimitMb" value={inMemoryLimitMb ?? ""} />
       <input
@@ -219,6 +222,15 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               onChange={setPresetIds}
               description={
                 wafMode === "override" ? t("wafPresetsHelpOverride") : t("wafPresetsHelpMerge")
+              }
+            />
+
+            <WafPluginPicker
+              value={pluginIds}
+              onChange={setPluginIds}
+              crsLoaded={loadCrs}
+              description={
+                wafMode === "override" ? t("wafPluginsHelpOverride") : t("wafPluginsHelpMerge")
               }
             />
 
