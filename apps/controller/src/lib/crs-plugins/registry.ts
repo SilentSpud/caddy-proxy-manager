@@ -69,6 +69,8 @@ const KNOWN_UNSUPPORTED: Readonly<Record<string, CrsUnsupportedReason>> = {
 export type CrsPluginRelease = {
   version: string;
   description: string | null;
+  /** The plugins/ rule files the release shipped, sorted. */
+  fileNames: string[];
   configRules: string;
   beforeRules: string;
   afterRules: string;
@@ -303,6 +305,7 @@ export async function fetchCrsPluginRelease(
   const release: CrsPluginRelease = {
     version,
     description: descriptor.description,
+    fileNames: files,
     configRules: rules.config.join("\n"),
     beforeRules: rules.before.join("\n"),
     afterRules: rules.after.join("\n"),

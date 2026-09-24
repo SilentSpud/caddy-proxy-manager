@@ -30,6 +30,8 @@ export type CrsPlugin = {
   afterRules: string;
   /** The operator's -config file, or null while the upstream one runs. */
   configOverride: string | null;
+  /** The plugins/ rule files the installed release shipped. */
+  fileNames: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -42,6 +44,15 @@ export type CrsPluginUsage = {
 };
 
 type PluginRow = typeof crsPlugins.$inferSelect;
+
+function parseFileNames(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((name) => typeof name === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 function toCrsPlugin(row: PluginRow): CrsPlugin {
   return {
@@ -56,6 +67,7 @@ function toCrsPlugin(row: PluginRow): CrsPlugin {
     beforeRules: row.beforeRules,
     afterRules: row.afterRules,
     configOverride: row.configOverride,
+    fileNames: parseFileNames(row.fileNames),
     createdAt: toIso(row.createdAt)!,
     updatedAt: toIso(row.updatedAt)!,
   };
@@ -206,6 +218,7 @@ export async function installCrsPlugin(
       beforeRules: release.beforeRules,
       afterRules: release.afterRules,
       configOverride: null,
+      fileNames: JSON.stringify(release.fileNames),
       createdBy: actorUserId,
       createdAt: now,
       updatedAt: now,
@@ -257,6 +270,7 @@ export async function updateCrsPlugin(
       configRules: release.configRules,
       beforeRules: release.beforeRules,
       afterRules: release.afterRules,
+      fileNames: JSON.stringify(release.fileNames),
       updatedAt: nowIso(),
     })
     .where(eq(crsPlugins.id, id))

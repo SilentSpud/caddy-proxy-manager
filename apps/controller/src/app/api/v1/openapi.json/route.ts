@@ -3304,6 +3304,11 @@ const spec = {
           beforeRules: { type: "string" },
           afterRules: { type: "string" },
           configOverride: { type: ["string", "null"] },
+          fileNames: {
+            type: "array",
+            items: { type: "string" },
+            description: "The plugins/ rule files the installed release shipped",
+          },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },

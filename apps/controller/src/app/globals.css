@@ -115,6 +115,21 @@
     box-shadow: 0 0 0 1px var(--color-border-pink);
   }
 
+  /* A flush editor has no border to colour, and the pane around it clips an outer ring. An
+     outline paints above the frame's children, so the scrollbar cannot cover it. */
+  .cpm-code-editor[data-flush]:focus-within {
+    box-shadow: none;
+    outline: 1px solid var(--color-border-pink);
+    outline-offset: -1px;
+  }
+
+  /* Clear of the native scrollbar, whose width CodeEditor measures onto its frame. */
+  .cpm-code-editor-overlay {
+    position: absolute;
+    right: calc(var(--cpm-scrollbar-gutter) + var(--spacing-2));
+    bottom: var(--spacing-3);
+  }
+
   /**
    * A field whose value has been typed but not saved yet.
    *

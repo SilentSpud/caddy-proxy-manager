@@ -18,11 +18,15 @@
 import {
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+  useEffect,
   useId,
   useInsertionEffect,
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import { Field } from "@astryxdesign/core/Field";
 import { HStack } from "@astryxdesign/core/Stack";
@@ -74,7 +78,34 @@ export type CodeEditorProps = {
   isReadOnly?: boolean;
   isDisabled?: boolean;
   height?: keyof typeof HEIGHTS;
+  /** For an editor whose name is already on screen; the label stays for screen readers. */
+  isLabelHidden?: boolean;
+  /** No border or rounding, for an editor filling a pane whose own dividers frame it. */
+  isFlush?: boolean;
+  /** Drops the keyboard hint and language line under the editor. */
+  isFooterHidden?: boolean;
+  /** Floats over the editor's bottom corner, clear of the scrollbar: a Save button, say. */
+  overlay?: ReactNode;
 };
+
+/**
+ * The scroller's native scrollbar width, which differs by platform and is 0 where scrollbars
+ * overlay. Floated content (the `overlay` prop) is kept that far in from the right edge.
+ */
+function useScrollbarWidth(scroller: RefObject<HTMLDivElement | null>): number {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const measure = () => setWidth(el.offsetWidth - el.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => observer.disconnect();
+  }, [scroller]);
+  return width;
+}
 
 /** One line of the highlighted layer: its number, then its text split at the token boundaries. */
 function Line({
@@ -141,6 +172,10 @@ export function CodeEditor({
   isReadOnly,
   isDisabled,
   height = "md",
+  isLabelHidden,
+  isFlush,
+  isFooterHidden,
+  overlay,
 }: CodeEditorProps) {
   const t = useTranslations("ui");
   const inputID = useId();
@@ -168,6 +203,8 @@ export function CodeEditor({
    */
   const pendingCaret = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const scrollbarWidth = useScrollbarWidth(scrollerRef);
 
   useLayoutEffect(() => {
     const caret = pendingCaret.current;
@@ -195,6 +232,7 @@ export function CodeEditor({
   return (
     <Field
       label={label}
+      isLabelHidden={isLabelHidden}
       description={description}
       inputID={inputID}
       descriptionID={description ? descriptionID : undefined}
@@ -204,106 +242,120 @@ export function CodeEditor({
           matching native control behaviour. */}
       {htmlName && !isDisabled && <input type="hidden" name={htmlName} value={value} />}
 
+      {/* The frame holds the border and the focus ring; the scroller inside it moves the text, so
+          its scrollbar cannot paint over the ring. */}
       <div
         className="cpm-code-editor"
+        data-flush={isFlush ? "" : undefined}
         style={{
           position: "relative",
           height: `${HEIGHTS[height]}px`,
-          overflow: "auto",
           background: "var(--color-syntax-background)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-element)",
+          border: isFlush ? 0 : "1px solid var(--color-border)",
+          borderRadius: isFlush ? 0 : "var(--radius-element)",
+          overflow: "hidden",
           opacity: isDisabled ? 0.6 : 1,
+          // Read by .cpm-code-editor-overlay to keep floated content off the scrollbar.
+          ["--cpm-scrollbar-gutter" as string]: `${scrollbarWidth}px`,
         }}
       >
-        <div style={{ position: "relative", minHeight: "100%" }}>
-          {/* The gutter's separator, as tall as the content rather than the viewport so it scrolls
+        <div
+          ref={scrollerRef}
+          className="cpm-code-editor-scroller"
+          style={{ height: "100%", overflow: "auto" }}
+        >
+          <div style={{ position: "relative", minHeight: "100%" }}>
+            {/* The gutter's separator, as tall as the content rather than the viewport so it scrolls
               with the numbers. Halfway between the numbers' right edge and the text. */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              top: 0,
-              bottom: 0,
-              left: 0,
-              width: `${GUTTER - PAD_X / 2}px`,
-              borderRight: "1px solid var(--color-border)",
-              pointerEvents: "none",
-            }}
-          />
-          <pre
-            aria-hidden="true"
-            // A page translator would otherwise rewrite the directives in place, and the reader
-            // would copy a Caddyfile that no longer parses.
-            translate="no"
-            style={{ ...textLayer, color: "var(--color-text-primary)", pointerEvents: "none" }}
-          >
-            {/* The theme gives `code` its own font and a line-height of its own, which would put
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: `${GUTTER - PAD_X / 2}px`,
+                borderRight: "1px solid var(--color-border)",
+                pointerEvents: "none",
+              }}
+            />
+            <pre
+              aria-hidden="true"
+              // A page translator would otherwise rewrite the directives in place, and the reader
+              // would copy a Caddyfile that no longer parses.
+              translate="no"
+              style={{ ...textLayer, color: "var(--color-text-primary)", pointerEvents: "none" }}
+            >
+              {/* The theme gives `code` its own font and a line-height of its own, which would put
                 every line 2px out of step with the textarea. Take the <pre>'s instead. */}
-            <code style={{ display: "block", font: "inherit", lineHeight: "inherit" }}>
-              {lines.map((line, index) => (
-                <Line
-                  // A line has no identity beyond its position: inserting one really does
-                  // renumber every line after it, which is what an index key describes. Nothing
-                  // here holds state for React to move to the wrong row.
-                  // biome-ignore lint/suspicious/noArrayIndexKey: see above
-                  key={index}
-                  text={line}
-                  tokens={showsPlaceholder ? [] : (tokenLines[index] ?? [])}
-                  number={index + 1}
-                  isPlaceholder={showsPlaceholder}
-                />
-              ))}
-            </code>
-          </pre>
+              <code style={{ display: "block", font: "inherit", lineHeight: "inherit" }}>
+                {lines.map((line, index) => (
+                  <Line
+                    // A line has no identity beyond its position: inserting one really does
+                    // renumber every line after it, which is what an index key describes. Nothing
+                    // here holds state for React to move to the wrong row.
+                    // biome-ignore lint/suspicious/noArrayIndexKey: see above
+                    key={index}
+                    text={line}
+                    tokens={showsPlaceholder ? [] : (tokenLines[index] ?? [])}
+                    number={index + 1}
+                    isPlaceholder={showsPlaceholder}
+                  />
+                ))}
+              </code>
+            </pre>
 
-          <textarea
-            ref={textareaRef}
-            id={inputID}
-            aria-describedby={description ? descriptionID : undefined}
-            // Only while Tab is actually being taken; a read-only field never takes it.
-            aria-keyshortcuts={readOnly ? undefined : "Tab Escape"}
-            value={value}
-            onChange={(event) => onChange?.(event.target.value)}
-            onKeyDown={readOnly ? undefined : handleKeyDown}
-            readOnly={readOnly}
-            disabled={isDisabled}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            autoComplete="off"
-            // Grammarly and friends inject their own overlay into a textarea, which lands between
-            // these two layers and pushes the text off its highlighting.
-            data-gramm="false"
-            style={{
-              ...textLayer,
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              resize: "none",
-              outline: "none",
-              background: "transparent",
-              // The glyphs the reader sees are the ones in the <pre> underneath; this layer
-              // contributes the caret, the selection and the events.
-              color: "transparent",
-              caretColor: "var(--color-text-primary)",
-              overflow: "hidden",
-            }}
-          />
+            <textarea
+              ref={textareaRef}
+              id={inputID}
+              aria-describedby={description ? descriptionID : undefined}
+              // Only while Tab is actually being taken; a read-only field never takes it.
+              aria-keyshortcuts={readOnly ? undefined : "Tab Escape"}
+              value={value}
+              onChange={(event) => onChange?.(event.target.value)}
+              onKeyDown={readOnly ? undefined : handleKeyDown}
+              readOnly={readOnly}
+              disabled={isDisabled}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+              // Grammarly and friends inject their own overlay into a textarea, which lands between
+              // these two layers and pushes the text off its highlighting.
+              data-gramm="false"
+              style={{
+                ...textLayer,
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                resize: "none",
+                outline: "none",
+                background: "transparent",
+                // The glyphs the reader sees are the ones in the <pre> underneath; this layer
+                // contributes the caret, the selection and the events.
+                color: "transparent",
+                caretColor: "var(--color-text-primary)",
+                overflow: "hidden",
+              }}
+            />
+          </div>
         </div>
+        {overlay && <div className="cpm-code-editor-overlay">{overlay}</div>}
       </div>
 
       {/* The keyboard hint is what makes Tab-to-indent discoverable, so it says so in the open
           rather than only through `aria-keyshortcuts`. */}
-      <HStack justify="between" gap={2}>
-        <Text type="body" size="xsm" color="secondary">
-          {readOnly ? "" : t("codeEditor.keyboardHint")}
-        </Text>
-        <Text type="body" size="xsm" color="secondary">
-          {language === "plaintext" ? t("codeEditor.plaintextLabel") : LANGUAGE_LABELS[language]}
-        </Text>
-      </HStack>
+      {!isFooterHidden && (
+        <HStack justify="between" gap={2}>
+          <Text type="body" size="xsm" color="secondary">
+            {readOnly ? "" : t("codeEditor.keyboardHint")}
+          </Text>
+          <Text type="body" size="xsm" color="secondary">
+            {language === "plaintext" ? t("codeEditor.plaintextLabel") : LANGUAGE_LABELS[language]}
+          </Text>
+        </HStack>
+      )}
     </Field>
   );
 }

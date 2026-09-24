@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useCallback, useState } from "react";
+import { type MouseEvent, type ReactNode, useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight } from "lucide-react";
 import {
@@ -10,6 +10,7 @@ import {
   useTableRowExpansion,
   useTableRowStatus,
   type TableColumn,
+  type TablePlugin,
   type TableRowStatus,
 } from "@astryxdesign/core/Table";
 import { Button } from "@astryxdesign/core/Button";
@@ -56,6 +57,8 @@ type DataTableProps<T> = {
   mobileCard?: (row: T) => ReactNode;
   /** Detail panel below an expanded row; adds the chevron column. The open set is owned here. */
   expandedRow?: (row: T) => ReactNode;
+  /** With expandedRow: a click anywhere on the row toggles it, not only the chevron. */
+  expandOnRowClick?: boolean;
 };
 
 // Fixed-length placeholder lists. Keys are built once here rather than from the map index, so the
@@ -68,6 +71,23 @@ const ALIGN: Record<NonNullable<Column<unknown>["align"]>, "start" | "center" | 
   center: "center",
   right: "end",
 };
+
+/**
+ * Astryx pads the chevron's cell and the chevron's own wrapper, which together leave its 40px
+ * column no room for the 24px button: the arrow renders clipped. The cell loses its padding and
+ * the column grows to fit the wrapper's.
+ */
+const EXPANSION_COLUMN = "__expansion";
+const EXPANSION_COLUMN_WIDTH = pixel(48);
+
+/** A click that lands on a control inside the row belongs to that control, not the row. */
+function isInteractiveTarget(event: MouseEvent): boolean {
+  return (
+    (event.target as HTMLElement).closest(
+      'button, a, input, select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="menuitem"]',
+    ) !== null
+  );
+}
 
 function toColumnWidth(width: Column<unknown>["width"]) {
   if (typeof width === "number") return pixel(width);
@@ -150,6 +170,7 @@ export function DataTable<T>({
   sort,
   mobileCard,
   expandedRow,
+  expandOnRowClick = false,
 }: DataTableProps<T>) {
   const t = useTranslations("ui");
   const emptyTitle = emptyMessage ?? t("noDataAvailable");
@@ -168,21 +189,57 @@ export function DataTable<T>({
   const statusPlugin = useTableRowStatus<TableRow>({ getStatus });
 
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
-  const expansionPlugin = useTableRowExpansion<TableRow>({
+  const toggleExpanded = useCallback((key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }, []);
+  const getRowKey = useCallback((row: TableRow) => String(row[keyField as string]), [keyField]);
+  const astryxExpansion = useTableRowExpansion<TableRow>({
     expandedKeys,
-    onToggle: useCallback((key: string) => {
-      setExpandedKeys((prev) => {
-        const next = new Set(prev);
-        if (!next.delete(key)) next.add(key);
-        return next;
-      });
-    }, []),
-    getRowKey: useCallback((row: TableRow) => String(row[keyField as string]), [keyField]),
+    onToggle: toggleExpanded,
+    getRowKey,
     renderExpanded: useCallback(
       (row: TableRow) => (expandedRow ? expandedRow(row as T) : null),
       [expandedRow],
     ),
   });
+
+  const expansionPlugin = useMemo(
+    (): TablePlugin<TableRow> => ({
+      ...astryxExpansion,
+      transformColumns: (cols) =>
+        (astryxExpansion.transformColumns?.(cols) ?? cols).map((col) =>
+          col.key === EXPANSION_COLUMN ? { ...col, width: EXPANSION_COLUMN_WIDTH } : col,
+        ),
+      transformBodyCell: (props, column, ...rest) => {
+        const next = astryxExpansion.transformBodyCell?.(props, column, ...rest) ?? props;
+        if (column.key !== EXPANSION_COLUMN) return next;
+        return {
+          ...next,
+          htmlProps: { ...next.htmlProps, style: { ...next.htmlProps.style, paddingInline: 0 } },
+        };
+      },
+      transformBodyRow: (props, row, index) => {
+        const next = astryxExpansion.transformBodyRow?.(props, row, index) ?? props;
+        if (!expandOnRowClick) return next;
+        return {
+          ...next,
+          htmlProps: {
+            ...next.htmlProps,
+            style: { ...next.htmlProps.style, cursor: "pointer" },
+            onClick: (event) => {
+              next.htmlProps.onClick?.(event);
+              if (!isInteractiveTarget(event)) toggleExpanded(getRowKey(row));
+            },
+          },
+        };
+      },
+    }),
+    [astryxExpansion, expandOnRowClick, toggleExpanded, getRowKey],
+  );
 
   const plugins = {
     ...(rowStatus ? { rowStatus: statusPlugin } : {}),

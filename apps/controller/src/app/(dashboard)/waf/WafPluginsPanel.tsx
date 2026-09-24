@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MoreHorizontal, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
-import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Link } from "@astryxdesign/core/Link";
@@ -18,8 +17,6 @@ import { Token } from "@astryxdesign/core/Token";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
-import { AppDialog } from "@/components/ui/AppDialog";
-import { CodeEditor } from "@/components/ui/CodeEditor";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchField } from "@/components/ui/SearchField";
 import type { CrsRegistryEntry } from "@/lib/crs-plugins/registry";
@@ -27,10 +24,10 @@ import {
   checkCrsPluginUpdatesAction,
   installCrsPluginAction,
   listCrsRegistryAction,
-  saveCrsPluginConfigAction,
   uninstallCrsPluginAction,
   updateCrsPluginAction,
 } from "./actions";
+import { WafPluginFiles } from "./WafPluginFiles";
 
 export type WafPluginRow = {
   id: number;
@@ -41,7 +38,10 @@ export type WafPluginRow = {
   ruleIdStart: number;
   ruleIdEnd: number;
   configRules: string;
+  beforeRules: string;
+  afterRules: string;
   configOverride: string | null;
+  fileNames: string[];
   updatedAt: string;
   usedGlobally: boolean;
   usedByDashboard: boolean;
@@ -74,7 +74,6 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
   const [updates, setUpdates] = useState<Record<number, string> | null>(null);
   const [checking, setChecking] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const [configuring, setConfiguring] = useState<WafPluginRow | null>(null);
   const [uninstalling, setUninstalling] = useState<WafPluginRow | null>(null);
   const [query, setQuery] = useState("");
   const registryRows = useMemo(() => {
@@ -213,43 +212,6 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
         );
       },
     },
-    {
-      id: "actions",
-      label: t("actions"),
-      width: 64,
-      align: "right",
-      render: (row) => (
-        <DropdownMenu
-          hasChevron={false}
-          alignment="end"
-          button={{
-            variant: "ghost",
-            icon: <MoreHorizontal />,
-            label: t("pluginActions", { name: row.name }),
-            isIconOnly: true,
-            isLoading: updatingId === row.id,
-          }}
-          items={[
-            ...(updates?.[row.id]
-              ? [
-                  {
-                    id: "update",
-                    label: t("pluginUpdateTo", { version: shortVersion(updates[row.id]) }),
-                    onClick: () => void update(row),
-                  },
-                ]
-              : []),
-            { id: "configure", label: t("pluginConfigure"), onClick: () => setConfiguring(row) },
-            {
-              id: "source",
-              label: t("pluginSource"),
-              onClick: () => window.open(row.repository, "_blank", "noopener,noreferrer"),
-            },
-            { id: "uninstall", label: t("pluginUninstall"), onClick: () => setUninstalling(row) },
-          ]}
-        />
-      ),
-    },
   ];
 
   const registryColumns: Column<RegistryRow>[] = [
@@ -356,7 +318,27 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
           {plugins.length === 0 ? (
             <EmptyState title={t("pluginsEmptyTitle")} description={t("pluginsEmptyDescription")} />
           ) : (
-            <DataTable columns={installedColumns} data={plugins} keyField="id" />
+            <DataTable
+              columns={installedColumns}
+              data={plugins}
+              keyField="id"
+              expandOnRowClick
+              expandedRow={(row) => (
+                <WafPluginFiles
+                  plugin={row}
+                  update={
+                    updates?.[row.id]
+                      ? {
+                          version: shortVersion(updates[row.id]),
+                          isUpdating: updatingId === row.id,
+                          onUpdate: () => void update(row),
+                        }
+                      : null
+                  }
+                  onUninstall={() => setUninstalling(row)}
+                />
+              )}
+            />
           )}
         </VStack>
       </Card>
@@ -405,16 +387,6 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
         </VStack>
       </Card>
 
-      <WafPluginConfigDialog
-        plugin={configuring}
-        onClose={() => setConfiguring(null)}
-        onSaved={(message) => {
-          setConfiguring(null);
-          toast.success(message);
-          router.refresh();
-        }}
-      />
-
       <AlertDialog
         isOpen={uninstalling !== null}
         onOpenChange={(open) => !open && setUninstalling(null)}
@@ -435,82 +407,5 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
         }}
       />
     </VStack>
-  );
-}
-
-function WafPluginConfigDialog({
-  plugin,
-  onClose,
-  onSaved,
-}: {
-  plugin: WafPluginRow | null;
-  onClose: () => void;
-  onSaved: (message: string) => void;
-}) {
-  const t = useTranslations("waf");
-  const [config, setConfig] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!plugin) return;
-    setConfig(plugin.configOverride ?? plugin.configRules);
-    setError(null);
-  }, [plugin]);
-
-  const save = async () => {
-    if (!plugin) return;
-    setSubmitting(true);
-    try {
-      const result = await saveCrsPluginConfigAction(plugin.id, config);
-      if (result.status === "error") setError(result.message ?? null);
-      else onSaved(result.message ?? "");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const inUse = plugin && (plugin.usedGlobally || plugin.usedByDashboard || plugin.hostCount > 0);
-
-  return (
-    <AppDialog
-      open={plugin !== null}
-      onClose={onClose}
-      title={plugin ? t("pluginConfigureNamed", { name: plugin.name }) : ""}
-      maxWidth="lg"
-      submitLabel={t("save")}
-      isSubmitting={submitting}
-      onSubmit={() => void save()}
-    >
-      <VStack gap={3}>
-        {error && <Banner status="error" title={error} />}
-        {inUse && <Banner status="info" title={t("pluginConfigAppliesEverywhere")} />}
-        <CodeEditor
-          label={t("pluginConfigLabel")}
-          language="seclang"
-          height="md"
-          value={config}
-          onChange={setConfig}
-          description={
-            plugin
-              ? t("pluginConfigHelp", {
-                  start: plugin.ruleIdStart,
-                  end: plugin.ruleIdEnd,
-                })
-              : undefined
-          }
-        />
-        {plugin && config !== plugin.configRules && (
-          <HStack>
-            <Button
-              variant="ghost"
-              size="sm"
-              label={t("pluginConfigRestore")}
-              onClick={() => setConfig(plugin.configRules)}
-            />
-          </HStack>
-        )}
-      </VStack>
-    </AppDialog>
   );
 }

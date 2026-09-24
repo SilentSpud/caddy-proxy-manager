@@ -89,6 +89,10 @@ describe('installCrsPlugin', () => {
     });
     // CRLF from the repository is stored as LF, the way Coraza's parser reads it either way.
     expect(plugin.configRules).toBe('# enabled by default');
+    expect(plugin.fileNames).toEqual([
+      'wordpress-rule-exclusions-before.conf',
+      'wordpress-rule-exclusions-config.conf',
+    ]);
     const registry = await listCrsRegistry(github.fetcher);
     expect(registry.find((entry) => entry.name === plugin.name)?.installedId).toBe(plugin.id);
     // Nothing selects it yet.

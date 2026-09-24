@@ -447,6 +447,8 @@ export const crsPlugins = pgTable(
     afterRules: text("afterRules").notNull(),
     // The operator's edit of the -config file; null runs the upstream one. Survives an update.
     configOverride: text("configOverride"),
+    // JSON array of the plugins/ files the release had, for display; the rules are stored by kind.
+    fileNames: text("fileNames").notNull().default("[]"),
     createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
     createdAt: text("createdAt").notNull(),
     updatedAt: text("updatedAt").notNull(),
