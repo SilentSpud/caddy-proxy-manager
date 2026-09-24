@@ -529,9 +529,18 @@ export class DockerHost {
           reason: wait.timedOut ? "caddy validate did not finish in time." : tail(wait.output, 3),
         };
       }
+      const accepted = wait.output.trim() === "0";
       const logs = await run(["docker", "logs", name], { timeoutSeconds: remaining() });
-      const output = tail(logs.output, VALIDATE_TRANSCRIPT_LINES);
-      return { state: wait.output.trim() === "0" ? "accepted" : "refused", output };
+      // An acceptance is the exit code alone. A refusal is only worth reporting with Caddy's
+      // reason: without it the output would be the daemon's error, read as Caddy's.
+      if (!logs.ok && !accepted) {
+        return {
+          state: "unavailable",
+          reason: logs.timedOut ? "docker logs did not finish in time." : tail(logs.output, 3),
+        };
+      }
+      const output = logs.ok ? tail(logs.output, VALIDATE_TRANSCRIPT_LINES) : "";
+      return { state: accepted ? "accepted" : "refused", output };
     } finally {
       rmSync(local, { force: true });
       // Also after a timeout, when the container may still be running.

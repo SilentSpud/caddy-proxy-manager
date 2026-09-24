@@ -116,6 +116,26 @@ describe("validateCaddyConfig", () => {
     expect(subcommands()).toEqual(["inspect"]);
   });
 
+  it("is unavailable when a refusal's transcript cannot be read", async () => {
+    replies.wait = { exitCode: 0, stdout: "1\n" };
+    replies.logs = { exitCode: 1, stdout: "Error response from daemon: no such container" };
+    const result = await new DockerHost(loadConfig()).validateCaddyConfig("{}");
+
+    expect(result).toEqual({
+      state: "unavailable",
+      reason: "Error response from daemon: no such container",
+    });
+    expect(subcommands().at(-1)).toBe("rm");
+  });
+
+  it("still accepts on exit 0 when the transcript cannot be read", async () => {
+    replies.wait = { exitCode: 0, stdout: "0\n" };
+    replies.logs = { exitCode: 1, stdout: "Error response from daemon" };
+    const result = await new DockerHost(loadConfig()).validateCaddyConfig("{}");
+
+    expect(result).toEqual({ state: "accepted", output: "" });
+  });
+
   it("removes the container when a step fails", async () => {
     replies.start = { exitCode: 1, stdout: "cannot start" };
     const result = await new DockerHost(loadConfig()).validateCaddyConfig("{}");
