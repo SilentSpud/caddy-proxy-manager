@@ -71,7 +71,7 @@ export function StagedControls({ view }: { view: StagedView }) {
   );
 }
 
-/** Which configuration Caddy is running, and whether the last apply got there. */
+/** Which configuration Caddy is running, and whether the last apply got there. Opens the history. */
 export function RevisionPill({ staged }: { staged: StagedView }) {
   const t = useTranslations("settings");
   if (staged.currentRevision === null) {
@@ -83,10 +83,12 @@ export function RevisionPill({ staged }: { staged: StagedView }) {
   }
   const latest = staged.revisions[0];
   return (
-    <Badge
-      variant={latest?.outcome === "failed" ? "error" : "success"}
-      label={t("revisionPill", { id: staged.currentRevision })}
-    />
+    <Link href="/settings/history" aria-label={t("history.viewAll")}>
+      <Badge
+        variant={latest?.outcome === "failed" ? "error" : "success"}
+        label={t("revisionPill", { id: staged.currentRevision })}
+      />
+    </Link>
   );
 }
 
@@ -193,7 +195,13 @@ function ReviewSheet({
             {view.revisions.length > 0 && (
               <>
                 <Divider />
-                <Heading level={5}>{t("reviewHistoryTitle")}</Heading>
+                <HStack gap={2} vAlign="center">
+                  <Heading level={5}>{t("reviewHistoryTitle")}</Heading>
+                  <div style={{ flexGrow: 1 }} />
+                  <Link href="/settings/history" onClick={onClose}>
+                    <Text type="supporting">{t("history.viewAll")}</Text>
+                  </Link>
+                </HStack>
                 {view.revisions.map((revision) => (
                   <HStack key={revision.id} gap={2} vAlign="center">
                     <Text type="code" size="xsm" color="secondary">
@@ -258,7 +266,7 @@ function ReviewSheet({
  * What a past apply changed, named the way the change list above names it. The stored summary is
  * the raw storage keys, so it only shows for a revision whose keys column cannot be read.
  */
-function revisionSummary(
+export function revisionSummary(
   t: ReturnType<typeof useTranslations<"settings">>,
   format: ReturnType<typeof useFormatter>,
   revision: RevisionRow,
@@ -280,7 +288,7 @@ const DIFF_BACKGROUND: Record<DiffLine["kind"], string | undefined> = {
   gap: "var(--color-background-muted)",
 };
 
-function DiffView({ lines }: { lines: DiffLine[] }) {
+export function DiffView({ lines }: { lines: DiffLine[] }) {
   const t = useTranslations("settings");
   return (
     <div

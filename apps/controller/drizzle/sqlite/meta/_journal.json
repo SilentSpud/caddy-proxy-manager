@@ -29,6 +29,13 @@
       "when": 1790198667842,
       "tag": "0003_crs_plugin_file_names",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790221148353,
+      "tag": "0004_settings_revision_changes",
+      "breakpoints": true
     }
   ]
 }

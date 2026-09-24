@@ -206,6 +206,9 @@ export const settingsStaged = sqliteTable(
  * `id` is the revision number the UI shows. `summary` is the human-readable change list rendered
  * at apply time rather than derived later: the settings it describes have moved on by then, and a
  * history that re-reads current values would narrate the present, not what happened.
+ *
+ * `changes` is each committed key's serialized value before and after, as JSON. It is what makes
+ * two revisions comparable and an old one restorable; null on rows written before it existed.
  */
 export const settingsRevisions = sqliteTable("settings_revisions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -213,6 +216,7 @@ export const settingsRevisions = sqliteTable("settings_revisions", {
   appliedByName: text("appliedByName"),
   summary: text("summary").notNull(),
   keys: text("keys").notNull(),
+  changes: text("changes"),
   outcome: text("outcome").notNull(),
   error: text("error"),
   appliedAt: text("appliedAt").notNull(),

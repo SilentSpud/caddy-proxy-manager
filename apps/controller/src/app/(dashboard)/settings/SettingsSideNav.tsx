@@ -13,7 +13,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { VStack } from "@astryxdesign/core/Stack";
-import { ArrowLeft, LayoutGrid } from "lucide-react";
+import { ArrowLeft, History, LayoutGrid } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { SETTINGS_GROUPS, settingsGroupLabel, settingsSectionName } from "./sections";
@@ -49,6 +49,13 @@ export default function SettingsSideNav({
           label={t("homeOverview")}
           icon={<LayoutGrid />}
           isSelected={pathname === "/settings"}
+        />
+        <SideNavItem
+          as={Link}
+          href="/settings/history"
+          label={t("history.navLabel")}
+          icon={<History />}
+          isSelected={pathname === "/settings/history"}
         />
       </SideNavSection>
 

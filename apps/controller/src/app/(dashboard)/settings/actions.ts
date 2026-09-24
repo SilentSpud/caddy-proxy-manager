@@ -94,6 +94,7 @@ import {
 } from "@/src/lib/settings/staging";
 import { withCapturedWrites } from "@/src/lib/settings/staging-context";
 import { applyStagedSettings } from "@/src/lib/settings/apply";
+import { stageRevisionRestore } from "@/src/lib/settings/revisions";
 import {
   ensurePairingCode,
   mintRepairCode,
@@ -2123,6 +2124,27 @@ export async function discardStagedSettingsAction(key?: string): Promise<ActionR
     return {
       success: false,
       message: extractErrorMessage(t, error, t("errors.discardStagedFailed")),
+    };
+  }
+}
+
+/** Stage the values an earlier revision had. The operator applies it through the review sheet. */
+export async function restoreRevisionAction(revision: number): Promise<ActionResult> {
+  const t = await getTranslations();
+  try {
+    const session = await requireAdmin();
+    const { staged } = await stageRevisionRestore(Number(session.user.id), revision);
+    revalidatePath("/settings", "layout");
+    return {
+      success: true,
+      staged: staged > 0,
+      message: t("settings.history.restoreStaged", { count: staged, id: revision }),
+    };
+  } catch (error) {
+    console.error("Failed to stage a revision restore:", error);
+    return {
+      success: false,
+      message: extractErrorMessage(t, error, t("errors.restoreRevisionFailed")),
     };
   }
 }

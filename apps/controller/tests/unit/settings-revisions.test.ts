@@ -36,7 +36,13 @@ vi.mock('../../src/lib/caddy', () => ({
 }));
 
 import { applyStagedSettings, recentRevisions } from '../../src/lib/settings/apply';
-import { stageWrites } from '../../src/lib/settings/staging';
+import { listStagedSettings, stageWrites } from '../../src/lib/settings/staging';
+import {
+  compareRevisions,
+  previousRevisionId,
+  revisionExists,
+  stageRevisionRestore,
+} from '../../src/lib/settings/revisions';
 import { applyCaddyConfig } from '../../src/lib/caddy';
 import { DomainError } from '../../src/lib/domain-error';
 import * as schema from '../../src/lib/db/schema';
@@ -98,5 +104,105 @@ describe('recentRevisions', () => {
     await insertRevision('geoblock', JSON.stringify({ not: 'a list' }));
     const revisions = await recentRevisions(2);
     expect(revisions.map((revision) => revision.keys)).toEqual([[], []]);
+  });
+});
+
+describe('revision version control', () => {
+  beforeEach(async () => {
+    await ctx.db.delete(schema.settingsStaged);
+    await ctx.db.delete(schema.settings);
+    await ctx.db.delete(schema.users).catch(() => {});
+    await ctx.db.insert(schema.users).values({
+      id: 1,
+      email: 'test@example.com',
+      name: 'Test User',
+      role: 'admin',
+      provider: 'credentials',
+      subject: 'test',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  });
+
+  async function apply(writes: Record<string, unknown>): Promise<number> {
+    await stageWrites(
+      1,
+      new Map(Object.entries(writes).map(([key, value]) => [key, JSON.stringify(value)])),
+    );
+    const outcome = await applyStagedSettings(1, 'Test User');
+    return outcome.revision;
+  }
+
+  it('records each key before and after, so the revision is comparable', async () => {
+    const first = await apply({ general: { defaultDomain: 'a.test' } });
+    const second = await apply({ general: { defaultDomain: 'b.test' } });
+
+    const [latest] = await recentRevisions(1);
+    expect(latest.recorded).toBe(true);
+
+    const comparison = await compareRevisions(first, second);
+    expect(comparison.keys?.map((entry) => entry.key)).toEqual(['general']);
+    const lines = comparison.keys?.[0]?.diff.lines ?? [];
+    expect(lines.some((line) => line.kind === 'removed' && line.text.includes('a.test'))).toBe(
+      true,
+    );
+    expect(lines.some((line) => line.kind === 'added' && line.text.includes('b.test'))).toBe(true);
+
+    // Backwards is the same span with its sides swapped.
+    const reversed = await compareRevisions(second, first);
+    const back = reversed.keys?.[0]?.diff.lines ?? [];
+    expect(back.some((line) => line.kind === 'added' && line.text.includes('a.test'))).toBe(true);
+  });
+
+  it('masks credentials inside a compared blob', async () => {
+    const first = await apply({ cloudflare: { apiToken: 'one' } });
+    const second = await apply({ cloudflare: { apiToken: 'two' } });
+    const comparison = await compareRevisions(first, second);
+    const text = (comparison.keys?.[0]?.diff.lines ?? []).map((line) => line.text).join('\n');
+    expect(text).not.toContain('one');
+    expect(text).not.toContain('two');
+  });
+
+  it('stages the values an earlier revision had, including clearing a key it did not have', async () => {
+    const first = await apply({ general: { defaultDomain: 'a.test' } });
+    await apply({ general: { defaultDomain: 'b.test' }, waf: { enabled: true } });
+
+    const { staged } = await stageRevisionRestore(1, first);
+    expect(staged).toBe(2);
+    const entries = new Map((await listStagedSettings(1)).map((entry) => [entry.key, entry.value]));
+    expect(JSON.parse(entries.get('general') ?? 'null')).toEqual({ defaultDomain: 'a.test' });
+    expect(entries.get('waf')).toBe('null');
+  });
+
+  it('refuses to restore across a revision without recorded values', async () => {
+    const first = await apply({ general: { defaultDomain: 'a.test' } });
+    await insertRevision('waf', JSON.stringify(['waf']));
+    await expect(stageRevisionRestore(1, first)).rejects.toMatchObject({
+      code: 'revisionNotRecorded',
+    });
+    expect((await compareRevisions(0, first + 1)).keys).toBeNull();
+  });
+
+  it('finds the revision before one across gaps in the ids, and 0 before the first', async () => {
+    const first = await apply({ general: { defaultDomain: 'a.test' } });
+    await ctx.db.insert(schema.settingsRevisions).values({
+      id: first + 5,
+      appliedBy: null,
+      appliedByName: 'Admin',
+      summary: 'waf',
+      keys: JSON.stringify(['waf']),
+      outcome: 'applied',
+      error: null,
+      appliedAt: new Date().toISOString(),
+    });
+    expect(await previousRevisionId(first + 5)).toBe(first);
+    expect(await previousRevisionId(first)).toBe(0);
+    expect(await revisionExists(first + 5)).toBe(true);
+    expect(await revisionExists(first + 1)).toBe(false);
+  });
+
+  it('refuses a revision that does not exist', async () => {
+    await expect(stageRevisionRestore(1, 99)).rejects.toMatchObject({ code: 'revisionNotFound' });
   });
 });
