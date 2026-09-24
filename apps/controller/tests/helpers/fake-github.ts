@@ -45,20 +45,34 @@ export const REGISTRY = {
   ],
 };
 
-export function fakeGithub(repos: Record<string, FakeRepo>, registry: unknown = REGISTRY) {
+/** The official registry's URL, which `fakeGithub` answers with `REGISTRY` unless told otherwise. */
+export const OFFICIAL_URL =
+  'https://raw.githubusercontent.com/coreruleset/plugin-registry/main/registry.json';
+
+/** `registries` maps a registry URL to its document; the official one defaults to `REGISTRY`. */
+export function fakeGithub(
+  repos: Record<string, FakeRepo>,
+  registries: Record<string, unknown> = { [OFFICIAL_URL]: REGISTRY },
+) {
   const requested: string[] = [];
-  const status = { rateLimited: false };
+  const headers: Record<string, Record<string, string>> = {};
+  /** Rate-limits API calls after this many succeed; Infinity never does. */
+  const status = { rateLimited: false, apiCallsLeft: Number.POSITIVE_INFINITY };
   const json = (body: unknown, code = 200) =>
     new Response(JSON.stringify(body), {
       status: code,
       headers: { 'content-type': 'application/json' },
     });
-  const fetcher: Fetcher = async (input) => {
+  const fetcher: Fetcher = async (input, init) => {
     const url = new URL(input);
     requested.push(input);
+    headers[input] = { ...(init?.headers as Record<string, string>) };
     if (status.rateLimited) return new Response('', { status: 403 });
-    if (input.endsWith('/plugin-registry/main/registry.json')) return json(registry);
+    if (input in registries) return json(registries[input]);
     const api = /^\/repos\/([^/]+\/[^/]+)\/(.+)$/.exec(url.pathname);
+    if (url.host === 'api.github.com' && status.apiCallsLeft-- <= 0) {
+      return new Response('', { status: 403 });
+    }
     if (url.host === 'api.github.com' && api) {
       const repo = repos[api[1]];
       if (!repo) return json({ message: 'Not Found' }, 404);
@@ -91,7 +105,7 @@ export function fakeGithub(repos: Record<string, FakeRepo>, registry: unknown = 
     }
     return new Response('', { status: 404 });
   };
-  return { fetcher, requested, status };
+  return { fetcher, requested, headers, status };
 }
 
 export const WORDPRESS: FakeRepo = {

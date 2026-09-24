@@ -10,9 +10,10 @@
  */
 
 import { findCrsPluginRejections } from "../caddy-waf";
-import { domainError, domainErrorMessage } from "../domain-error";
+import { DomainError, domainError, domainErrorMessage } from "../domain-error";
 
-const REGISTRY_URL =
+/** The OWASP registry; an operator may point at a registry of their own instead. */
+export const OFFICIAL_CRS_REGISTRY_URL =
   "https://raw.githubusercontent.com/coreruleset/plugin-registry/main/registry.json";
 const GITHUB_API = "https://api.github.com";
 const GITHUB_RAW = "https://raw.githubusercontent.com";
@@ -21,9 +22,6 @@ const FETCH_TIMEOUT_MS = 15_000;
 
 /** The largest registered plugin is under 100 KiB; this only stops an endless body. */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
-
-/** The registry changes a few times a year, and every page load of the tab would ask otherwise. */
-const REGISTRY_CACHE_MS = 60 * 60 * 1000;
 
 const REPOSITORY = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)\/?$/;
 const PLUGIN_FILE = /^[A-Za-z0-9._-]+-(config|before|after)\.conf$/;
@@ -40,31 +38,20 @@ export type CrsRegistryEntry = {
   license: string;
   ruleIdStart: number;
   ruleIdEnd: number;
-  /** Why the plugin is known not to install, or null. See KNOWN_UNSUPPORTED. */
-  unsupported: CrsUnsupportedReason | null;
 };
-
-export type CrsUnsupportedReason = "files" | "engine" | "compile" | "ruleIds" | "noRules";
 
 /**
- * Registry plugins install refused when every entry was tried against the shipped Caddy image on
- * 2026-09-23. Checking live would take two GitHub API calls per plugin on every listing, well past
- * the unauthenticated limit. Only a hint for the listing: install still checks the release itself.
+ * Why a registry plugin cannot be installed here, found by fetching and checking its latest
+ * release (`checkCrsPluginSupport`). Static checks only: whether Coraza actually compiles a
+ * plugin is not tested yet.
  */
-const KNOWN_UNSUPPORTED: Readonly<Record<string, CrsUnsupportedReason>> = {
-  "fake-bot": "files",
-  "false-positive-report-plugin": "files",
-  "netnea-crs-upgrading-plugin": "files",
-  "wordpress-hardening-plugin": "files",
-  antivirus: "engine",
-  "auto-decoding": "engine",
-  "body-decompress": "engine",
-  "database-logging-plugin": "engine",
-  "dos-protection-modsecurity": "compile",
-  "google-oauth2": "compile",
-  "traffic-observation-plugin": "ruleIds",
-  "machine-learning-integration-plugin": "noRules",
-};
+export type CrsUnsupportedReason =
+  | "files"
+  | "engine"
+  | "compile"
+  | "ruleIds"
+  | "noRules"
+  | "directives";
 
 export type CrsPluginRelease = {
   version: string;
@@ -108,17 +95,30 @@ export function parseCrsRegistry(json: unknown): CrsRegistryEntry[] {
       license: typeof p.license === "string" ? p.license : "",
       ruleIdStart: range!.start as number,
       ruleIdEnd: range!.end as number,
-      unsupported: Object.hasOwn(KNOWN_UNSUPPORTED, p.name) ? KNOWN_UNSUPPORTED[p.name] : null,
     });
   }
   return entries.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-let registryCache: { at: number; entries: CrsRegistryEntry[] } | null = null;
-
-/** For tests, which each bring their own registry. */
-export function resetCrsRegistryCache(): void {
-  registryCache = null;
+/**
+ * Adds the operator's GitHub token to API requests, lifting the unauthenticated limit of 60 an
+ * hour to 5,000. Never sent anywhere but api.github.com: a custom registry lives elsewhere.
+ */
+export function withGitHubToken(fetcher: Fetcher, token: string | null): Fetcher {
+  if (!token) return fetcher;
+  return (input, init) =>
+    fetcher(
+      input,
+      input.startsWith(`${GITHUB_API}/`)
+        ? {
+            ...init,
+            headers: {
+              ...(init?.headers as Record<string, string>),
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : init,
+    );
 }
 
 async function get(fetcher: Fetcher, url: string, accept?: string): Promise<Response> {
@@ -166,26 +166,21 @@ async function readText(url: string, response: Response): Promise<string> {
   return text.replace(/\r\n?/g, "\n");
 }
 
-export async function fetchCrsRegistry(fetcher: Fetcher = fetch): Promise<CrsRegistryEntry[]> {
-  if (registryCache && Date.now() - registryCache.at < REGISTRY_CACHE_MS) {
-    return registryCache.entries;
-  }
-  const response = await get(fetcher, REGISTRY_URL);
-  if (!response.ok) failed(REGISTRY_URL, response);
-  const text = await readText(REGISTRY_URL, response);
+/** Reads a registry.json. Callers keep the result; see crs-plugins/sync.ts. */
+export async function fetchCrsRegistry(
+  fetcher: Fetcher = fetch,
+  url: string = OFFICIAL_CRS_REGISTRY_URL,
+): Promise<CrsRegistryEntry[]> {
+  const response = await get(fetcher, url);
+  if (!response.ok) failed(url, response);
+  const text = await readText(url, response);
   let json: unknown;
   try {
     json = JSON.parse(text);
   } catch {
-    throw domainError(
-      "crsPluginFetchFailed",
-      { url: REGISTRY_URL, reason: "not JSON" },
-      { status: 400 },
-    );
+    throw domainError("crsPluginFetchFailed", { url, reason: "not JSON" }, { status: 400 });
   }
-  const entries = parseCrsRegistry(json);
-  registryCache = { at: Date.now(), entries };
-  return entries;
+  return parseCrsRegistry(json);
 }
 
 function repoPath(entry: Pick<CrsRegistryEntry, "repository">): string {
@@ -260,8 +255,11 @@ async function fetchDescriptor(
  * Fetches and checks a plugin's rule files at `version`. Throws, naming each refused line, rather
  * than returning a plugin that would be half emitted.
  */
+/** What a release is fetched and checked by; a registry entry, or an installed plugin. */
+export type CrsPluginSource = Pick<CrsRegistryEntry, "repository" | "ruleIdStart" | "ruleIdEnd">;
+
 export async function fetchCrsPluginRelease(
-  entry: CrsRegistryEntry,
+  entry: CrsPluginSource,
   version: string,
   fetcher: Fetcher = fetch,
 ): Promise<CrsPluginRelease> {
@@ -334,5 +332,54 @@ export function assertCrsPluginRulesLoadable(
   const details = rejections
     .slice(0, MAX_NAMED_REJECTIONS)
     .map((entry) => `"${entry.line.slice(0, 160)}" - ${domainErrorMessage(entry.reason, range)}`);
-  throw domainError("crsPluginRejected", { count: rejections.length, details }, { status: 400 });
+  throw domainError(
+    "crsPluginRejected",
+    // `reasons` is for checkCrsPluginSupport; the message does not print it.
+    { count: rejections.length, details, reasons: [...new Set(rejections.map((r) => r.reason))] },
+    { status: 400 },
+  );
+}
+
+/** Which rejection explains a plugin best when it has several: the most fundamental first. */
+const REJECTION_REASON: [string, CrsUnsupportedReason][] = [
+  ["crsPluginNeedsFile", "files"],
+  ["crsPluginPersistentCollection", "compile"],
+  ["crsPluginUnbalancedQuotes", "compile"],
+  ["crsPluginUnterminated", "compile"],
+  ["crsPluginRuleIdOutOfRange", "ruleIds"],
+  ["crsPluginDirectiveNotAllowed", "directives"],
+  ["crsPluginCtlRuleEngine", "directives"],
+];
+
+export type CrsPluginSupport =
+  | { supported: true }
+  | { supported: false; reason: CrsUnsupportedReason; error: DomainError };
+
+/**
+ * Fetches `version` and runs the same checks an install does, returning a verdict instead of
+ * throwing. A failure to fetch at all - a rate limit, GitHub being down - is not a verdict about
+ * the plugin, so that still throws.
+ */
+export async function checkCrsPluginSupport(
+  entry: CrsPluginSource,
+  version: string,
+  fetcher: Fetcher = fetch,
+): Promise<CrsPluginSupport> {
+  try {
+    await fetchCrsPluginRelease(entry, version, fetcher);
+    return { supported: true };
+  } catch (error) {
+    if (!(error instanceof DomainError)) throw error;
+    if (error.code === "crsPluginEngineIncompatible") {
+      return { supported: false, reason: "engine", error };
+    }
+    if (error.code === "crsPluginNoRuleFiles")
+      return { supported: false, reason: "noRules", error };
+    if (error.code === "crsPluginRejected") {
+      const found = new Set(error.params.reasons as readonly string[]);
+      const reason = REJECTION_REASON.find(([code]) => found.has(code))?.[1] ?? "directives";
+      return { supported: false, reason, error };
+    }
+    throw error;
+  }
 }

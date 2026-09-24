@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Settings } from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Link } from "@astryxdesign/core/Link";
 import { Text } from "@astryxdesign/core/Text";
@@ -19,15 +20,20 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchField } from "@/components/ui/SearchField";
-import type { CrsRegistryEntry } from "@/lib/crs-plugins/registry";
+import { useEmptyValue } from "@/components/ui/empty-value";
+import { Timestamp } from "@/components/ui/Timestamp";
+import type { CrsRegistryListing } from "@/lib/models/crs-plugins";
 import {
+  type CrsRegistryOverview,
   checkCrsPluginUpdatesAction,
+  checkCrsRegistryNowAction,
   installCrsPluginAction,
   listCrsRegistryAction,
   uninstallCrsPluginAction,
   updateCrsPluginAction,
 } from "./actions";
 import { WafPluginFiles } from "./WafPluginFiles";
+import { WafPluginRegistrySettings } from "./WafPluginRegistrySettings";
 
 export type WafPluginRow = {
   id: number;
@@ -48,7 +54,8 @@ export type WafPluginRow = {
   hostCount: number;
 };
 
-type RegistryRow = CrsRegistryEntry & { installedId: number | null };
+/** `key` tells apart two registries' plugins of the same name. */
+type RegistryRow = CrsRegistryListing & { key: string };
 
 /** The registry's status, as a token colour and the catalog key naming it. */
 const STATUS = {
@@ -63,15 +70,25 @@ function shortVersion(version: string): string {
   return /^[0-9a-f]{40}$/.test(version) ? version.slice(0, 7) : version;
 }
 
-export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
+export function WafPluginsPanel({
+  plugins,
+  storedUpdates,
+}: {
+  plugins: WafPluginRow[];
+  /** Newer releases the last scheduled check found, by installed plugin id. */
+  storedUpdates: Record<number, string>;
+}) {
   const t = useTranslations("waf");
+  const emptyValue = useEmptyValue();
   const router = useRouter();
-  const [registry, setRegistry] = useState<
-    (CrsRegistryEntry & { installedId: number | null })[] | null
-  >(null);
+  const [registry, setRegistry] = useState<CrsRegistryOverview | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [checkingRegistry, setCheckingRegistry] = useState(false);
   const [registryError, setRegistryError] = useState<string | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
-  const [updates, setUpdates] = useState<Record<number, string> | null>(null);
+  const [updates, setUpdates] = useState<Record<number, string> | null>(
+    Object.keys(storedUpdates).length > 0 ? storedUpdates : null,
+  );
   const [checking, setChecking] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [uninstalling, setUninstalling] = useState<WafPluginRow | null>(null);
@@ -79,8 +96,9 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
   const registryRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return (
-      (registry ?? [])
+      (registry?.entries ?? [])
         .filter((entry) => entry.name.toLowerCase().includes(needle))
+        .map((entry) => ({ ...entry, key: `${entry.registryId}/${entry.name}` }))
         // The unsupported ones last: they are listed only so their absence is explained.
         .toSorted((a, b) => Number(!!a.unsupported) - Number(!!b.unsupported))
     );
@@ -90,17 +108,34 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
     setRegistryError(null);
     const result = await listCrsRegistryAction();
     if (result.status === "error") setRegistryError(result.message);
-    else setRegistry(result.entries);
+    else setRegistry(result);
   }, []);
+
+  const checkRegistryNow = async () => {
+    setCheckingRegistry(true);
+    try {
+      const result = await checkCrsRegistryNowAction();
+      if (result.status === "error") {
+        toast.error(result.message);
+        return;
+      }
+      setRegistry(result);
+      if (!result.error) {
+        toast.success(t("pluginRegistryChecked", { count: result.entries.length }));
+      }
+    } finally {
+      setCheckingRegistry(false);
+    }
+  };
 
   useEffect(() => {
     void loadRegistry();
   }, [loadRegistry]);
 
-  const install = async (name: string) => {
-    setInstalling(name);
+  const install = async (row: RegistryRow) => {
+    setInstalling(row.key);
     try {
-      const result = await installCrsPluginAction(name);
+      const result = await installCrsPluginAction(row.registryId, row.name);
       if (result.status === "error") {
         toast.error(result.message);
         return;
@@ -229,6 +264,16 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
       ),
     },
     {
+      id: "registry",
+      label: t("pluginRegistryColumn"),
+      width: 160,
+      render: (row) => (
+        <Text type="body" size="xsm" color={row.unsupported ? "disabled" : "secondary"}>
+          {row.registryName}
+        </Text>
+      ),
+    },
+    {
       id: "type",
       label: t("pluginType"),
       width: 140,
@@ -252,6 +297,16 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
           label={t(`pluginStatus.${STATUS[row.status].key}`)}
           isDisabled={Boolean(row.unsupported)}
         />
+      ),
+    },
+    {
+      id: "license",
+      label: t("pluginLicense"),
+      width: 140,
+      render: (row) => (
+        <Text type="body" size="xsm" color={row.unsupported ? "disabled" : "secondary"}>
+          {row.license || emptyValue}
+        </Text>
       ),
     },
     {
@@ -285,9 +340,9 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
           <Button
             size="sm"
             label={t("pluginInstall")}
-            isLoading={installing === row.name}
-            isDisabled={installing !== null && installing !== row.name}
-            onClick={() => void install(row.name)}
+            isLoading={installing === row.key}
+            isDisabled={installing !== null && installing !== row.key}
+            onClick={() => void install(row)}
           />
         ),
     },
@@ -345,12 +400,52 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
 
       <Card>
         <VStack gap={4}>
-          <VStack gap={1}>
-            <Heading level={2}>{t("pluginRegistry")}</Heading>
-            <Text type="body" size="sm" color="secondary">
-              {t("pluginRegistryDescription")}
-            </Text>
-          </VStack>
+          <HStack justify="between" vAlign="start" gap={3} wrap="wrap">
+            <VStack gap={1}>
+              <Heading level={2}>{t("pluginRegistry")}</Heading>
+              <Text type="body" size="sm" color="secondary">
+                {t("pluginRegistryDescription")}
+              </Text>
+              {registry && (
+                <Text type="body" size="xsm" color="secondary">
+                  {registry.checkedAt
+                    ? t.rich("pluginRegistryLastChecked", {
+                        time: () => <Timestamp value={registry.checkedAt ?? ""} />,
+                      })
+                    : t("pluginRegistryNeverChecked")}
+                </Text>
+              )}
+            </VStack>
+            <HStack gap={2}>
+              <Button
+                icon={<RefreshCw />}
+                label={t("pluginRegistryCheckNow")}
+                isLoading={checkingRegistry}
+                isDisabled={!registry}
+                onClick={() => void checkRegistryNow()}
+              />
+              <IconButton
+                label={t("pluginRegistrySettings")}
+                tooltip={t("pluginRegistrySettings")}
+                icon={<Settings />}
+                isDisabled={!registry}
+                onClick={() => setSettingsOpen(true)}
+              />
+            </HStack>
+          </HStack>
+          {registry?.error && (
+            <Banner
+              status="warning"
+              title={t("pluginRegistryIncomplete", { error: registry.error })}
+            />
+          )}
+          {registry?.sourceErrors.map((source) => (
+            <Banner
+              key={source.name}
+              status="error"
+              title={t("pluginRegistrySourceFailed", { name: source.name, error: source.message })}
+            />
+          ))}
           {registryError ? (
             <Banner
               status="error"
@@ -379,13 +474,26 @@ export function WafPluginsPanel({ plugins }: { plugins: WafPluginRow[] }) {
               <DataTable
                 columns={registryColumns}
                 data={registryRows}
-                keyField="name"
+                keyField="key"
                 emptyMessage={t("pluginRegistryNoMatches")}
               />
             </VStack>
           )}
         </VStack>
       </Card>
+
+      {registry && (
+        <WafPluginRegistrySettings
+          settings={registry.settings}
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={(message) => {
+            setSettingsOpen(false);
+            toast.success(message);
+            void loadRegistry();
+          }}
+        />
+      )}
 
       <AlertDialog
         isOpen={uninstalling !== null}

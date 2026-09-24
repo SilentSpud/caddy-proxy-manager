@@ -1383,7 +1383,14 @@ const spec = {
               schema: {
                 type: "object",
                 required: ["name"],
-                properties: { name: { type: "string", description: "The registry's plugin name" } },
+                properties: {
+                  name: { type: "string", description: "The registry's plugin name" },
+                  registry: {
+                    type: "string",
+                    description:
+                      "The id of the registry listing it. Needed only when several registries list the name.",
+                  },
+                },
               },
             },
           },
@@ -1403,8 +1410,9 @@ const spec = {
     "/api/v1/crs-plugins/registry": {
       get: {
         tags: ["CRS Plugins"],
-        summary: "List the CRS plugin registry",
-        description: "Public registry entries, each with the id it is installed under.",
+        summary: "List the CRS plugin registries' plugins",
+        description:
+          "Every configured registry's public entries, from the last read: a registry not read yet is read now. Each carries the verdict of the last check and the id it is installed under.",
         operationId: "listCrsRegistry",
         responses: {
           "200": {
@@ -1416,6 +1424,8 @@ const spec = {
                   items: {
                     type: "object",
                     properties: {
+                      registryId: { type: "string" },
+                      registryName: { type: "string" },
                       name: { type: "string" },
                       repository: { type: "string", format: "uri" },
                       type: { type: "string", enum: ["official", "3rd-party"] },
@@ -1429,8 +1439,21 @@ const spec = {
                       installedId: { type: ["integer", "null"] },
                       unsupported: {
                         type: ["string", "null"],
-                        enum: ["files", "engine", "compile", "ruleIds", "noRules", null],
-                        description: "Why the plugin is known not to install here, or null",
+                        enum: [
+                          "files",
+                          "engine",
+                          "compile",
+                          "ruleIds",
+                          "noRules",
+                          "directives",
+                          null,
+                        ],
+                        description:
+                          "Why the last check found it cannot install here, or null: installable, or not checked yet",
+                      },
+                      checkedVersion: {
+                        type: ["string", "null"],
+                        description: "The release the verdict is for",
                       },
                     },
                   },
@@ -1439,6 +1462,89 @@ const spec = {
             },
           },
           "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/crs-plugins/registry/settings": {
+      get: {
+        tags: ["CRS Plugins"],
+        summary: "Get the CRS plugin registry settings",
+        operationId: "getCrsRegistrySettings",
+        responses: {
+          "200": {
+            description: "Registry settings",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/CrsRegistrySettings" } },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      put: {
+        tags: ["CRS Plugins"],
+        summary: "Update the CRS plugin registry settings",
+        description:
+          "Fields left out keep their value. A change of registries or token starts a check in the background.",
+        operationId: "updateCrsRegistrySettings",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  registries: {
+                    type: "array",
+                    maxItems: 10,
+                    description:
+                      "The full list. An entry without an id is new; a registry left out is removed.",
+                    items: {
+                      type: "object",
+                      required: ["name", "url"],
+                      properties: {
+                        id: { type: ["string", "null"] },
+                        name: { type: "string", maxLength: 64 },
+                        url: { type: "string", format: "uri", description: "https only" },
+                      },
+                    },
+                  },
+                  refreshIntervalHours: {
+                    type: "integer",
+                    minimum: 0,
+                    maximum: 720,
+                    description: "0 checks only on demand",
+                  },
+                  githubToken: {
+                    type: "string",
+                    description: "Write-only. An empty string removes the stored token.",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Settings as saved",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/CrsRegistrySettings" } },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/crs-plugins/registry/check": {
+      post: {
+        tags: ["CRS Plugins"],
+        summary: "Check the CRS plugin registries now",
+        description:
+          "Re-reads every registry and checks each plugin's latest release the way an install would, answering once the pass is done. Only releases not checked before are fetched. The checks are static: whether Coraza compiles a plugin is not tested.",
+        operationId: "checkCrsRegistry",
+        responses: {
+          "200": { description: "The pass's outcome and the listing it produced" },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -3289,6 +3395,24 @@ const spec = {
           updatedAt: { type: "string", format: "date-time" },
         },
         required: ["id", "name", "directives", "createdAt", "updatedAt"],
+      },
+      CrsRegistrySettings: {
+        type: "object",
+        properties: {
+          registries: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                url: { type: "string", format: "uri" },
+              },
+            },
+          },
+          refreshIntervalHours: { type: "integer" },
+          hasGithubToken: { type: "boolean" },
+        },
       },
       CrsPlugin: {
         type: "object",

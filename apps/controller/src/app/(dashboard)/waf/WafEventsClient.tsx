@@ -86,6 +86,7 @@ type Props = {
   globalWaf: WafSettings | null;
   presets: WafPresetRow[];
   plugins: WafPluginRow[];
+  pluginUpdates: Record<number, string>;
 };
 
 type RangeOption = Props["initialRange"];
@@ -980,6 +981,7 @@ export default function WafEventsClient({
   globalWaf,
   presets,
   plugins,
+  pluginUpdates,
 }: Props) {
   const t = useTranslations("waf");
   // Always set by the provider (see app/providers.tsx); UTC only satisfies the type.
@@ -1469,7 +1471,7 @@ export default function WafEventsClient({
 
       {tab === "presets" && <WafPresetsPanel presets={presets} />}
 
-      {tab === "plugins" && <WafPluginsPanel plugins={plugins} />}
+      {tab === "plugins" && <WafPluginsPanel plugins={plugins} storedUpdates={pluginUpdates} />}
 
       {tab === "settings" && (
         <VStack gap={6}>

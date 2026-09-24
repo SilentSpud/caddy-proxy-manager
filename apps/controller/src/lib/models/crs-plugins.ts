@@ -6,13 +6,21 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { domainError } from "../domain-error";
 import { type CrsPluginRules, findCrsPluginRejections, normalizeWafPluginIds } from "../caddy-waf";
 import {
-  type CrsRegistryEntry,
+  type CrsUnsupportedReason,
   type Fetcher,
   assertCrsPluginRulesLoadable,
   fetchCrsPluginRelease,
-  fetchCrsRegistry,
   resolveCrsPluginVersion,
+  withGitHubToken,
 } from "../crs-plugins/registry";
+import { crsRegistryGithubToken, getCrsRegistrySettings } from "../crs-plugins/settings";
+import {
+  type CrsListedPlugin,
+  crsRegistryListsStale,
+  getCrsRegistryState,
+  refreshCrsRegistryLists,
+  verdictKey,
+} from "../crs-plugins/sync";
 import { getDashboardSettings, getWafSettings } from "../settings";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -164,34 +172,109 @@ export async function assertCrsPluginIdsExist(ids: readonly number[] | undefined
   }
 }
 
-/** The registry, each entry marked with the id it is installed under. */
-export async function listCrsRegistry(
-  fetcher?: Fetcher,
-): Promise<(CrsRegistryEntry & { installedId: number | null })[]> {
-  const [entries, installed] = await Promise.all([fetchCrsRegistry(fetcher), listCrsPlugins()]);
-  const byName = new Map(installed.map((plugin) => [plugin.name, plugin.id]));
-  return entries.map((entry) => ({ ...entry, installedId: byName.get(entry.name) ?? null }));
+/** A registry plugin as the registry table shows it. */
+export type CrsRegistryListing = CrsListedPlugin & {
+  registryName: string;
+  installedId: number | null;
+  /** Null until a check has reached a verdict, or when it found the plugin installable. */
+  unsupported: CrsUnsupportedReason | null;
+  /** The release the verdict is for. */
+  checkedVersion: string | null;
+};
+
+/**
+ * Every configured registry's plugins, from what the last read stored. Only a registry the stored
+ * lists do not match yet is read now, and that read makes no GitHub API calls.
+ */
+export async function listCrsRegistry(fetcher?: Fetcher): Promise<CrsRegistryListing[]> {
+  const state = (await crsRegistryListsStale())
+    ? await refreshCrsRegistryLists(fetcher)
+    : await getCrsRegistryState();
+  const [installed, { registries }] = await Promise.all([
+    listCrsPlugins(),
+    getCrsRegistrySettings(),
+  ]);
+  const names = new Map(registries.map((source) => [source.id, source.name]));
+  return state.entries.map((entry) => {
+    const verdict = state.verdicts[verdictKey(entry)];
+    const current = verdict?.repository === entry.repository ? verdict : undefined;
+    return {
+      ...entry,
+      registryName: names.get(entry.registryId) ?? entry.registryId,
+      installedId:
+        installed.find(
+          (plugin) => plugin.name === entry.name && plugin.repository === entry.repository,
+        )?.id ?? null,
+      unsupported: current && !current.supported ? current.reason : null,
+      checkedVersion: current?.version ?? null,
+    };
+  });
 }
 
-async function registryEntry(name: string, fetcher?: Fetcher): Promise<CrsRegistryEntry> {
-  const entry = (await fetchCrsRegistry(fetcher)).find((candidate) => candidate.name === name);
+async function githubFetcher(fetcher?: Fetcher): Promise<Fetcher> {
+  return withGitHubToken(fetcher ?? fetch, await crsRegistryGithubToken());
+}
+
+async function registryEntry(
+  registryId: string,
+  name: string,
+  fetcher?: Fetcher,
+): Promise<CrsListedPlugin> {
+  const entry = (await listCrsRegistry(fetcher)).find(
+    (candidate) => candidate.registryId === registryId && candidate.name === name,
+  );
   if (!entry) throw domainError("crsPluginNotInRegistry", { name }, { status: 404 });
   return entry;
 }
 
 /** id -> the latest version upstream, for plugins that have a newer one than installed. */
 export async function checkCrsPluginUpdates(fetcher?: Fetcher): Promise<Map<number, string>> {
+  const github = await githubFetcher(fetcher);
   const updates = new Map<number, string>();
   for (const plugin of await listCrsPlugins()) {
-    const latest = await resolveCrsPluginVersion(plugin, fetcher);
+    const latest = await resolveCrsPluginVersion(plugin, github);
     if (latest !== plugin.version) updates.set(plugin.id, latest);
   }
   return updates;
 }
 
+/** The same, from the last scheduled check: no GitHub calls, for a page to render with. */
+export async function storedCrsPluginUpdates(): Promise<Map<number, string>> {
+  const [plugins, state] = await Promise.all([listCrsPlugins(), getCrsRegistryState()]);
+  const updates = new Map<number, string>();
+  for (const plugin of plugins) {
+    const latest = state.latestVersions[plugin.repository];
+    if (latest && latest !== plugin.version) updates.set(plugin.id, latest);
+  }
+  return updates;
+}
+
+/** For the scheduled check: installed plugins' repositories, listed in a registry or not. */
+export async function installedCrsPluginRepositories(): Promise<string[]> {
+  return [...new Set((await listCrsPlugins()).map((plugin) => plugin.repository))];
+}
+
+/**
+ * Two registries allocate rule ids independently, so their ranges can collide. Coraza refuses a
+ * duplicate id, and that refusal takes every host's config down, so an overlap is refused here.
+ */
+async function assertRangeFree(start: number, end: number, exceptId: number | null): Promise<void> {
+  const clash = (await listCrsPlugins()).find(
+    (plugin) => plugin.id !== exceptId && plugin.ruleIdStart <= end && start <= plugin.ruleIdEnd,
+  );
+  if (clash) {
+    throw domainError(
+      "crsPluginRangeOverlaps",
+      { name: clash.name, start: String(clash.ruleIdStart), end: String(clash.ruleIdEnd) },
+      { status: 409 },
+    );
+  }
+}
+
 // ── Writes ───────────────────────────────────────────────────────────
 
 export async function installCrsPlugin(
+  registryId: string,
   name: string,
   actorUserId: number,
   fetcher?: Fetcher,
@@ -201,9 +284,11 @@ export async function installCrsPlugin(
   });
   if (existing) throw domainError("crsPluginAlreadyInstalled", { name }, { status: 409 });
 
-  const entry = await registryEntry(name, fetcher);
-  const version = await resolveCrsPluginVersion(entry, fetcher);
-  const release = await fetchCrsPluginRelease(entry, version, fetcher);
+  const entry = await registryEntry(registryId, name, fetcher);
+  await assertRangeFree(entry.ruleIdStart, entry.ruleIdEnd, null);
+  const github = await githubFetcher(fetcher);
+  const version = await resolveCrsPluginVersion(entry, github);
+  const release = await fetchCrsPluginRelease(entry, version, github);
   const now = nowIso();
   const [record] = await db
     .insert(crsPlugins)
@@ -250,10 +335,21 @@ export async function updateCrsPlugin(
   const existing = await getCrsPlugin(id);
   if (!existing) throw domainError("crsPluginNotFound", {}, { status: 404 });
 
-  const entry = await registryEntry(existing.name, fetcher);
-  const version = await resolveCrsPluginVersion(entry, fetcher);
+  // The registry that listed it may be gone, or list a different plugin by that name now: the
+  // repository and range it was installed with stand in.
+  const listed = (await listCrsRegistry(fetcher)).find(
+    (candidate) => candidate.name === existing.name && candidate.repository === existing.repository,
+  );
+  const entry = listed ?? {
+    repository: existing.repository,
+    ruleIdStart: existing.ruleIdStart,
+    ruleIdEnd: existing.ruleIdEnd,
+  };
+  if (listed) await assertRangeFree(listed.ruleIdStart, listed.ruleIdEnd, id);
+  const github = await githubFetcher(fetcher);
+  const version = await resolveCrsPluginVersion(entry, github);
   if (version === existing.version) return existing;
-  const release = await fetchCrsPluginRelease(entry, version, fetcher);
+  const release = await fetchCrsPluginRelease(entry, version, github);
   // A range the registry moved would strand an edited config's rule ids outside it.
   if (existing.configOverride !== null) {
     assertCrsPluginRulesLoadable([existing.configOverride], entry.ruleIdStart, entry.ruleIdEnd);

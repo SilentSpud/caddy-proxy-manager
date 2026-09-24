@@ -3,17 +3,34 @@
 import { revalidatePath } from "next/cache";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { requireAdmin } from "@/src/lib/auth";
-import { actionSuccess, extractErrorMessage, type ActionState } from "@/src/lib/actions";
+import {
+  actionSuccess,
+  extractErrorMessage,
+  storedErrorMessage,
+  type ActionState,
+} from "@/src/lib/actions";
 import { createWafPreset, deleteWafPreset, updateWafPreset } from "@/src/lib/models/waf-presets";
 import {
+  type CrsRegistryListing as CrsRegistryRow,
   checkCrsPluginUpdates,
   installCrsPlugin,
+  installedCrsPluginRepositories,
   listCrsRegistry,
   setCrsPluginConfig,
   uninstallCrsPlugin,
   updateCrsPlugin,
 } from "@/src/lib/models/crs-plugins";
-import type { CrsRegistryEntry } from "@/src/lib/crs-plugins/registry";
+import {
+  type CrsRegistrySettings,
+  type CrsRegistrySettingsInput,
+  getCrsRegistrySettings,
+  saveCrsRegistrySettings,
+} from "@/src/lib/crs-plugins/settings";
+import {
+  type CrsRegistryState,
+  getCrsRegistryState,
+  runCrsRegistrySync,
+} from "@/src/lib/crs-plugins/sync";
 
 type FallbackKey =
   | "presetSaveFailed"
@@ -22,7 +39,9 @@ type FallbackKey =
   | "pluginInstallFailed"
   | "pluginUpdateFailed"
   | "pluginConfigFailed"
-  | "pluginUninstallFailed";
+  | "pluginUninstallFailed"
+  | "pluginRegistrySaveFailed"
+  | "pluginRegistryCheckFailed";
 
 async function failure(error: unknown, fallbackKey: FallbackKey) {
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
@@ -74,25 +93,95 @@ export async function deleteWafPresetAction(id: number): Promise<ActionState> {
 
 // ── CRS plugins ──────────────────────────────────────────────────────
 
+export type CrsRegistryOverview = {
+  entries: CrsRegistryRow[];
+  settings: CrsRegistrySettings;
+  checkedAt: string | null;
+  /** Why the last check stopped short, in the reader's language. */
+  error: string | null;
+  /** Registries that could not be read, by name. */
+  sourceErrors: { name: string; message: string }[];
+};
+
 export type CrsRegistryListing =
-  | { status: "success"; entries: (CrsRegistryEntry & { installedId: number | null })[] }
+  | ({ status: "success" } & CrsRegistryOverview)
   | { status: "error"; message: string };
 
-/** Asked for when the tab opens rather than on page load, which would wait on GitHub. */
+async function overview(state?: CrsRegistryState): Promise<CrsRegistryOverview> {
+  const [entries, settings, t] = await Promise.all([
+    listCrsRegistry(),
+    getCrsRegistrySettings(),
+    getTranslations(),
+  ]);
+  const current = state ?? (await getCrsRegistryState());
+  return {
+    entries,
+    settings,
+    checkedAt: current.checkedAt,
+    error: current.error ? storedErrorMessage(t, current.error.message, current.error.code) : null,
+    sourceErrors: settings.registries.flatMap((source) => {
+      const failed = current.sources[source.id]?.error;
+      return failed
+        ? [{ name: source.name, message: storedErrorMessage(t, failed.message, failed.code) }]
+        : [];
+    }),
+  };
+}
+
+/** From what the last check stored; only a registry not read yet is fetched, with no API calls. */
 export async function listCrsRegistryAction(): Promise<CrsRegistryListing> {
   try {
     await requireAdmin();
-    return { status: "success", entries: await listCrsRegistry() };
+    return { status: "success", ...(await overview()) };
   } catch (error) {
     const result = await failure(error, "pluginRegistryFailed");
     return { status: "error", message: result.message };
   }
 }
 
-export async function installCrsPluginAction(name: string): Promise<ActionState> {
+/** Re-reads every registry and checks each plugin now, waiting for the pass to finish. */
+export async function checkCrsRegistryNowAction(): Promise<CrsRegistryListing> {
+  try {
+    await requireAdmin();
+    const state = await runCrsRegistrySync({
+      extraRepositories: await installedCrsPluginRepositories(),
+    });
+    revalidatePath("/waf");
+    return { status: "success", ...(await overview(state)) };
+  } catch (error) {
+    const result = await failure(error, "pluginRegistryCheckFailed");
+    return { status: "error", message: result.message };
+  }
+}
+
+export async function saveCrsRegistrySettingsAction(
+  input: CrsRegistrySettingsInput,
+): Promise<ActionState> {
+  try {
+    await requireAdmin();
+    const changed = await saveCrsRegistrySettings(input);
+    // Checked in the background: a first check of a new registry takes a while, and the table
+    // shows its plugins as soon as the list alone is read.
+    if (changed) {
+      void installedCrsPluginRepositories()
+        .then((extraRepositories) => runCrsRegistrySync({ extraRepositories }))
+        .catch((error: unknown) => console.error("[crs-plugins] registry check failed:", error));
+    }
+    revalidatePath("/waf");
+    const t = await getTranslations("waf");
+    return actionSuccess(t("pluginRegistrySaved"));
+  } catch (error) {
+    return failure(error, "pluginRegistrySaveFailed");
+  }
+}
+
+export async function installCrsPluginAction(
+  registryId: string,
+  name: string,
+): Promise<ActionState> {
   try {
     const session = await requireAdmin();
-    const plugin = await installCrsPlugin(name, Number(session.user.id));
+    const plugin = await installCrsPlugin(registryId, name, Number(session.user.id));
     revalidatePath("/waf");
     const t = await getTranslations("waf");
     return actionSuccess(t("pluginInstalled", { name: plugin.name, version: plugin.version }));

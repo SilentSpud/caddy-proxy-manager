@@ -62,23 +62,38 @@ anything still selects it; the error names what does.
 
 The [CRS plugin registry](https://github.com/coreruleset/plugin-registry) lists plugins for the
 Core Rule Set: rule exclusions for WordPress, Nextcloud, Drupal, phpMyAdmin and other applications,
-and extra detections. **WAF → Plugins** lists the registry with who maintains each plugin and how
-far it has been tested, and installs one with a click.
+and extra detections. **WAF → Plugins** lists the registry with who maintains each plugin, how far
+it has been tested and its license, and installs one with a click.
 
 Installing fetches the plugin's latest release from its GitHub repository - or the newest commit,
 for a plugin that has never tagged one - and stores its files, so what runs is exactly what was
-installed until you update it. **Check for updates** compares each plugin with its latest release.
+installed until you update it. A newer release shows beside the plugin's version once the
+registries have been checked, or straight away with **Check for updates**.
 
 Once installed, a plugin is selected like a preset: globally in **WAF → Settings**, or per host in
 the host's WAF card, merged or overridden the same way. Plugins tune the CRS rules, so they load
 only where the CRS does, in the order CRS itself uses: every plugin's configuration, then its
 `-before` rules, the CRS rules, then its `-after` rules.
 
-**Edit configuration** changes a plugin's `-config` file - to turn off part of it, or set one of
-its variables. The edit is kept when the plugin updates. Restoring the upstream text, or saving it
-blank, goes back to the plugin's own.
+Click an installed plugin to open it: its files are listed in that order, and the `-config` file -
+the one that turns parts of a plugin off or sets its variables - can be edited there. The edit is
+kept when the plugin updates; restoring the upstream text goes back to the plugin's own. The other
+files are shown as the release shipped them.
 
-Some plugins cannot run here, and are refused at install with the reason:
+### Registries
+
+The gear on the **Plugin Registry** card lists the registries plugins come from. The OWASP one is
+there to start with; add your own - any `https://` URL serving a `registry.json` in the
+[same format](https://github.com/coreruleset/plugin-registry/blob/main/docs/registry-schema.md) -
+or remove it. Plugins from every registry share one table, with a column naming the registry each
+came from.
+
+Each registry is re-read on the interval set there (daily by default, 0 for only when you click
+**Check now**), and every plugin's latest release is checked the way an install would check it.
+One that cannot run here is greyed out and marked **Unsupported**, with the reason on hover. A
+release is checked once: later checks only look for a newer one.
+
+Some plugins cannot run here, and are refused - both by the check and at install:
 
 - A rule that reads a file - a Lua script (`@inspectFile`), a data file (`@pmFromFile`,
   `@ipMatchFromFile`) or a GeoIP database (`@geoLookup`). Caddy runs on your agents and only has
@@ -88,17 +103,24 @@ Some plugins cannot run here, and are refused at install with the reason:
   the whole config, for every host.
 - A rule id outside the range the registry gave the plugin. That range is what keeps a plugin
   from redefining a CRS rule, which would stop Caddy loading its config.
+- A rule id range that overlaps a plugin already installed. Registries allocate ranges
+  independently, so two of them can clash.
 - A directive other than `SecRule`, `SecAction`, `SecMarker` and the `SecRuleRemove*` and
   `SecRuleUpdateTarget*` exclusions, or `ctl:ruleEngine`.
+
+These checks read the rules rather than compile them, so a plugin that passes can still, rarely,
+be one Coraza refuses. If Caddy then rejects a config, deselect the plugin you just selected.
 
 :::caution
 The registry records who vetted a plugin; it is not a code audit. A plugin's rules run in front of
 every host that selects it, so install what you would be willing to paste into a preset.
 :::
 
-The controller needs outbound HTTPS to `api.github.com` and `raw.githubusercontent.com` to list
-and install plugins. GitHub allows 60 unauthenticated requests an hour, and an install takes about
-three.
+The controller needs outbound HTTPS to `api.github.com`, `raw.githubusercontent.com` and any
+registry you add. GitHub allows 60 unauthenticated API requests an hour: an install takes about
+three, and a first check of the OWASP registry most of them. A GitHub token in the registry
+settings - one with no scopes - raises that to 5,000. It is stored encrypted and sent only to
+`api.github.com`.
 
 ## Custom directives
 

@@ -2,13 +2,14 @@
  * src/lib/crs-plugins/registry.ts against a fake GitHub: reading the registry, resolving a
  * release, and refusing a plugin that could not load in Caddy before anything is stored.
  */
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect } from 'bun:test';
 import {
   fetchCrsPluginRelease,
   fetchCrsRegistry,
+  checkCrsPluginSupport,
   parseCrsRegistry,
-  resetCrsRegistryCache,
   resolveCrsPluginVersion,
+  withGitHubToken,
 } from '../../src/lib/crs-plugins/registry';
 import { DomainError } from '../../src/lib/domain-error';
 import { FAKE_BOT, REGISTRY, WORDPRESS, fakeGithub } from '../helpers/fake-github';
@@ -23,8 +24,6 @@ async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
   }
   return undefined;
 }
-
-beforeEach(() => resetCrsRegistryCache());
 
 describe('parseCrsRegistry', () => {
   it('keeps installable entries, sorted, and drops private or malformed ones', () => {
@@ -49,14 +48,6 @@ describe('parseCrsRegistry', () => {
     });
   });
 
-  it('marks plugins known not to install, and only those', () => {
-    const entries = parseCrsRegistry(REGISTRY);
-    expect(entries.find((entry) => entry.name === 'fake-bot')?.unsupported).toBe('files');
-    expect(
-      entries.find((entry) => entry.name === 'wordpress-rule-exclusions')?.unsupported,
-    ).toBeNull();
-  });
-
   it('reads nothing out of a document that is not a registry', () => {
     expect(parseCrsRegistry(null)).toEqual([]);
     expect(parseCrsRegistry({ plugins: 'x' })).toEqual([]);
@@ -64,11 +55,12 @@ describe('parseCrsRegistry', () => {
 });
 
 describe('fetchCrsRegistry', () => {
-  it('caches the listing rather than asking GitHub on every page load', async () => {
-    const github = fakeGithub({});
-    await fetchCrsRegistry(github.fetcher);
-    await fetchCrsRegistry(github.fetcher);
-    expect(github.requested).toHaveLength(1);
+  it("reads a registry of the operator's own from its URL", async () => {
+    const url = 'https://example.test/my-registry.json';
+    const github = fakeGithub({}, { [url]: { plugins: [REGISTRY.plugins[0]] } });
+    const entries = await fetchCrsRegistry(github.fetcher, url);
+    expect(entries.map((entry) => entry.name)).toEqual(['wordpress-rule-exclusions']);
+    expect(github.requested).toEqual([url]);
   });
 
   it('names a rate limit, which is the likely failure unauthenticated', async () => {
@@ -147,6 +139,70 @@ describe('fetchCrsPluginRelease', () => {
     const github = fakeGithub({ [WORDPRESS_REPO]: { release: 'v9', files: {} } });
     expect(await codeOf(fetchCrsPluginRelease(wordpress, 'v9', github.fetcher))).toBe(
       'crsPluginNoRuleFiles',
+    );
+  });
+});
+
+describe('withGitHubToken', () => {
+  it('sends the token to the GitHub API and nowhere else', async () => {
+    const github = fakeGithub({ [WORDPRESS_REPO]: WORDPRESS });
+    const fetcher = withGitHubToken(github.fetcher, 'ghp_secret');
+    await resolveCrsPluginVersion({ repository: `https://github.com/${WORDPRESS_REPO}` }, fetcher);
+    await fetchCrsRegistry(fetcher);
+    const api = Object.keys(github.headers).find((url) =>
+      url.startsWith('https://api.github.com/'),
+    );
+    const raw = Object.keys(github.headers).find((url) => url.includes('registry.json'));
+    expect(github.headers[api!].Authorization).toBe('Bearer ghp_secret');
+    expect(github.headers[raw!].Authorization).toBeUndefined();
+  });
+
+  it('changes nothing without a token', () => {
+    const github = fakeGithub({});
+    expect(withGitHubToken(github.fetcher, null)).toBe(github.fetcher);
+  });
+});
+
+describe('checkCrsPluginSupport', () => {
+  const [wordpress, fakeBot] = [REGISTRY.plugins[0], REGISTRY.plugins[1]].map(
+    (raw) => parseCrsRegistry({ plugins: [raw] })[0],
+  );
+
+  it('finds an installable plugin supported', async () => {
+    const github = fakeGithub({ [WORDPRESS_REPO]: WORDPRESS });
+    expect(await checkCrsPluginSupport(wordpress, 'v1.2.0', github.fetcher)).toEqual({
+      supported: true,
+    });
+  });
+
+  it('names why a plugin cannot load, as a verdict rather than a throw', async () => {
+    const github = fakeGithub({ 'coreruleset/fake-bot-plugin': FAKE_BOT });
+    const verdict = await checkCrsPluginSupport(fakeBot, 'v1.1.0', github.fetcher);
+    expect(verdict.supported).toBe(false);
+    expect(verdict.supported === false && verdict.reason).toBe('files');
+  });
+
+  it('reports a descriptor that excludes Coraza, and a repository with no rules', async () => {
+    const engine = fakeGithub({
+      [WORDPRESS_REPO]: {
+        ...WORDPRESS,
+        descriptor: ['compatibility:', '  engines:', '    - modsecurity3', ''].join('\n'),
+      },
+    });
+    const noRules = fakeGithub({ [WORDPRESS_REPO]: { release: 'v9', files: {} } });
+    const reason = async (promise: ReturnType<typeof checkCrsPluginSupport>) => {
+      const verdict = await promise;
+      return verdict.supported ? null : verdict.reason;
+    };
+    expect(await reason(checkCrsPluginSupport(wordpress, 'v1.2.0', engine.fetcher))).toBe('engine');
+    expect(await reason(checkCrsPluginSupport(wordpress, 'v9', noRules.fetcher))).toBe('noRules');
+  });
+
+  it('still throws when GitHub cannot be reached, which says nothing about the plugin', async () => {
+    const github = fakeGithub({ [WORDPRESS_REPO]: WORDPRESS });
+    github.status.rateLimited = true;
+    expect(await codeOf(checkCrsPluginSupport(wordpress, 'v1.2.0', github.fetcher))).toBe(
+      'crsPluginRateLimited',
     );
   });
 });

@@ -7,11 +7,12 @@ import { vi } from '@/tests/helpers/vi';
 import { createTestDb, currentDb, type TestDb } from '../helpers/db';
 import { crsPlugins, proxyHosts, users } from '../../src/lib/db/schema';
 import { DomainError } from '../../src/lib/domain-error';
-import { resetCrsRegistryCache } from '../../src/lib/crs-plugins/registry';
 import { FAKE_BOT, WORDPRESS, fakeGithub } from '../helpers/fake-github';
 
 let db: TestDb;
 let globalWaf: { plugin_ids?: number[] } | null = null;
+// The registry settings and the sync state are settings rows; a map stands in for the table.
+const settingsStore = new Map<string, unknown>();
 
 vi.mock('../../src/lib/db', () => ({
   default: currentDb(() => db),
@@ -24,6 +25,10 @@ vi.mock('../../src/lib/caddy', () => ({ applyCaddyConfig }));
 vi.mock('../../src/lib/settings', () => ({
   getWafSettings: async () => globalWaf,
   getDashboardSettings: async () => ({ options: { meta: null } }),
+  getSetting: async (key: string) => structuredClone(settingsStore.get(key) ?? null),
+  setSetting: async (key: string, value: unknown) => {
+    settingsStore.set(key, structuredClone(value));
+  },
 }));
 
 import {
@@ -56,7 +61,7 @@ async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
 beforeEach(async () => {
   db = await createTestDb();
   vi.clearAllMocks();
-  resetCrsRegistryCache();
+  settingsStore.clear();
   globalWaf = null;
   const now = new Date().toISOString();
   const [user] = await db
@@ -78,7 +83,12 @@ beforeEach(async () => {
 describe('installCrsPlugin', () => {
   it('stores the release it fetched and marks it installed in the registry', async () => {
     const github = fakeGithub({ [WORDPRESS_REPO]: WORDPRESS });
-    const plugin = await installCrsPlugin('wordpress-rule-exclusions', userId, github.fetcher);
+    const plugin = await installCrsPlugin(
+      'official',
+      'wordpress-rule-exclusions',
+      userId,
+      github.fetcher,
+    );
     expect(plugin).toMatchObject({
       name: 'wordpress-rule-exclusions',
       version: 'v1.2.0',
@@ -104,14 +114,16 @@ describe('installCrsPlugin', () => {
       [WORDPRESS_REPO]: WORDPRESS,
       'coreruleset/fake-bot-plugin': FAKE_BOT,
     });
-    await installCrsPlugin('wordpress-rule-exclusions', userId, github.fetcher);
+    await installCrsPlugin('official', 'wordpress-rule-exclusions', userId, github.fetcher);
     expect(
-      await codeOf(installCrsPlugin('wordpress-rule-exclusions', userId, github.fetcher)),
+      await codeOf(
+        installCrsPlugin('official', 'wordpress-rule-exclusions', userId, github.fetcher),
+      ),
     ).toBe('crsPluginAlreadyInstalled');
-    expect(await codeOf(installCrsPlugin('nope', userId, github.fetcher))).toBe(
+    expect(await codeOf(installCrsPlugin('official', 'nope', userId, github.fetcher))).toBe(
       'crsPluginNotInRegistry',
     );
-    expect(await codeOf(installCrsPlugin('fake-bot', userId, github.fetcher))).toBe(
+    expect(await codeOf(installCrsPlugin('official', 'fake-bot', userId, github.fetcher))).toBe(
       'crsPluginRejected',
     );
     expect(await listCrsPlugins()).toHaveLength(1);
@@ -121,7 +133,12 @@ describe('installCrsPlugin', () => {
 describe('setCrsPluginConfig', () => {
   it('stores an edit, checks its rule ids, and goes back to upstream on blank', async () => {
     const github = fakeGithub({ [WORDPRESS_REPO]: WORDPRESS });
-    const { id } = await installCrsPlugin('wordpress-rule-exclusions', userId, github.fetcher);
+    const { id } = await installCrsPlugin(
+      'official',
+      'wordpress-rule-exclusions',
+      userId,
+      github.fetcher,
+    );
 
     expect((await setCrsPluginConfig(id, `${CONFIG}\r\n`, userId)).configOverride).toBe(CONFIG);
     expect((await getCrsPluginRules()).get(id)?.config).toBe(CONFIG);
@@ -136,7 +153,12 @@ describe('setCrsPluginConfig', () => {
 
   it('applies the config when something selects the plugin', async () => {
     const github = fakeGithub({ [WORDPRESS_REPO]: WORDPRESS });
-    const { id } = await installCrsPlugin('wordpress-rule-exclusions', userId, github.fetcher);
+    const { id } = await installCrsPlugin(
+      'official',
+      'wordpress-rule-exclusions',
+      userId,
+      github.fetcher,
+    );
     globalWaf = { plugin_ids: [id] };
     await setCrsPluginConfig(id, CONFIG, userId);
     expect(applyCaddyConfig).toHaveBeenCalledTimes(1);
@@ -147,7 +169,12 @@ describe('updateCrsPlugin', () => {
   it('moves to the latest release and keeps the edited config', async () => {
     const repo = { ...WORDPRESS };
     const github = fakeGithub({ [WORDPRESS_REPO]: repo });
-    const { id } = await installCrsPlugin('wordpress-rule-exclusions', userId, github.fetcher);
+    const { id } = await installCrsPlugin(
+      'official',
+      'wordpress-rule-exclusions',
+      userId,
+      github.fetcher,
+    );
     await setCrsPluginConfig(id, CONFIG, userId);
 
     expect(await checkCrsPluginUpdates(github.fetcher)).toEqual(new Map());
@@ -164,7 +191,12 @@ describe('updateCrsPlugin', () => {
 describe('uninstallCrsPlugin', () => {
   it('refuses while the global settings or a host select it', async () => {
     const github = fakeGithub({ [WORDPRESS_REPO]: WORDPRESS });
-    const { id } = await installCrsPlugin('wordpress-rule-exclusions', userId, github.fetcher);
+    const { id } = await installCrsPlugin(
+      'official',
+      'wordpress-rule-exclusions',
+      userId,
+      github.fetcher,
+    );
 
     globalWaf = { plugin_ids: [id] };
     expect(await codeOf(uninstallCrsPlugin(id, userId))).toBe('crsPluginInUseGlobally');
