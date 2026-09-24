@@ -25,6 +25,9 @@ services:
       # Pinned as admin.listen into a config loaded with no agent in between, as the agent pins every
       # config it forwards. Must match caddy's CADDY_ADMIN_LISTEN.
       CADDY_ADMIN_LISTEN: caddy-admin:2019
+      # Re-apply this controller's config to a Caddy that drifted from it. A Settings field; this is
+      # the first-start default. Off only on a controller sharing a Caddy it does not own.
+      CADDY_MONITOR_ENABLED: ${CADDY_MONITOR_ENABLED:-true}
 
       # Where generated certificates are written. Defaults to <workdir>/data/certs.
       CERTS_DIRECTORY: ${CERTS_DIRECTORY:-}

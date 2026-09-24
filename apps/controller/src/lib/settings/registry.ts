@@ -293,6 +293,18 @@ export const caddyApiUrl = stringSetting({
   maxLength: 512,
 });
 
+export const caddyMonitorEnabled = booleanSetting({
+  name: "caddy_monitor_enabled",
+  env: "CADDY_MONITOR_ENABLED",
+  group: "application",
+  label: "Re-apply after a Caddy restart",
+  description:
+    "Watch every Caddy for a restart onto a config this controller did not send, and push its " +
+    "configuration back. Turn it off only on a controller sharing a Caddy it does not own, or " +
+    "the two push their own idea of the config at each other every pass.",
+  default: true,
+});
+
 export const gravatarEnabled = booleanSetting({
   name: "avatar_gravatar",
   env: "AVATAR_GRAVATAR",
@@ -636,6 +648,7 @@ export const SETTING_DEFINITIONS = [
   appName,
   baseUrl,
   caddyApiUrl,
+  caddyMonitorEnabled,
   gravatarEnabled,
   forwardAuthInternalUrl,
   caddyBuildTimeout,

@@ -2106,6 +2106,10 @@
         "description": "Where Caddy's admin API is reachable, for a deployment running Caddy with no agent. With an agent, every admin call is proxied through it and this is not used.",
         "label": "Caddy admin API"
       },
+      "caddy_monitor_enabled": {
+        "label": "Re-apply after a Caddy restart",
+        "description": "Watch every Caddy for a restart onto a config this controller did not send, and push its configuration back. Turn it off only on a controller sharing a Caddy it does not own, or the two push their own idea of the config at each other every pass."
+      },
       "caddy_build_timeout": {
         "description": "How long to wait for an xcaddy rebuild before giving up. Caddy compiles from source, so slow or ARM hosts can take considerably longer than the default.",
         "label": "Caddy build timeout (seconds)"

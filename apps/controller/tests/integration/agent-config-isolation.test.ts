@@ -194,6 +194,28 @@ describe('a rogue agent', () => {
     await checkCaddyHealth(0);
     await waitFor(() => loadsOn(agent).length > 0);
   });
+
+  it('does nothing while the setting is off, and resumes when it is turned back on', async () => {
+    // Read on every pass, not when the monitor starts: the switch must work without a restart.
+    const { clearStoredSetting, saveSettings } = await import('../../src/lib/settings/resolve');
+    const { caddyMonitorEnabled } = await import('../../src/lib/settings/registry');
+    const agent = await startFakeAgent({
+      caddyAdmin: { status: 200, text: '{"apps":{"http":{"servers":{}}}}' },
+    });
+    try {
+      await saveSettings({ [caddyMonitorEnabled.key]: false });
+      await checkCaddyHealth(0);
+      await Bun.sleep(50);
+      expect(getMonitorState()[agent.agentId]).toBeUndefined();
+      expect(loadsOn(agent)).toHaveLength(0);
+
+      await saveSettings({ [caddyMonitorEnabled.key]: true });
+      await checkCaddyHealth(0);
+      await waitFor(() => loadsOn(agent).length > 0);
+    } finally {
+      await clearStoredSetting(caddyMonitorEnabled.key);
+    }
+  });
 });
 
 describe('validating a Caddyfile snippet', () => {
