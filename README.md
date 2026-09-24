@@ -31,7 +31,7 @@ Download `caddy-proxy-manager-<version>-deploy.tar.gz` from the
 release - so it runs from wherever it is unpacked, and no clone is needed.
 
 ```bash
-VERSION=v3.2.1   # the release you downloaded
+VERSION=v3.3.0   # the release you downloaded
 mkdir caddy-proxy-manager && cd caddy-proxy-manager
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 
