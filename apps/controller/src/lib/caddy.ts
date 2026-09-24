@@ -106,6 +106,7 @@ import { buildRoleMaps } from "./models/mtls-roles";
 import { getAccessRulesForHosts } from "./models/mtls-access-rules";
 import { getWafPresetDirectives } from "./models/waf-presets";
 import { getCrsPluginRules } from "./models/crs-plugins";
+import { loadWithCrsPluginRecovery } from "./crs-plugins/recovery";
 import { type CrsPluginRules, buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
 import {
@@ -117,7 +118,12 @@ import {
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { FORWARD_AUTH_PROXY_PROOF_HEADER, getForwardAuthProxyProof } from "./forward-auth-trust";
 import { decryptSecret } from "./secret";
-import { CaddyApplyError, describeCaddyRejection, logCaddyApplyFailure } from "./caddy-apply-error";
+import {
+  CaddyApplyError,
+  describeCaddyRejection,
+  describeWafRejection,
+  logCaddyApplyFailure,
+} from "./caddy-apply-error";
 import { currentStagingScope } from "./settings/staging-context";
 
 const CERTS_DIR = process.env.CERTS_DIRECTORY || join(process.cwd(), "data", "certs");
@@ -3607,6 +3613,7 @@ function assertCaddyAccepted(response: { status: number; text: string }, who: st
       ? `Caddy rejected configuration${where}: ${reason}`
       : `Caddy rejected configuration${where}`,
     "CADDY_REJECTED",
+    describeWafRejection(response.text),
   );
 }
 
@@ -3678,7 +3685,11 @@ export async function applyCaddyConfig() {
   if (currentStagingScope()?.suppressApply) {
     return;
   }
+  // A CRS plugin Coraza will not build is switched off rather than left to fail every apply.
+  await loadWithCrsPluginRecovery(loadEveryAgent);
+}
 
+async function loadEveryAgent(): Promise<void> {
   const { broadcastCaddyAdmin, listAgentTargets } = await import("./agent/client");
   const targets = await listAgentTargets();
 
@@ -3757,7 +3768,7 @@ export async function applyCaddyConfigToAgent(agent: {
   name: string;
 }): Promise<void> {
   if (currentStagingScope()?.suppressApply) return;
-  await loadOne(agent, agent.name);
+  await loadWithCrsPluginRecovery(() => loadOne(agent, agent.name));
 }
 
 /**

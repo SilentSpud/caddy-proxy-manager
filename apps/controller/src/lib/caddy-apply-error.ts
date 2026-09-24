@@ -2,14 +2,40 @@ import { randomUUID } from "node:crypto";
 
 export type CaddyApplyErrorCode = "CADDY_REJECTED" | "CADDY_UNREACHABLE" | "CADDY_REQUEST_FAILED";
 
+/** What a rejection says about the WAF, read out of Caddy's body without repeating any of it. */
+export type WafRejection = {
+  /** Coraza could not build a WAF handler: a directive it will not compile. */
+  wafFailed: boolean;
+  /** Rule ids the error quotes, which point at whatever defined them. */
+  ruleIds: number[];
+};
+
 export class CaddyApplyError extends Error {
   readonly code: CaddyApplyErrorCode;
+  readonly waf: WafRejection;
 
-  constructor(message: string, code: CaddyApplyErrorCode) {
+  constructor(
+    message: string,
+    code: CaddyApplyErrorCode,
+    waf: WafRejection = { wafFailed: false, ruleIds: [] },
+  ) {
     super(message);
     this.name = "CaddyApplyError";
     this.code = code;
+    this.waf = waf;
   }
+}
+
+/** Coraza's own wording, from the handler it failed to provision. */
+const WAF_BUILD_FAILURE = /provision http\.handlers\.waf|invalid WAF config/i;
+
+export function describeWafRejection(responseBody: string): WafRejection {
+  if (!WAF_BUILD_FAILURE.test(responseBody)) return { wafFailed: false, ruleIds: [] };
+  // The body escapes the directive it quotes, so an id can arrive as `\"id:123`.
+  const ruleIds = [...responseBody.matchAll(/(?:^|[^A-Za-z])id\s*:\s*'?(\d+)/g)].map((m) =>
+    Number(m[1]),
+  );
+  return { wafFailed: true, ruleIds: [...new Set(ruleIds)] };
 }
 
 export function safeSystemErrorCode(error: unknown): string | null {

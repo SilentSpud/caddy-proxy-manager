@@ -22,6 +22,11 @@ import {
   verdictKey,
 } from "../crs-plugins/sync";
 import { getDashboardSettings, getWafSettings } from "../settings";
+import {
+  type CrsPluginLoadFailure,
+  getCrsPluginQuarantine,
+  releaseCrsPlugin,
+} from "../crs-plugins/quarantine";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -110,7 +115,10 @@ export async function getCrsPlugin(id: number): Promise<CrsPlugin | null> {
  */
 export async function getCrsPluginRules(): Promise<Map<number, CrsPluginRules>> {
   const rules = new Map<number, CrsPluginRules>();
+  // Left out like an uninstalled plugin: a host still selecting it loads the rest of its WAF.
+  const quarantine = await getCrsPluginQuarantine();
   for (const row of await db.select().from(crsPlugins)) {
+    if (row.id in quarantine) continue;
     const plugin: CrsPluginRules = {
       config: row.configOverride ?? row.configRules,
       before: row.beforeRules,
@@ -380,6 +388,8 @@ export async function updateCrsPlugin(
     summary: `Updated CRS plugin ${existing.name} to ${release.version}`,
   });
 
+  // A new release or config is worth another try, if Caddy refused the old one.
+  await releaseCrsPlugin(id);
   await applyIfSelected(id);
   return toCrsPlugin(record);
 }
@@ -414,6 +424,8 @@ export async function setCrsPluginConfig(
     summary: `Configured CRS plugin ${existing.name}`,
   });
 
+  // A new release or config is worth another try, if Caddy refused the old one.
+  await releaseCrsPlugin(id);
   await applyIfSelected(id);
   return toCrsPlugin(record);
 }
@@ -435,6 +447,7 @@ export async function uninstallCrsPlugin(id: number, actorUserId: number): Promi
   }
 
   await db.delete(crsPlugins).where(eq(crsPlugins.id, id));
+  await releaseCrsPlugin(id);
 
   await logAuditEvent({
     userId: actorUserId,
@@ -443,4 +456,34 @@ export async function uninstallCrsPlugin(id: number, actorUserId: number): Promi
     entityId: id,
     summary: `Uninstalled CRS plugin ${existing.name}`,
   });
+}
+
+/** Installed plugins Caddy refused to load the WAF with, by id; see crs-plugins/recovery.ts. */
+export async function crsPluginLoadFailures(): Promise<Map<number, CrsPluginLoadFailure>> {
+  const [quarantine, plugins] = await Promise.all([getCrsPluginQuarantine(), listCrsPlugins()]);
+  return new Map(
+    plugins.flatMap((plugin) => {
+      const failure = quarantine[plugin.id];
+      return failure ? [[plugin.id, failure] as const] : [];
+    }),
+  );
+}
+
+/**
+ * Switches a disabled plugin back on and applies the config. Returns false when Caddy refused it
+ * again, in which case the recovery has switched it off once more.
+ */
+export async function retryCrsPlugin(id: number, actorUserId: number): Promise<boolean> {
+  const existing = await getCrsPlugin(id);
+  if (!existing) throw domainError("crsPluginNotFound", {}, { status: 404 });
+  if (!(await releaseCrsPlugin(id))) return true;
+  await logAuditEvent({
+    userId: actorUserId,
+    action: "update",
+    entityType: "crs_plugin",
+    entityId: id,
+    summary: `Re-enabled CRS plugin ${existing.name}`,
+  });
+  await applyCaddyConfig();
+  return !(id in (await getCrsPluginQuarantine()));
 }

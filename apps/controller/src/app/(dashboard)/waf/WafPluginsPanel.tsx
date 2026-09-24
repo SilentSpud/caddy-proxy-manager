@@ -48,6 +48,8 @@ export type WafPluginRow = {
   afterRules: string;
   configOverride: string | null;
   fileNames: string[];
+  /** When Caddy refused to load the WAF with it and it was switched off; null while it loads. */
+  loadFailedAt: string | null;
   updatedAt: string;
   usedGlobally: boolean;
   usedByDashboard: boolean;
@@ -215,6 +217,11 @@ export function WafPluginsPanel({
       render: (row) => (
         <HStack gap={1} wrap="wrap">
           <Token size="sm" label={shortVersion(row.version)} />
+          {row.loadFailedAt && (
+            <Tooltip content={t("pluginDisabledTooltip")}>
+              <Token size="sm" color="red" label={t("pluginDisabled")} />
+            </Tooltip>
+          )}
           {row.configOverride !== null && (
             <Token size="sm" color="blue" label={t("pluginConfigEdited")} />
           )}

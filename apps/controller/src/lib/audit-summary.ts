@@ -78,6 +78,18 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   },
   {
     entityType: "crs_plugin",
+    action: "update",
+    message: "crsPluginDisabled",
+    pattern: /^Disabled CRS plugin (?<name>\S+): Caddy refused to load it$/s,
+  },
+  {
+    entityType: "crs_plugin",
+    action: "update",
+    message: "crsPluginReenabled",
+    pattern: /^Re-enabled CRS plugin (?<name>.+)$/s,
+  },
+  {
+    entityType: "crs_plugin",
     action: "delete",
     message: "crsPluginUninstalled",
     pattern: /^Uninstalled CRS plugin (?<name>.+)$/s,

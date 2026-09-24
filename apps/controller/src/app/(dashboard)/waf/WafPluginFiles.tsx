@@ -13,7 +13,8 @@ import { Token } from "@astryxdesign/core/Token";
 import { TreeList } from "@astryxdesign/core/TreeList";
 import { useTranslations } from "next-intl";
 import { CodeEditor } from "@/components/ui/CodeEditor";
-import { saveCrsPluginConfigAction } from "./actions";
+import { Timestamp } from "@/components/ui/Timestamp";
+import { retryCrsPluginAction, saveCrsPluginConfigAction } from "./actions";
 import type { WafPluginRow } from "./WafPluginsPanel";
 
 type FileKind = "config" | "before" | "after";
@@ -71,6 +72,19 @@ export function WafPluginFiles({
   const [config, setConfig] = useState(savedConfig);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  const retry = async () => {
+    setRetrying(true);
+    try {
+      const result = await retryCrsPluginAction(plugin.id, plugin.name);
+      if (result.status === "error") toast.error(result.message);
+      else toast.success(result.message);
+      router.refresh();
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const file = files.find((candidate) => candidate.name === selected) ?? files[0];
   const inUse = plugin.usedGlobally || plugin.usedByDashboard || plugin.hostCount > 0;
@@ -163,6 +177,28 @@ export function WafPluginFiles({
                 />
               </HStack>
             </HStack>
+            {plugin.loadFailedAt && (
+              <VStack gap={2} paddingInline={3} paddingBlockEnd={3}>
+                <Banner
+                  status="error"
+                  title={t("pluginDisabledTitle")}
+                  description={t("pluginDisabledDescription")}
+                  endContent={
+                    <HStack gap={2} vAlign="center">
+                      <Text type="body" size="xsm" color="secondary">
+                        <Timestamp value={plugin.loadFailedAt} />
+                      </Text>
+                      <Button
+                        size="sm"
+                        label={t("pluginRetry")}
+                        isLoading={retrying}
+                        onClick={() => void retry()}
+                      />
+                    </HStack>
+                  }
+                />
+              </VStack>
+            )}
             {isConfig && (error || inUse) && (
               <VStack gap={2} paddingInline={3} paddingBlockEnd={3}>
                 {error && <Banner status="error" title={error} />}

@@ -15,6 +15,7 @@ import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { getWafPresetUsage, listWafPresets, toWafPresetOption } from "@/src/lib/models/waf-presets";
 import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/WafPresetOptions";
 import {
+  crsPluginLoadFailures,
   getCrsPluginUsage,
   listCrsPlugins,
   storedCrsPluginUpdates,
@@ -108,6 +109,7 @@ export default async function WafPage({ searchParams }: PageProps) {
     plugins,
     pluginUsage,
     pluginUpdates,
+    pluginFailures,
   ] = await Promise.all([
     listWafEvents(PER_PAGE, offset, filter, from, to),
     countWafEvents(filter, from, to),
@@ -119,6 +121,7 @@ export default async function WafPage({ searchParams }: PageProps) {
     listCrsPlugins(),
     withStagedReads(overlay, () => getCrsPluginUsage()),
     storedCrsPluginUpdates(),
+    crsPluginLoadFailures(),
   ]);
 
   const globalExcludedIds = globalWaf?.excluded_rule_ids ?? [];
@@ -179,6 +182,7 @@ export default async function WafPage({ searchParams }: PageProps) {
             afterRules: plugin.afterRules,
             configOverride: plugin.configOverride,
             fileNames: plugin.fileNames,
+            loadFailedAt: pluginFailures.get(plugin.id)?.at ?? null,
             updatedAt: plugin.updatedAt,
             usedGlobally: usage?.global ?? false,
             usedByDashboard: usage?.dashboard ?? false,

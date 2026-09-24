@@ -109,7 +109,11 @@ Some plugins cannot run here, and are refused - both by the check and at install
   `SecRuleUpdateTarget*` exclusions, or `ctl:ruleEngine`.
 
 These checks read the rules rather than compile them, so a plugin that passes can still, rarely,
-be one Coraza refuses. If Caddy then rejects a config, deselect the plugin you just selected.
+be one Coraza refuses - and Coraza building the WAF is part of Caddy loading its config, so one
+such plugin would stop every host's config from loading. When that happens the plugin is found and
+switched off, and the config loads without it: hosts that select it keep the rest of their WAF.
+The plugin is marked **Disabled**, with the reason and a **Retry** button in its row, and the
+audit log records it. Updating it or editing its configuration tries it again.
 
 :::caution
 The registry records who vetted a plugin; it is not a code audit. A plugin's rules run in front of

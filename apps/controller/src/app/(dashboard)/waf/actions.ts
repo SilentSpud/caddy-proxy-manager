@@ -16,6 +16,7 @@ import {
   installCrsPlugin,
   installedCrsPluginRepositories,
   listCrsRegistry,
+  retryCrsPlugin,
   setCrsPluginConfig,
   uninstallCrsPlugin,
   updateCrsPlugin,
@@ -41,7 +42,8 @@ type FallbackKey =
   | "pluginConfigFailed"
   | "pluginUninstallFailed"
   | "pluginRegistrySaveFailed"
-  | "pluginRegistryCheckFailed";
+  | "pluginRegistryCheckFailed"
+  | "pluginRetryError";
 
 async function failure(error: unknown, fallbackKey: FallbackKey) {
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
@@ -240,5 +242,20 @@ export async function uninstallCrsPluginAction(id: number): Promise<ActionState>
     return actionSuccess(t("pluginUninstalled"));
   } catch (error) {
     return failure(error, "pluginUninstallFailed");
+  }
+}
+
+/** Switches a plugin Caddy refused back on; the result says whether Caddy took it this time. */
+export async function retryCrsPluginAction(id: number, name: string): Promise<ActionState> {
+  try {
+    const session = await requireAdmin();
+    const loaded = await retryCrsPlugin(id, Number(session.user.id));
+    revalidatePath("/waf");
+    const t = await getTranslations("waf");
+    return loaded
+      ? actionSuccess(t("pluginRetryWorked", { name }))
+      : { status: "error", message: t("pluginRetryFailed", { name }) };
+  } catch (error) {
+    return failure(error, "pluginRetryError");
   }
 }
