@@ -24,6 +24,8 @@ import {
   type AgentLifecycle as Lifecycle,
   type AgentLocalState,
   type AgentServerEvent,
+  CADDY_VALIDATE_REFUSED_STATUS,
+  type CaddyValidateRequest,
   MANAGED_SERVICES,
   MAX_CADDY_CONFIG_BYTES,
   SHIPPED_CADDY_MODULES,
@@ -558,9 +560,9 @@ export class AgentLifecycle {
   /**
    * Run one command and hand the answer back.
    *
-   * The only kind is a Caddy admin call, and it is the one thing in the protocol the controller
-   * blocks on: inverting the dial direction is what forced it onto the stream rather than leaving
-   * it a request the controller could simply make.
+   * Commands are the one thing in the protocol the controller blocks on: inverting the dial
+   * direction is what forced them onto the stream rather than leaving them requests the controller
+   * could simply make.
    */
   private async execute(command: AgentCommand): Promise<void> {
     const result = await this.runCommand(command);
@@ -575,6 +577,7 @@ export class AgentLifecycle {
   }
 
   private async runCommand(command: AgentCommand): Promise<AgentCommandResult> {
+    if (command.kind === "caddy-validate") return this.runValidate(command.id, command.request);
     if (!isAllowedAdminPath(command.request.path)) {
       return {
         id: command.id,
@@ -614,6 +617,25 @@ export class AgentLifecycle {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /**
+   * `caddy validate` for the controller. Not pinned like a load: nothing binds, and the container
+   * it runs in has no network to bind on.
+   */
+  private async runValidate(
+    id: string,
+    request: CaddyValidateRequest,
+  ): Promise<AgentCommandResult> {
+    if (typeof request?.config !== "string" || request.config.length > MAX_CADDY_CONFIG_BYTES) {
+      return { id, ok: false, code: "BAD_REQUEST", error: "The config is missing or too large." };
+    }
+    const validation = await this.deps.docker.validateCaddyConfig(request.config);
+    if (validation.state === "unavailable") {
+      return { id, ok: false, code: "BUSY", error: validation.reason };
+    }
+    const status = validation.state === "accepted" ? 200 : CADDY_VALIDATE_REFUSED_STATUS;
+    return { id, ok: true, response: { status, text: validation.output, headers: {} } };
   }
 
   // ─── Caddy ─────────────────────────────────────────────────────────────────

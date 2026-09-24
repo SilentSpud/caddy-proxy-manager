@@ -22,6 +22,7 @@ import {
   verdictKey,
 } from "../crs-plugins/sync";
 import { getDashboardSettings, getWafSettings } from "../settings";
+import { assertWafLoads, wafCandidatesSelecting } from "../waf-dry-run";
 import {
   type CrsPluginLoadFailure,
   getCrsPluginQuarantine,
@@ -297,6 +298,11 @@ export async function installCrsPlugin(
   const github = await githubFetcher(fetcher);
   const version = await resolveCrsPluginVersion(entry, github);
   const release = await fetchCrsPluginRelease(entry, version, github);
+  await assertPluginLoads(null, {
+    config: release.configRules,
+    before: release.beforeRules,
+    after: release.afterRules,
+  });
   const now = nowIso();
   const [record] = await db
     .insert(crsPlugins)
@@ -328,6 +334,29 @@ export async function installCrsPlugin(
 
   // Nothing selects a new plugin yet, so there is no config to apply.
   return toCrsPlugin(record);
+}
+
+/**
+ * Has Caddy compile the plugin alongside the CRS, and in every WAF selecting it, with `rules` in
+ * place of what is stored. A plugin being installed has no id yet and nothing selects it.
+ */
+async function assertPluginLoads(id: number | null, rules: CrsPluginRules): Promise<void> {
+  const probeId = id ?? 0;
+  const plugins = new Map(await getCrsPluginRules()).set(probeId, rules);
+  const alone = {
+    enabled: true,
+    mode: "On" as const,
+    load_owasp_crs: true,
+    custom_directives: "",
+    plugin_ids: [probeId],
+  };
+  const selecting =
+    id === null
+      ? []
+      : await wafCandidatesSelecting(
+          (waf) => waf.load_owasp_crs && (waf.plugin_ids ?? []).includes(id),
+        );
+  await assertWafLoads([{ target: { kind: "plugin" }, waf: alone }, ...selecting], { plugins });
 }
 
 async function applyIfSelected(id: number): Promise<void> {
@@ -362,6 +391,11 @@ export async function updateCrsPlugin(
   if (existing.configOverride !== null) {
     assertCrsPluginRulesLoadable([existing.configOverride], entry.ruleIdStart, entry.ruleIdEnd);
   }
+  await assertPluginLoads(id, {
+    config: existing.configOverride ?? release.configRules,
+    before: release.beforeRules,
+    after: release.afterRules,
+  });
 
   const [record] = await db
     .update(crsPlugins)
@@ -409,6 +443,11 @@ export async function setCrsPluginConfig(
     assertCrsPluginRulesLoadable([override], existing.ruleIdStart, existing.ruleIdEnd);
   }
   if (override === existing.configOverride) return existing;
+  await assertPluginLoads(id, {
+    config: override ?? existing.configRules,
+    before: existing.beforeRules,
+    after: existing.afterRules,
+  });
 
   const [record] = await db
     .update(crsPlugins)

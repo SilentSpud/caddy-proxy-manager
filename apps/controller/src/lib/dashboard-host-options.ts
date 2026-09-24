@@ -92,6 +92,8 @@ export async function readDashboardHostOptions(
     customCaddyfileChanged:
       updates.customCaddyfile !== undefined &&
       proxyHostMetaView(meta).customCaddyfile !== proxyHostMetaView(base.meta).customCaddyfile,
+    previousMeta: base.meta,
+    target: { kind: "dashboard" },
   });
 
   return {

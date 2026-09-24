@@ -76,6 +76,11 @@ controller never dials the agent. Three consequences worth knowing before touchi
   a six-letter code. Both land in the same route and the same registry - only where the credential
   came from differs. An agentId that is already paired is re-paired only with a credential minted
   for that agent (the Re-pair action), never the shared code.
+- **A command kind an agent has not listed in `AgentStatus.capabilities` must not be sent.** An
+  older agent answers an unknown kind with silence, and the caller waits out the command timeout.
+  `caddy-validate` is the one listed today: the agent runs `caddy validate` in a throwaway,
+  network-less container from Caddy's image, which is how a WAF save is checked against the real
+  Coraza (`lib/waf-dry-run.ts`) without loading anything.
 - **An agent is less trusted than the controller.** Whatever one agent answers may only shape that
   agent's own config: Caddyfile snippets are adapted by the agent the document is loaded onto
   (`CaddyAdminRequest.agentId`), and the health monitor re-applies per agent. The unpinned "primary"

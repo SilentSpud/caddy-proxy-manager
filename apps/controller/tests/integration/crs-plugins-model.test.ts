@@ -2,12 +2,13 @@
  * Integration: src/lib/models/crs-plugins.ts against a real database and a fake GitHub - install,
  * update, the config edit, the in-use guard on uninstall, and what the Caddy builder is handed.
  */
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { createTestDb, currentDb, type TestDb } from '../helpers/db';
 import { crsPlugins, proxyHosts, users } from '../../src/lib/db/schema';
 import { DomainError } from '../../src/lib/domain-error';
 import { FAKE_BOT, WORDPRESS, fakeGithub } from '../helpers/fake-github';
+import { type CaddyValidator, setCaddyValidator } from '../../src/lib/waf-dry-run';
 
 let db: TestDb;
 let globalWaf: { plugin_ids?: number[] } | null = null;
@@ -239,5 +240,50 @@ describe('getCrsPluginRules', () => {
       })
       .returning();
     expect((await getCrsPluginRules()).has(row.id)).toBe(false);
+  });
+});
+
+describe('Coraza checks', () => {
+  let restore: CaddyValidator | null = null;
+  afterEach(() => {
+    if (restore) setCaddyValidator(restore);
+    restore = null;
+  });
+
+  it('refuses a config edit the linter knows Coraza will not load', async () => {
+    const github = fakeGithub({ [WORDPRESS_REPO]: WORDPRESS });
+    const { id } = await installCrsPlugin(
+      'official',
+      'wordpress-rule-exclusions',
+      userId,
+      github.fetcher,
+    );
+    const error = await setCrsPluginConfig(id, 'SecAction "id:9507010,phase:9,pass"', userId).catch(
+      (e: unknown) => e,
+    );
+    expect((error as DomainError).code).toBe('crsPluginRejected');
+    expect((error as DomainError).message).toContain('Coraza would refuse it');
+  });
+
+  it('refuses a config edit Caddy will not load, with the edit in place of the stored file', async () => {
+    const github = fakeGithub({ [WORDPRESS_REPO]: WORDPRESS });
+    const { id } = await installCrsPlugin(
+      'official',
+      'wordpress-rule-exclusions',
+      userId,
+      github.fetcher,
+    );
+    const seen: string[] = [];
+    restore = setCaddyValidator(async (config) => {
+      seen.push(config);
+      return {
+        status: 422,
+        text: 'Error: provision http.handlers.waf: invalid WAF config from string: failed to compile the directive "secaction": duplicated rule id 9507010',
+      };
+    });
+    expect(await codeOf(setCrsPluginConfig(id, CONFIG, userId))).toBe('wafDryRunRejectedPlugin');
+    expect(seen[0]).toContain('tx.wordpress-rule-exclusions-plugin_enabled=0');
+    expect(seen[0]).toContain('"load_owasp_crs":true');
+    expect((await listCrsPlugins())[0].configOverride).toBeNull();
   });
 });

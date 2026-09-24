@@ -13,10 +13,22 @@ import { waitForHydration } from '../../helpers/hydration';
 import { clearSettingRow, runSeedScript, setSettingRow } from '../../helpers/seed';
 
 const DOMAIN = 'func-waf-plugin-recovery.test';
+const TRIGGER_DOMAIN = 'func-waf-plugin-recovery-trigger.test';
 
-/** Passes every static check - allowed directive, balanced quotes, id in range - but Coraza
- * refuses the unknown action, and its error quotes no rule id. */
-const BROKEN_RULE = 'SecRule ARGS "@rx x" "id:9599100,phase:1,pass,nolog,notanaction"';
+function globalWaf(pluginIds: number[]) {
+  return {
+    enabled: true,
+    mode: 'On',
+    load_owasp_crs: true,
+    custom_directives: '',
+    excluded_rule_ids: [],
+    plugin_ids: pluginIds,
+  };
+}
+
+/** Passes every static check, the linter's included, but Go's regexp refuses the reversed range,
+ * and Coraza's error quotes no rule id. Seeded, so the install-time dry run never sees it. */
+const BROKEN_RULE = 'SecRule ARGS "@rx [z-a]" "id:9599100,phase:1,pass,nolog"';
 const WORKING_RULE = 'SecRule ARGS "@rx x" "id:9598100,phase:1,pass,nolog"';
 
 function seedPlugin(name: string, start: number, before: string): number {
@@ -55,14 +67,7 @@ test.describe
       savedWaf = readSetting('waf');
       workingId = seedPlugin('e2e-working', 9598000, WORKING_RULE);
       brokenId = seedPlugin('e2e-broken', 9599000, BROKEN_RULE);
-      setSettingRow('waf', {
-        enabled: true,
-        mode: 'On',
-        load_owasp_crs: true,
-        custom_directives: '',
-        excluded_rule_ids: [],
-        plugin_ids: [brokenId, workingId],
-      });
+      setSettingRow('waf', globalWaf([]));
     });
 
     test.afterAll(() => {
@@ -76,14 +81,22 @@ test.describe
     });
 
     test('the config still loads: the host is served', async ({ page }) => {
-      // Creating a host applies the config. The host's WAF merges with the global one, which
-      // selects both plugins; a host created with its WAF off would opt out of them.
+      // The host's WAF merges with the global one. Saved before the global selects the plugins,
+      // since the save-time dry run would refuse the broken one - this recovery is for a plugin
+      // that got past those checks, which seeding the selection stands in for.
       await createProxyHost(page, {
         name: 'Functional WAF Plugin Recovery Test',
         domain: DOMAIN,
         upstream: 'echo-server:8080',
         enableWaf: true,
         wafMode: 'merge',
+      });
+      setSettingRow('waf', globalWaf([brokenId, workingId]));
+      // Any save applies the whole config; this host has its WAF off, so nothing is dry-run.
+      await createProxyHost(page, {
+        name: 'Functional WAF Plugin Recovery Trigger',
+        domain: TRIGGER_DOMAIN,
+        upstream: 'echo-server:8080',
       });
       await waitForRoute(DOMAIN);
       const res = await httpGet(DOMAIN, '/');

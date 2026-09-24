@@ -361,7 +361,10 @@ export function assertCrsPluginRulesLoadable(
   const range = { start: String(ruleIdStart), end: String(ruleIdEnd) };
   const details = rejections
     .slice(0, MAX_NAMED_REJECTIONS)
-    .map((entry) => `"${entry.line.slice(0, 160)}" - ${domainErrorMessage(entry.reason, range)}`);
+    .map(
+      (entry) =>
+        `"${entry.line.slice(0, 160)}" - ${domainErrorMessage(entry.reason, { ...range, ...entry.params })}`,
+    );
   throw domainError(
     "crsPluginRejected",
     // `reasons` is for checkCrsPluginSupport; the message does not print it.
@@ -376,6 +379,7 @@ const REJECTION_REASON: [string, CrsUnsupportedReason][] = [
   ["crsPluginPersistentCollection", "compile"],
   ["crsPluginUnbalancedQuotes", "compile"],
   ["crsPluginUnterminated", "compile"],
+  ["crsPluginInvalidSeclang", "compile"],
   ["crsPluginRuleIdOutOfRange", "ruleIds"],
   ["crsPluginDirectiveNotAllowed", "directives"],
   ["crsPluginCtlRuleEngine", "directives"],

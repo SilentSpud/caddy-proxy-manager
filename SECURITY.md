@@ -91,6 +91,8 @@ The controls that matter are therefore:
 - **The agent validates what it is told.** Desired state from the controller is checked on the
   agent before it reaches Docker: published ports, Caddy module paths, the environment variables a
   managed service may receive, and GeoIP edition names. Caddy admin calls pass a path allowlist.
+  A WAF dry run creates a container from the Caddy image itself, with no network, no mounts and
+  no capability but the one Caddy's binary needs, and copies the config in.
 - **The agent stays minimal.** Its image holds the compiled agent, the Docker CLI and the Compose
   plugin, and it is the only container on the proxy's internal network.
 - **The agent does not read `.env`.** It mounts the compose directory read-only to run Compose, but

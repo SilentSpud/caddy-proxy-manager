@@ -13,6 +13,7 @@ import { Token } from "@astryxdesign/core/Token";
 import { TreeList } from "@astryxdesign/core/TreeList";
 import { useTranslations } from "next-intl";
 import { CodeEditor } from "@/components/ui/CodeEditor";
+import { useSeclangIssues } from "@/components/ui/seclang-issues";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { retryCrsPluginAction, saveCrsPluginConfigAction } from "./actions";
 import type { WafPluginRow } from "./WafPluginsPanel";
@@ -70,6 +71,7 @@ export function WafPluginFiles({
   const upstreamConfig = plugin.configRules;
   const savedConfig = plugin.configOverride ?? upstreamConfig;
   const [config, setConfig] = useState(savedConfig);
+  const configIssues = useSeclangIssues(config);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -228,6 +230,7 @@ export function WafPluginFiles({
               }
               onChange={isConfig ? setConfig : undefined}
               isReadOnly={!isConfig}
+              issues={isConfig ? configIssues : undefined}
               overlay={
                 isConfig && (
                   <HStack gap={2}>

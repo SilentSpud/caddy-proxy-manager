@@ -14,12 +14,15 @@ import {
   droppedWafDirectiveDetails,
   filterCustomDirectives,
   findInvalidBodyLimitDirective,
+  seclangErrorDetails,
   isValidBodyLimit,
   normalizeWafPluginIds,
   normalizeWafPresetIds,
 } from "../caddy-waf";
 import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
+import { seclangErrors } from "../seclang";
+import { type WafDryRunTarget, assertWafLoads, wafCandidatesForHost } from "../waf-dry-run";
 import { agentIdsForHost, setHostAgents } from "./host-agents";
 import { assertWafPresetIdsExist } from "./waf-presets";
 import { assertCrsPluginIdsExist } from "./crs-plugins";
@@ -460,6 +463,16 @@ function validateWafMeta(waf: WafHostConfig): WafHostConfig {
     throw domainError(
       "hostWafDirectivesDropped",
       { count: dropped.length, details: droppedWafDirectiveDetails(dropped) },
+      { status: 400 },
+    );
+  }
+  const lintErrors = seclangErrors(waf.custom_directives ?? "", {
+    crsLoaded: waf.load_owasp_crs === true,
+  });
+  if (lintErrors.length > 0) {
+    throw domainError(
+      "hostWafDirectivesInvalid",
+      { count: lintErrors.length, details: seclangErrorDetails(lintErrors) },
       { status: 400 },
     );
   }
@@ -3016,6 +3029,9 @@ export async function assertProxyHostOptionsStorable(options: {
   agentIds: readonly number[];
   meta: string | null;
   customCaddyfileChanged: boolean;
+  /** The WAF block as stored before, so an unchanged one skips the dry run. */
+  previousMeta?: string | null;
+  target?: WafDryRunTarget;
 }): Promise<void> {
   await assertWildcardIssuable(options.domains, options.certificateId);
   if (options.customCaddyfileChanged) {
@@ -3024,6 +3040,26 @@ export async function assertProxyHostOptionsStorable(options: {
   await assertTailscaleServable(options.meta);
   await assertWafPresetIdsExist(parseMeta(options.meta).waf?.preset_ids);
   await assertCrsPluginIdsExist(parseMeta(options.meta).waf?.plugin_ids);
+  if (options.target) {
+    await assertHostWafLoads(
+      options.target,
+      parseMeta(options.previousMeta ?? null).waf,
+      parseMeta(options.meta).waf,
+    );
+  }
+}
+
+/**
+ * Has Caddy compile the host's WAF as it will be emitted, when the save changes it. After the
+ * id checks, so a missing preset is reported as that rather than as whatever Coraza makes of it.
+ */
+async function assertHostWafLoads(
+  target: WafDryRunTarget,
+  before: WafHostConfig | undefined,
+  after: WafHostConfig | undefined,
+): Promise<void> {
+  if (JSON.stringify(before ?? null) === JSON.stringify(after ?? null)) return;
+  await assertWafLoads(await wafCandidatesForHost(target, after));
 }
 
 function parseProxyHost(row: ProxyHostRow): ProxyHost {
@@ -3220,6 +3256,11 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
   await assertCrsPluginIdsExist(parseMeta(meta).waf?.plugin_ids);
+  await assertHostWafLoads(
+    { kind: "host", name: input.name.trim() },
+    undefined,
+    parseMeta(meta).waf,
+  );
   const [record] = await db
     .insert(proxyHosts)
     .values({
@@ -3361,6 +3402,11 @@ export async function updateProxyHost(
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
   await assertCrsPluginIdsExist(parseMeta(meta).waf?.plugin_ids);
+  await assertHostWafLoads(
+    { kind: "host", name: input.name ?? existing.name },
+    existingMeta.waf,
+    parseMeta(meta).waf,
+  );
 
   const now = nowIso();
   await db

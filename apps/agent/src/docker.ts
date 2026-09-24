@@ -7,7 +7,9 @@
  * create time, and compiled-in plugins.
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   isValidL4PortMapping,
@@ -453,7 +455,101 @@ export class DockerHost {
       return [];
     }
   }
+
+  /**
+   * `caddy validate` on a config, run by the binary this host's Caddy runs, without loading it.
+   *
+   * A throwaway container from the Caddy container's own image, so a rebuilt Caddy validates with
+   * its own modules. The socket proxy grants no exec, and a mount would hand the image this agent's
+   * data volume, so the config is copied into the created container before it starts. It keeps
+   * the image's user because Coraza opens the audit log, caddy-owned in the image, while building a
+   * WAF. No network: whatever the config says, it can reach nothing.
+   */
+  async validateCaddyConfig(config: string, timeoutSeconds = 45): Promise<CaddyValidation> {
+    const deadline = Date.now() + timeoutSeconds * 1000;
+    const remaining = () => Math.max(1, Math.round((deadline - Date.now()) / 1000));
+
+    const image = await run(
+      ["docker", "inspect", "--format", "{{.Image}}", this.config.caddyContainerName],
+      { timeoutSeconds: 15 },
+    );
+    if (!image.ok || !image.output.trim().startsWith("sha256:")) {
+      return { state: "unavailable", reason: "Caddy's container does not exist yet." };
+    }
+
+    const id = randomUUID();
+    const name = `cpm-caddy-validate-${id}`;
+    const local = join(tmpdir(), `${name}.json`);
+    writeFileSync(local, config, { mode: 0o644 });
+    try {
+      const create = await run(
+        [
+          "docker",
+          "create",
+          "--name",
+          name,
+          "--label",
+          "cpm.caddy-validate=1",
+          "--network",
+          "none",
+          "--cap-drop",
+          "ALL",
+          // The image's caddy carries it as a file capability, and exec fails without it.
+          "--cap-add",
+          "NET_BIND_SERVICE",
+          "--security-opt",
+          "no-new-privileges",
+          // `docker logs` below needs a driver it can read back, whatever the daemon defaults to.
+          "--log-driver",
+          "json-file",
+          "--entrypoint",
+          "caddy",
+          image.output.trim(),
+          "validate",
+          "--config",
+          VALIDATE_CONFIG_PATH,
+        ],
+        { timeoutSeconds: remaining() },
+      );
+      if (!create.ok) return { state: "unavailable", reason: tail(create.output, 3) };
+
+      // Started and waited on rather than `docker run`: attaching is a hijacked connection, which
+      // the socket proxy's HTTP mode is not trusted to pass.
+      for (const argv of [
+        ["docker", "cp", local, `${name}:${VALIDATE_CONFIG_PATH}`],
+        ["docker", "start", name],
+      ]) {
+        const step = await run(argv, { timeoutSeconds: remaining() });
+        if (!step.ok) return { state: "unavailable", reason: tail(step.output, 3) };
+      }
+      const wait = await run(["docker", "wait", name], { timeoutSeconds: remaining() });
+      if (!wait.ok) {
+        return {
+          state: "unavailable",
+          reason: wait.timedOut ? "caddy validate did not finish in time." : tail(wait.output, 3),
+        };
+      }
+      const logs = await run(["docker", "logs", name], { timeoutSeconds: remaining() });
+      const output = tail(logs.output, VALIDATE_TRANSCRIPT_LINES);
+      return { state: wait.output.trim() === "0" ? "accepted" : "refused", output };
+    } finally {
+      rmSync(local, { force: true });
+      // Also after a timeout, when the container may still be running.
+      await run(["docker", "rm", "--force", name], { timeoutSeconds: 15 });
+    }
+  }
 }
+
+/** Where the copied config sits in the validation container. /tmp is writable in any image. */
+const VALIDATE_CONFIG_PATH = "/tmp/cpm-validate.json";
+
+/** Caddy logs a line per module it provisions; the refusal is the last. */
+const VALIDATE_TRANSCRIPT_LINES = 40;
+
+export type CaddyValidation =
+  | { state: "accepted" | "refused"; output: string }
+  /** Nothing was learned about the config: there was no Caddy to ask, or asking failed. */
+  | { state: "unavailable"; reason: string };
 
 // ─── Generated compose files ─────────────────────────────────────────────────
 

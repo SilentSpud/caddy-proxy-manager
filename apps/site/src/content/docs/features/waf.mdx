@@ -108,10 +108,13 @@ Some plugins cannot run here, and are refused - both by the check and at install
 - A directive other than `SecRule`, `SecAction`, `SecMarker` and the `SecRuleRemove*` and
   `SecRuleUpdateTarget*` exclusions, or `ctl:ruleEngine`.
 
-These checks read the rules rather than compile them, so a plugin that passes can still, rarely,
-be one Coraza refuses - and Coraza building the WAF is part of Caddy loading its config, so one
-such plugin would stop every host's config from loading. When that happens the plugin is found and
-switched off, and the config loads without it: hosts that select it keep the rest of their WAF.
+An install, an update and a configuration edit also go through the checks in
+[Before anything is saved](#before-anything-is-saved), Caddy's own included. A plugin that gets
+past all of them can still, rarely, be one Coraza refuses - one seeded from a backup, say, or
+checked while no agent could run Caddy - and Coraza building the WAF is part of Caddy loading its
+config, so one such plugin would stop every host's config from loading. When that happens the
+plugin is found and switched off, and the config loads without it: hosts that select it keep the
+rest of their WAF.
 The plugin is marked **Disabled**, with the reason and a **Retry** button in its row, and the
 audit log records it. Updating it or editing its configuration tries it again.
 
@@ -141,6 +144,27 @@ SecRule REQUEST_URI "@beginsWith /api/" \
 Anything that would switch the engine off or rewrite rules - `SecRuleEngine`, `ctl:ruleEngine`,
 `SecRuleRemoveById` and the other `SecRule*` mutations, or `Include` - is refused when you save,
 with the offending lines named. To stop a rule from firing, suppress it instead.
+
+## Before anything is saved
+
+Coraza compiles every WAF while Caddy loads its config, so one rule it refuses would stop every
+host's config from loading, not just the one it was written for. Directives are checked twice
+before they are stored - custom directives, presets and a CRS plugin's files alike.
+
+- **As you type.** The editor reads the text the way Coraza does and marks each line it would
+  refuse: an unknown variable, operator, action or transformation, an action missing its value or
+  given one it does not take, a malformed rule, a repeated rule id, a disruptive action on a
+  chained rule, or a regular expression using lookaround, backreferences or anything else Go's
+  RE2 engine does not support. An error blocks the save. A warning - a rule with no id, or one in
+  the range the CRS reserves - does not.
+- **On save.** The agent has its own Caddy validate the WAFs the change produces - the edited one,
+  and every host that merges or selects it - without loading them. This is what catches the rest:
+  a rule id the CRS already uses, rules from the global settings and a host colliding once merged,
+  or a pattern Go refuses to compile. The error names the host and quotes Coraza.
+
+The second check runs in a short-lived container from the Caddy image, with no network, and takes
+a second or two. It needs a paired agent with Caddy started; without one the save goes ahead on
+the first check alone.
 
 ## The event log
 
