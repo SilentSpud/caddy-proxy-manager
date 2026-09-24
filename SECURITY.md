@@ -34,7 +34,7 @@ Our CI/CD pipeline implements multiple security layers:
    end-to-end suites and never touches the registry, so there is no build-and-push path for
    untrusted code to reach.
 2. **Only a release tag on `main` publishes**: `release.yml` tags a release when `package.json`'s
-   version changes on `main`, then dispatches the image build at that tag. The build's first job
+   version changes on `main`, then dispatches the image build at that tag and the docs site build on `main`. The build's first job
    refuses any ref that is not a `vX.Y.Z` tag whose commit is reachable from `main`, so a manual
    dispatch on a branch publishes nothing. Anyone who can push tags can still start a build, but
    only of a commit that already landed on `main`.

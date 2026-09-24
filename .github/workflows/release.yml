@@ -309,3 +309,7 @@ jobs:
           # reads the version off the tag.
           gh workflow run docker-build-trusted.yml --ref "$TAG"
           echo "Dispatched docker-build-trusted at ${TAG}"
+          # The docs site publishes per release rather than per push. On main, not the tag: the
+          # github-pages environment deploys from main only.
+          gh workflow run site.yml --ref main
+          echo "Dispatched site"

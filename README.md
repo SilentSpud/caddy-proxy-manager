@@ -1711,8 +1711,8 @@ Contributions welcome:
 
 ## Support
 
+- **Documentation:** [silentspud.github.io/caddy-proxy-manager](https://silentspud.github.io/caddy-proxy-manager/)
 - **Issues:** [GitHub Issues](https://github.com/silentspud/caddy-proxy-manager/issues) for bugs and feature requests
-- **Discussions:** [GitHub Discussions](https://github.com/silentspud/caddy-proxy-manager/discussions) for questions and ideas
 
 ---
 
