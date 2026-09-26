@@ -11,7 +11,14 @@ import {
   checkHostAccess,
   consumeRedirectIntent,
   hasLiveRedirectIntent,
+  redirectIntentWantsCaptcha,
 } from "@/src/lib/models/forward-auth";
+import {
+  CAPTCHA_PASS_CLEAR_COOKIE,
+  captchaPassFromCookieHeader,
+  redeemCaptchaPass,
+} from "@/src/lib/captcha/pass";
+import { getActiveCaptcha } from "@/src/lib/captcha/settings";
 import { logAuditEvent } from "@/src/lib/audit";
 import {
   accountKey,
@@ -63,6 +70,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("invalidRedirectIntent") }, { status: 400 });
     }
 
+    // Unless the host this sign-in is for has opted out, the same gate as the dashboard's: one
+    // solve, one attempt, spent whatever the password turns out to be.
+    const captchaGated =
+      (await getActiveCaptcha()) !== null && (await redirectIntentWantsCaptcha(rid));
+    if (
+      captchaGated &&
+      !redeemCaptchaPass(captchaPassFromCookieHeader(request.headers.get("cookie")), username)
+    ) {
+      return NextResponse.json(
+        { error: t("captchaRequired"), code: "CAPTCHA_REQUIRED" },
+        { status: 403 },
+      );
+    }
+    const spentHeaders: HeadersInit = captchaGated
+      ? { "Set-Cookie": CAPTCHA_PASS_CLEAR_COOKIE }
+      : {};
+
     // Authenticate using the same logic as the credentials provider
     const email = `${username}@localhost`;
     const user = await db.query.users.findFirst({
@@ -78,7 +102,10 @@ export async function POST(request: NextRequest) {
         entityType: "user",
         summary: `Forward auth login failed for username: ${username}`,
       });
-      return NextResponse.json({ error: t("invalidCredentials") }, { status: 401 });
+      return NextResponse.json(
+        { error: t("invalidCredentials") },
+        { status: 401, headers: spentHeaders },
+      );
     }
 
     const isValid = await verifyPassword(password, user.passwordHash);
@@ -92,7 +119,10 @@ export async function POST(request: NextRequest) {
         entityId: user.id,
         summary: `Forward auth login failed for user ${user.email}`,
       });
-      return NextResponse.json({ error: t("invalidCredentials") }, { status: 401 });
+      return NextResponse.json(
+        { error: t("invalidCredentials") },
+        { status: 401, headers: spentHeaders },
+      );
     }
 
     resetAttempts(ip);
@@ -102,7 +132,10 @@ export async function POST(request: NextRequest) {
     // This is a one-time operation: the intent is deleted after consumption.
     const intent = await consumeRedirectIntent(rid);
     if (!intent) {
-      return NextResponse.json({ error: t("invalidRedirectIntent") }, { status: 400 });
+      return NextResponse.json(
+        { error: t("invalidRedirectIntent") },
+        { status: 400, headers: spentHeaders },
+      );
     }
 
     const targetUrl = new URL(intent.redirectUri);
@@ -118,7 +151,10 @@ export async function POST(request: NextRequest) {
         entityType: "proxy_host",
         summary: `Forward auth access denied for user ${user.email} to host ${targetUrl.hostname}`,
       });
-      return NextResponse.json({ error: t("noAccessToApplication") }, { status: 403 });
+      return NextResponse.json(
+        { error: t("noAccessToApplication") },
+        { status: 403, headers: spentHeaders },
+      );
     }
 
     // Create session and exchange code
@@ -137,7 +173,7 @@ export async function POST(request: NextRequest) {
     const callbackUrl = new URL("/.cpm-auth/callback", intent.audience.origin);
     callbackUrl.searchParams.set("code", rawCode);
 
-    return NextResponse.json({ redirectTo: callbackUrl.toString() });
+    return NextResponse.json({ redirectTo: callbackUrl.toString() }, { headers: spentHeaders });
   } catch (error) {
     console.error("Forward auth login error:", error);
     return NextResponse.json({ error: t("internalServerError") }, { status: 500 });

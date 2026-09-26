@@ -50,6 +50,7 @@ export function CpmForwardAuthFields({
   const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>(currentAccess?.groupIds ?? []);
   const [protectedPaths, setProtectedPaths] = useState(initial?.protected_paths?.join(", ") ?? "");
   const [excludedPaths, setExcludedPaths] = useState(initial?.excluded_paths?.join(", ") ?? "");
+  const [requireCaptcha, setRequireCaptcha] = useState(initial?.require_captcha ?? true);
 
   const hasNoTargets = groups.length === 0 && users.length === 0;
   const hasNothingSelected =
@@ -108,6 +109,13 @@ export function CpmForwardAuthFields({
               onChange={setExcludedPaths}
               rows={2}
               description={t("forwardAuthExcludedPathsHelp")}
+            />
+            <Switch
+              label={t("cpmForwardAuthRequireCaptcha")}
+              description={t("cpmForwardAuthRequireCaptchaHelp")}
+              htmlName="cpmForwardAuthRequireCaptcha"
+              value={requireCaptcha}
+              onChange={setRequireCaptcha}
             />
 
             {groups.length > 0 && (

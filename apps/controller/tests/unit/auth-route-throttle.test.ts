@@ -10,6 +10,7 @@ import { testTranslator } from '@/tests/helpers/next-intl';
 const ctx = vi.hoisted(() => ({
   seen: [] as Request[],
   status: 401,
+  captcha: false,
 }));
 
 vi.mock('@/src/lib/auth-server', () => ({
@@ -21,6 +22,10 @@ vi.mock('@/src/lib/auth-server', () => ({
   }),
 }));
 
+vi.mock('@/src/lib/captcha/settings', () => ({
+  getActiveCaptcha: async () => (ctx.captcha ? { provider: 'turnstile', siteKey: 'site' } : null),
+}));
+
 vi.mock('next-intl/server', () => ({
   getTranslations: async (namespace?: string) => testTranslator(namespace),
 }));
@@ -28,6 +33,7 @@ vi.mock('next-intl/server', () => ({
 import { GET, POST } from '@/src/app/api/auth/[...all]/route';
 import { CLIENT_IP_HEADER } from '@/src/lib/client-ip';
 import { accountKey, resetAccountFailures } from '@/src/lib/rate-limit';
+import { CAPTCHA_PASS_COOKIE, isValidCaptchaPass, issueCaptchaPass } from '@/src/lib/captcha/pass';
 
 function signIn(body: Record<string, string>, headers: Record<string, string> = {}) {
   return POST(
@@ -42,6 +48,7 @@ function signIn(body: Record<string, string>, headers: Record<string, string> = 
 beforeEach(() => {
   ctx.seen = [];
   ctx.status = 401;
+  ctx.captcha = false;
   resetAccountFailures(accountKey('alice'));
 });
 
@@ -97,5 +104,66 @@ describe('/api/auth route', () => {
   it('points better-auth at the header this route sets', () => {
     const source = readFileSync(`${import.meta.dir}/../../src/lib/auth-server.ts`, 'utf8');
     expect(source).toContain(`ipAddressHeaders: ["${CLIENT_IP_HEADER}"]`);
+  });
+
+  describe('with a CAPTCHA configured', () => {
+    beforeEach(() => {
+      ctx.captcha = true;
+    });
+
+    const passFor = (name: string) => ({
+      cookie: `${CAPTCHA_PASS_COOKIE}=${issueCaptchaPass(name)}`,
+    });
+
+    it('refuses a sign-in with no pass before it reaches better-auth', async () => {
+      const response = await signIn({ username: 'alice', password: 'pw' });
+      expect(response.status).toBe(403);
+      expect((await response.json()).code).toBe('CAPTCHA_REQUIRED');
+      expect(ctx.seen).toHaveLength(0);
+    });
+
+    it("refuses another name's pass", async () => {
+      const response = await signIn({ username: 'alice', password: 'pw' }, passFor('bob'));
+      expect(response.status).toBe(403);
+      expect(ctx.seen).toHaveLength(0);
+    });
+
+    it('spends the pass on a wrong password, so replaying it gets nowhere', async () => {
+      const pass = passFor('alice');
+      const first = await signIn({ username: 'alice', password: 'wrong' }, pass);
+      expect(first.status).toBe(401);
+      expect(first.headers.get('set-cookie')).toContain(`${CAPTCHA_PASS_COOKIE}=;`);
+
+      // A script ignores Set-Cookie and sends the same pass again.
+      const replay = await signIn({ username: 'alice', password: 'guess-2' }, pass);
+      expect(replay.status).toBe(403);
+      expect(ctx.seen).toHaveLength(1);
+    });
+
+    it('does not spend the pass on an attempt the account throttle refuses', async () => {
+      ctx.captcha = false;
+      for (let i = 0; i < 6; i++) await signIn({ username: 'alice', password: 'wrong' });
+      ctx.captcha = true;
+      const pass = issueCaptchaPass('alice');
+      const throttled = await signIn(
+        { username: 'alice', password: 'right' },
+        { cookie: `${CAPTCHA_PASS_COOKIE}=${pass}` },
+      );
+      expect(throttled.status).toBe(429);
+      expect(isValidCaptchaPass(pass, 'alice')).toBe(true);
+    });
+
+    it('spends the pass on a successful sign-in', async () => {
+      ctx.status = 200;
+      const response = await signIn({ username: 'alice', password: 'right' }, passFor('alice'));
+      expect(response.status).toBe(200);
+      expect(response.headers.get('set-cookie')).toContain(`${CAPTCHA_PASS_COOKIE}=;`);
+      expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+    });
+
+    it('leaves every other auth route alone', async () => {
+      await GET(new Request('http://localhost:3000/api/auth/get-session'));
+      expect(ctx.seen).toHaveLength(1);
+    });
   });
 });

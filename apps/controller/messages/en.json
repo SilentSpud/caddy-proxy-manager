@@ -352,7 +352,8 @@
       "passwordManagementDisabled": "Password management is disabled. Sign-in is handled by the OIDC provider.",
       "tooManyAttempts": "Too many attempts. Please try again later.",
       "unauthorized": "Unauthorized",
-      "userNotFound": "User not found"
+      "userNotFound": "User not found",
+      "captchaRequired": "Solve the CAPTCHA before signing in."
     },
     "authenticationRequired": "Authentication Required",
     "authorizeFailed": "Failed to authorize access.",
@@ -380,7 +381,25 @@
       "subtitlePassword": "Enter your password to continue",
       "subtitleSsoOnly": "Sign in with single sign-on",
       "username": "Username",
-      "usernameRequired": "Enter a username."
+      "usernameRequired": "Enter a username.",
+      "captcha": {
+        "required": "Complete the CAPTCHA to continue.",
+        "failed": "The CAPTCHA was not accepted. Try it again.",
+        "unavailable": "The CAPTCHA could not be checked right now. Try again in a moment.",
+        "tooManyChecks": "Too many attempts. Wait a few minutes and try again.",
+        "expired": "Your CAPTCHA expired. Solve it again to sign in.",
+        "loadFailed": "The CAPTCHA did not load, so sign-in cannot continue. Check your connection or any content blocker, then reload the page.",
+        "capInitial": "Verify you're human",
+        "capVerifying": "Verifying…",
+        "capSolved": "You're human",
+        "capError": "Error - try again",
+        "capRequired": "Verify you're human first",
+        "capVerifyAria": "Select to verify you're human",
+        "capVerifyingAria": "Verifying you're human, please wait",
+        "capVerifiedAria": "Verified. You can continue.",
+        "capErrorAria": "Verification failed. Try again.",
+        "capWasmDisabled": "Enable WebAssembly for much faster verification"
+      }
     },
     "missingDestinationDescription": "No redirect destination specified.",
     "missingProviderDescription": "Single sign-on is the only way to sign in, but no provider is configured.",
@@ -1411,6 +1430,8 @@
     "countries": "Countries",
     "cpmForwardAuth": "CPM Forward Auth",
     "cpmForwardAuthDescription": "Require users to authenticate via Caddy Proxy Manager before accessing this host",
+    "cpmForwardAuthRequireCaptcha": "Require the sign-in CAPTCHA",
+    "cpmForwardAuthRequireCaptchaHelp": "When a CAPTCHA is configured under Settings → Authentication, the portal asks for it before the password for this host. Turn off only for a host whose users cannot solve one - it leaves this host's sign-in open to scripted password guessing.",
     "create": "Create",
     "customCaddyfile": "Custom Caddyfile",
     "customCaddyfileHelp": "Caddyfile directives for this host, adapted by Caddy and inserted before the reverse proxy. Rejected on save if Caddy cannot parse them.",
@@ -2502,6 +2523,10 @@
       "logging": {
         "name": "Access Logging",
         "desc": "HTTP access log for proxied requests"
+      },
+      "captcha": {
+        "name": "CAPTCHA",
+        "desc": "A challenge to solve before the password is asked for"
       }
     },
     "dnsProviders": {
@@ -2961,7 +2986,14 @@
       "caddyBuildSavedSnippetWarning": "{rebuild, select, yes {Caddy module selection saved. Rebuild Caddy to apply the change to the running container.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently.",
       "registrySaved": "Settings saved",
       "registryFailed": "Could not save the settings",
-      "registryUnknownBlock": "Those settings do not belong to a settings block"
+      "registryUnknownBlock": "Those settings do not belong to a settings block",
+      "captchaSaved": "CAPTCHA settings saved. The sign-in screen asks for it from the next visit.",
+      "captchaDisabled": "CAPTCHA turned off",
+      "captchaInvalid": "A CAPTCHA field is too long or contains a control character",
+      "captchaSiteKeyRequired": "Enter the site key the provider issued",
+      "captchaSecretKeyRequired": "Enter the secret key the provider issued",
+      "captchaCapUrlRequired": "Enter the Cap instance URL, starting with http:// or https://",
+      "captchaFailed": "Failed to save CAPTCHA settings"
     },
     "geoipEditionDownloadFailed": "{edition}: {reason}",
     "pairingHostInsecureHint": "The dashboard host is not on HTTPS yet, so this pairs over plain HTTP. If the domain resolves to a public address, the agent refuses that unless CONTROLLER_ALLOW_INSECURE_HTTP is set on it - turn on HTTPS under Dashboard Host first.",
@@ -2970,7 +3002,27 @@
     "envPinned": "Set by the environment",
     "envPinnedHelp": "SETTINGS_ENV_OVERRIDE names {variable}, so the environment overrides what is saved here and this cannot be changed from Settings. Remove it from SETTINGS_ENV_OVERRIDE and restart to take the setting back.",
     "pageUnsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
-    "pageDiscard": "Discard"
+    "pageDiscard": "Discard",
+    "captcha": {
+      "provider": "Provider",
+      "providerHelp": "Shown on the sign-in screen's username step. The password step is refused until it is solved, for the form and the API alike. Single sign-on is not affected.",
+      "providers": {
+        "none": "Off",
+        "recaptcha": "Google reCAPTCHA v2",
+        "hcaptcha": "hCaptcha",
+        "turnstile": "Cloudflare Turnstile",
+        "cap": "Cap (self-hosted)"
+      },
+      "siteKey": "Site key",
+      "siteKeyHelp": "The public key the provider issued for this site. It is sent to every visitor of the sign-in page.",
+      "secretKey": "Secret key",
+      "secretKeyHelp": "Used by this server to check each solve with the provider. Stored encrypted.",
+      "secretKeyStored": "A secret key is stored. Leave blank to keep it.",
+      "capInstanceUrl": "Cap instance URL",
+      "capInstanceUrlHelp": "Where your Cap Standalone server is reached by browsers and by this server, without the site key.",
+      "oidcOnlyTitle": "Not shown in OIDC-only mode",
+      "oidcOnlyBody": "There is no username step while local accounts are disabled, so the CAPTCHA only applies once they are enabled again."
+    }
   },
   "setup": {
     "account": {

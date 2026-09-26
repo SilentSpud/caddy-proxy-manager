@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { auth } from "@/src/lib/auth";
 import { config as appConfig } from "@/src/lib/config";
-import { buildCsp } from "@/src/lib/csp";
+import { buildCsp, type CspAdditions } from "@/src/lib/csp";
 
 /** Next.js Proxy: defense-in-depth auth at the edge, before page components. Node runtime. */
 
@@ -24,12 +24,28 @@ function applySecurityHeaders(response: NextResponse, csp: string): NextResponse
 }
 
 /** A page response with a per-request nonce CSP. vinext reads the nonce from the request's copy. */
-function nonceCspResponse(req: NextRequest): NextResponse {
+function nonceCspResponse(req: NextRequest, extra?: CspAdditions): NextResponse {
   const nonce = crypto.randomBytes(16).toString("base64");
-  const csp = buildCsp(nonce);
+  const csp = buildCsp(nonce, extra);
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("Content-Security-Policy", csp);
   return applySecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }), csp);
+}
+
+/** The configured CAPTCHA's origins, which only the sign-in pages are allowed to load from. */
+async function loginCspAdditions(): Promise<CspAdditions | undefined> {
+  try {
+    const [{ getActiveCaptcha }, { captchaCspSources }] = await Promise.all([
+      import("@/src/lib/captcha/settings"),
+      import("@/src/lib/captcha/providers"),
+    ]);
+    const captcha = await getActiveCaptcha();
+    return captcha ? captchaCspSources(captcha) : undefined;
+  } catch (error) {
+    // The widget will be blocked and the form says so; the sign-in page itself must still load.
+    console.warn("[proxy] Could not read the CAPTCHA settings:", error);
+    return undefined;
+  }
 }
 
 export default async function proxy(req: NextRequest) {
@@ -49,9 +65,10 @@ export default async function proxy(req: NextRequest) {
     pathname === "/api/setup/restart";
 
   /** What a request nobody has signed in for gets: /login, /portal and setup pages, public APIs. */
-  const publicResponse = () => {
+  const publicResponse = async () => {
     // Pages get the same nonce CSP as the dashboard; the sign-in forms are what an injected script
     // would most want to read.
+    if (pathname === "/portal") return nonceCspResponse(req, await loginCspAdditions());
     if (!pathname.startsWith("/api/")) return nonceCspResponse(req);
 
     // Not HTML, so no script policy to enforce - only framing, which still applies to a response
@@ -92,7 +109,9 @@ export default async function proxy(req: NextRequest) {
     // Authenticates itself: an agent signs with the secret agreed at pairing, and an unsigned
     // caller is answered 404 rather than being redirected to a login page it cannot use.
     pathname.startsWith("/api/agent/") ||
-    pathname.startsWith("/api/forward-auth/")
+    pathname.startsWith("/api/forward-auth/") ||
+    // The sign-in CAPTCHA, solved before there is a session to have.
+    pathname === "/api/sign-in/captcha"
   ) {
     return publicResponse();
   }
@@ -130,7 +149,7 @@ export default async function proxy(req: NextRequest) {
   // Reached only once the setup gate above is satisfied, which is what lets an unconfigured
   // deployment redirect away from here instead of showing a form nothing can answer.
   if (pathname.startsWith("/login")) {
-    return publicResponse();
+    return nonceCspResponse(req, await loginCspAdditions());
   }
 
   return nonceCspResponse(req);

@@ -10,6 +10,7 @@ export default function ForwardAuthDemo() {
           enabled: true,
           protected_paths: null,
           excluded_paths: ["/api/webhook"],
+          require_captcha: true,
         }}
         currentAccess={{ userIds: [], groupIds: [2] }}
         groups={[

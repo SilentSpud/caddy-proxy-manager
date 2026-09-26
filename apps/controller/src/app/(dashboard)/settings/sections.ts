@@ -285,6 +285,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             ],
           },
           {
+            id: "captcha",
+            name: "CAPTCHA",
+            desc: "A challenge to solve before the password is asked for",
+          },
+          {
             id: "password-policy",
             name: "Password Policy",
             desc: "Migrate users off older password hashes",

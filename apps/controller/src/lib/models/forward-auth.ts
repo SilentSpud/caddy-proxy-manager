@@ -115,6 +115,29 @@ export async function hasLiveRedirectIntent(rid: string): Promise<boolean> {
   return row !== undefined;
 }
 
+/**
+ * Whether the host `rid` leads to asks for the sign-in CAPTCHA. True for an intent that is not
+ * live, or a host that has gone: the sign-in is refused over the intent anyway, and failing open
+ * would make a stale rid the way around the gate.
+ */
+export async function redirectIntentWantsCaptcha(rid: string): Promise<boolean> {
+  const intent = await db.query.forwardAuthRedirectIntents.findFirst({
+    columns: { proxyHostId: true },
+    where: (table, operators) =>
+      operators.and(
+        operators.eq(table.ridHash, hashToken(rid)),
+        operators.eq(table.consumed, false),
+        operators.gt(table.expiresAt, nowIso()),
+      ),
+  });
+  if (!intent?.proxyHostId) return true;
+  const host = await db.query.proxyHosts.findFirst({
+    columns: { meta: true },
+    where: (table, operators) => operators.eq(table.id, intent.proxyHostId as number),
+  });
+  return host ? parseCpmForwardAuthMeta(host)?.require_captcha !== false : true;
+}
+
 export async function consumeRedirectIntent(rid: string): Promise<{
   redirectUri: string;
   audience: ForwardAuthAudience;
@@ -462,15 +485,17 @@ export async function setForwardAuthAccess(
 
 // ── Domain Validation ────────────────────────────────────────────────
 
-function hasForwardAuthEnabled(ph: { meta: string | null }): boolean {
-  let parsedMeta: Record<string, unknown>;
+function parseCpmForwardAuthMeta(ph: { meta: string | null }): Record<string, unknown> | null {
   try {
-    parsedMeta = ph.meta ? JSON.parse(ph.meta) : {};
+    const parsedMeta = ph.meta ? JSON.parse(ph.meta) : {};
+    return (parsedMeta?.cpm_forward_auth as Record<string, unknown> | undefined) ?? null;
   } catch {
-    return false;
+    return null;
   }
-  const fa = parsedMeta.cpm_forward_auth as Record<string, unknown> | undefined;
-  return !!fa?.enabled;
+}
+
+function hasForwardAuthEnabled(ph: { meta: string | null }): boolean {
+  return !!parseCpmForwardAuthMeta(ph)?.enabled;
 }
 
 async function findForwardAuthProxyHost(host: string) {

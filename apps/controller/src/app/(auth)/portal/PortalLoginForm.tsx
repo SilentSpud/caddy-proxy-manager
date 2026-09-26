@@ -14,6 +14,8 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
 import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
 import { type SignInProvider, SignInProviders } from "@/src/components/auth/SignInProviders";
+import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
+import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import { AUTOFILL_CURRENT_PASSWORD, AUTOFILL_USERNAME } from "@/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
 import { useTranslations } from "next-intl";
@@ -28,6 +30,10 @@ interface PortalLoginFormProps {
   existingSession?: { userId: string; name: string | null; email: string | null } | null;
   /** A refused single sign-on attempt, already put into words by the page. */
   initialError?: string | null;
+  /** Null when none is configured, or the host this sign-in is for has turned it off. */
+  captcha?: CaptchaWidgetConfig | null;
+  /** The page's CSP nonce, which Cap needs for the scripts it injects. */
+  cspNonce?: string;
 }
 
 /** The portal is always one centred card; only its contents vary. */
@@ -68,6 +74,8 @@ export default function PortalLoginForm({
   localLoginEnabled = true,
   existingSession,
   initialError = null,
+  captcha = null,
+  cspNonce,
 }: PortalLoginFormProps) {
   const t = useTranslations("auth");
   const tl = useTranslations("auth.login");
@@ -80,6 +88,7 @@ export default function PortalLoginForm({
   // is a name to attach it to.
   const [onPasswordStep, setOnPasswordStep] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const captchaStep = useCaptchaStep({ config: captcha, nonce: cspNonce, onError: setError });
 
   // See LoginClient: focusing from the handler races React's commit, so the field is focused from
   // the effect that follows the step change.
@@ -126,7 +135,16 @@ export default function PortalLoginForm({
 
       const data = await response.json();
 
+      if (data.code === "CAPTCHA_REQUIRED") {
+        // See LoginClient: the pass lapsed, so solve again on this step and keep the password.
+        captchaStep.spent("expired");
+        setPending(false);
+        return;
+      }
+
       if (!response.ok) {
+        // The attempt spent the pass; the next one needs a new solve.
+        captchaStep.spent();
         setError(data.error ?? t("login.failed"));
         setPending(false);
         // Stay on the password step so the name that failed is still readable.
@@ -136,6 +154,8 @@ export default function PortalLoginForm({
 
       window.location.href = data.redirectTo;
     } catch {
+      // Whether the attempt reached the server is unknown, so assume the pass went with it.
+      captchaStep.spent();
       setError(t("unexpectedErrorTryAgain"));
       setPending(false);
       setOnPasswordStep(true);
@@ -157,13 +177,17 @@ export default function PortalLoginForm({
 
     // Step one advances whether or not the account exists - see LoginClient for why.
     if (!onPasswordStep) {
+      if (!(await captchaStep.pass(trimmedUsername))) return;
       if (!password) {
         setOnPasswordStep(true);
         return;
       }
-    } else if (!password) {
-      setError(tl("passwordRequired"));
-      return;
+    } else {
+      if (!password) {
+        setError(tl("passwordRequired"));
+        return;
+      }
+      if (!(await captchaStep.pass(trimmedUsername))) return;
     }
 
     await submitCredentials(trimmedUsername);
@@ -183,7 +207,7 @@ export default function PortalLoginForm({
     });
   };
 
-  const disabled = pending || !!oauthPending;
+  const disabled = pending || captchaStep.pending || !!oauthPending;
   const hasProviders = enabledProviders.length > 0;
 
   if (!hasRedirect) {
@@ -255,20 +279,25 @@ export default function PortalLoginForm({
                     setOnPasswordStep(false);
                     setPassword("");
                     setError(null);
+                    captchaStep.spent();
                   }}
                 />
               ) : (
-                <TextInput
-                  {...AUTOFILL_USERNAME}
-                  label={t("username")}
-                  htmlName="username"
-                  value={username}
-                  onChange={setUsername}
-                  isRequired
-                  hasAutoFocus
-                  isDisabled={disabled}
-                  width="100%"
-                />
+                <>
+                  <TextInput
+                    {...AUTOFILL_USERNAME}
+                    label={t("username")}
+                    htmlName="username"
+                    value={username}
+                    onChange={setUsername}
+                    isRequired
+                    hasAutoFocus
+                    isDisabled={disabled}
+                    width="100%"
+                  />
+                  {/* Mounted with the step, as on /login: a new name means a new solve. */}
+                  {captchaStep.widget}
+                </>
               )}
               <div hidden={!onPasswordStep}>
                 <TextInput
@@ -284,6 +313,8 @@ export default function PortalLoginForm({
                   width="100%"
                 />
               </div>
+              {/* Back after a failed attempt, which spent the last solve. */}
+              {onPasswordStep && captchaStep.widget}
               <Button
                 type="submit"
                 variant="primary"
@@ -294,7 +325,7 @@ export default function PortalLoginForm({
                       ? t("login.submit")
                       : tl("continueStep")
                 }
-                isLoading={pending}
+                isLoading={pending || captchaStep.pending}
                 isDisabled={disabled}
                 width="100%"
               />

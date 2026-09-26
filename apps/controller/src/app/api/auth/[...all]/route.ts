@@ -3,6 +3,12 @@ import { toNextJsHandler } from "better-auth/next-js";
 import { getTranslations } from "next-intl/server";
 import { CLIENT_IP_HEADER, getClientIp } from "@/src/lib/client-ip";
 import {
+  CAPTCHA_PASS_CLEAR_COOKIE,
+  captchaPassFromCookieHeader,
+  redeemCaptchaPass,
+} from "@/src/lib/captcha/pass";
+import { getActiveCaptcha } from "@/src/lib/captcha/settings";
+import {
   accountKey,
   accountRetryAfterMs,
   registerAccountFailure,
@@ -30,11 +36,12 @@ async function withClientIp(request: Request): Promise<Request> {
   } as RequestInit);
 }
 
-async function signInAccount(request: Request): Promise<string | null> {
+/** The name a password sign-in is for, as sent. */
+async function signInName(request: Request): Promise<string | null> {
   try {
     const body = (await request.json()) as { username?: unknown; email?: unknown };
     const name = typeof body.username === "string" ? body.username : body.email;
-    return typeof name === "string" && name.trim() ? accountKey(name) : null;
+    return typeof name === "string" && name.trim() ? name : null;
   } catch {
     return null;
   }
@@ -50,8 +57,10 @@ export async function POST(request: Request) {
     return toNextJsHandler(await getAuth()).POST(forwarded);
   }
 
+  const name = await signInName(forwarded.clone());
+
   // Shares its counter with the forward-auth portal, whatever address the guesses come from.
-  const account = await signInAccount(forwarded.clone());
+  const account = name ? accountKey(name) : null;
   const retryAfterMs = account ? accountRetryAfterMs(account) : 0;
   if (retryAfterMs > 0) {
     const t = await getTranslations("auth.apiErrors");
@@ -61,10 +70,25 @@ export async function POST(request: Request) {
     );
   }
 
+  // Enforced here, not only by the form: the endpoint is reachable without it. After the throttle,
+  // so a request refused for that does not spend the solve.
+  const captcha = await getActiveCaptcha();
+  if (
+    captcha &&
+    !redeemCaptchaPass(captchaPassFromCookieHeader(request.headers.get("cookie")), name ?? "")
+  ) {
+    const t = await getTranslations("auth.apiErrors");
+    return Response.json(
+      { code: "CAPTCHA_REQUIRED", message: t("captchaRequired") },
+      { status: 403 },
+    );
+  }
+
   const response = await toNextJsHandler(await getAuth()).POST(forwarded);
   if (account) {
     if (response.status === 401) registerAccountFailure(account);
     else if (response.ok) resetAccountFailures(account);
   }
+  if (captcha) response.headers.append("Set-Cookie", CAPTCHA_PASS_CLEAR_COOKIE);
   return response;
 }
