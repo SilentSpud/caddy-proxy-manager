@@ -3,6 +3,9 @@ title: Dashboard host
 description: CPM reverse-proxying its own dashboard, on a domain of its own.
 ---
 
+import Demo from "../../../components/Demo.astro";
+import DashboardHostDemo from "../../../demos/samples/DashboardHostDemo";
+
 The quickest way to see what this product does is to watch it proxy something, and the one upstream
 every deployment already has is the dashboard you are reading it in. Setup offers to switch this
 on, with the domain filled in.
@@ -77,6 +80,10 @@ Nothing is asked of a third party. The trade-off is that the request is made fro
 itself, so it cannot see through split-horizon DNS (passes, and ACME still fails) or a network
 without NAT hairpinning (fails, though the outside world reaches you fine). The toggle is a default
 you can override in both.
+
+<Demo title="Settings → Dashboard Host" note="Pick what the domain points at, then check it. Change the domain and the check waits for a save.">
+  <DashboardHostDemo client:visible />
+</Demo>
 
 ## You cannot lock yourself out
 

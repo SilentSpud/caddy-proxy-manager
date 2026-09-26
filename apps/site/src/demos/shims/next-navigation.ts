@@ -1,7 +1,7 @@
 /**
  * Stands in for `next/navigation` inside the demos (see the alias in astro.config.mjs).
  *
- * Only DataTable imports it. That table sorts and pages by pushing a new URL, because in the app
+ * DataTable is what needs it. That table sorts and pages by pushing a new URL, because in the app
  * the server does the sorting - so for the demo to be more than a picture, the query string has to
  * be somewhere a component can both write and watch. It writes to the real one, and the demo that
  * owns the rows subscribes here and re-derives them, which is the same contract with the work
@@ -10,6 +10,7 @@
  * `replaceState`, never `pushState`: a reader pressing Back should leave the page, not undo a sort.
  */
 import { useSyncExternalStore } from "react";
+import { currentSimulation } from "../setup-simulation";
 
 const listeners = new Set<() => void>();
 
@@ -40,10 +41,21 @@ export function useSearchParams(): URLSearchParams {
   return new URLSearchParams(useSyncExternalStore(subscribe, () => location.search, emptySnapshot));
 }
 
+/**
+ * Never reached: the setup actions that call it are shimmed too. Here so their real source, which
+ * the site's typecheck still reads, finds the export.
+ */
+export function redirect(href: string): never {
+  throw new Error(`redirect(${href}) has no server to run on in the documentation site`);
+}
+
 export function useRouter() {
+  // Inside the setup demo a push is a page of the simulation, not the docs' query string.
+  const simulation = currentSimulation();
+  const go = simulation ? (href: string) => simulation.navigate(href) : navigate;
   return {
-    push: navigate,
-    replace: navigate,
+    push: go,
+    replace: go,
     refresh() {},
     back() {},
     forward() {},

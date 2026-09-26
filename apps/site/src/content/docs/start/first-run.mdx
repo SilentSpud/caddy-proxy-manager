@@ -8,7 +8,7 @@ sidebar:
 import { Steps } from "@astrojs/starlight/components";
 import Demo from "../../../components/Demo.astro";
 import PasswordFieldDemo from "../../../demos/samples/PasswordFieldDemo";
-import SetupStepsDemo from "../../../demos/samples/SetupStepsDemo";
+import SetupFlowDemo from "../../../demos/samples/SetupFlowDemo";
 
 A fresh install has no accounts and nothing configured. The first request lands on `/setup`, and
 the app serves nothing else until the flow finishes.
@@ -36,8 +36,8 @@ resumes where it left off and the back button cannot desynchronise it. Every scr
 sits in the flow, and the stepper reads the same stages the redirects do, so the two cannot
 disagree.
 
-<Demo title="Setup progress" note="Step through it, or untick the database to drop the migration step.">
-  <SetupStepsDemo client:visible />
+<Demo title="Setup, simulated" note="The real screens against a simulated controller: migrate or start fresh, create an account, sign in, save, restart. Untick the database to drop the migration step.">
+  <SetupFlowDemo client:visible />
 </Demo>
 
 <Demo title="The administrator password field" note="Generate one and reveal it.">

@@ -20,6 +20,30 @@ const controller = (path) => fileURLToPath(new URL(`../controller/${path}`, impo
 const { version: controllerVersion } = createRequire(import.meta.url)("../controller/package.json");
 
 /**
+ * Points the setup screens' `./actions` imports at the setup demo's shim.
+ *
+ * A plugin rather than an alias because the specifier is relative: an alias would catch every
+ * `./actions` in every demo, and a page client importing its actions is otherwise undemoable on
+ * purpose (see AGENTS.md). This catches only the ones under `app/setup/`.
+ */
+function setupActionsShim() {
+  const setupPages = controller("src/app/setup/").replaceAll("\\", "/");
+  const shim = fileURLToPath(new URL("./src/demos/shims/setup-actions.ts", import.meta.url));
+  return {
+    name: "cpm-setup-actions-shim",
+    enforce: /** @type {const} */ ("pre"),
+    /**
+     * @param {string} source
+     * @param {string | undefined} importer
+     */
+    resolveId(source, importer) {
+      if (source !== "./actions" || !importer) return null;
+      return importer.replaceAll("\\", "/").startsWith(setupPages) ? shim : null;
+    },
+  };
+}
+
+/**
  * `satteri` in this app's dependencies is not imported by anything here, and is not cruft.
  *
  * It is Starlight's markdown engine, and it loads a per-platform native binding by `require`. The
@@ -131,6 +155,7 @@ export default defineConfig({
   ],
 
   vite: {
+    plugins: [setupActionsShim()],
     resolve: {
       /**
        * The demos render the controller's own components rather than copies, so the docs cannot
@@ -143,13 +168,30 @@ export default defineConfig({
        * component. Both resolve to a few lines each rather than dragging Next into a static site.
        *
        * The third replaces the controller's auth client, which would post sign-in attempts to
-       * `/api/auth/*` on this site. It has to come before the `@/src/` alias, which would
-       * otherwise match first.
+       * `/api/auth/*` on this site, and the fourth its full page loads, which would leave it. The
+       * two after them are host actions the editors import, answered in the browser instead. All of
+       * them have to come before the `@/src/` alias, which would otherwise match first.
        */
       alias: [
         {
           find: /^@\/src\/lib\/auth-client$/,
           replacement: fileURLToPath(new URL("./src/demos/shims/auth-client.ts", import.meta.url)),
+        },
+        {
+          find: /^@\/src\/lib\/browser-navigation$/,
+          replacement: fileURLToPath(
+            new URL("./src/demos/shims/browser-navigation.ts", import.meta.url),
+          ),
+        },
+        {
+          find: /^@\/src\/app\/\(dashboard\)\/proxy-hosts\/actions$/,
+          replacement: fileURLToPath(
+            new URL("./src/demos/shims/proxy-host-actions.ts", import.meta.url),
+          ),
+        },
+        {
+          find: /^@\/src\/app\/\(dashboard\)\/l4-proxy-hosts\/actions$/,
+          replacement: fileURLToPath(new URL("./src/demos/shims/l4-actions.ts", import.meta.url)),
         },
         { find: /^@\/components\//, replacement: `${controller("src/components")}/` },
         { find: /^@\/lib\//, replacement: `${controller("src/lib")}/` },

@@ -4,6 +4,7 @@ description: Layer 4 stream proxying - SNI matching, PROXY protocol, health chec
 ---
 
 import Demo from "../../../components/Demo.astro";
+import L4HostEditorDemo from "../../../demos/samples/L4HostEditorDemo";
 import L4HostsTableDemo from "../../../demos/samples/L4HostsTableDemo";
 
 Not everything is HTTP. L4 proxy hosts forward raw TCP and UDP streams: a database, a game server,
@@ -22,6 +23,10 @@ an SSH endpoint, anything that speaks its own protocol.
 - **HTTP Host** - plain-HTTP backends share a port the same way, routed by the Host header.
 - **PROXY protocol** - connections that arrive wrapped in a PROXY protocol header, from a load
   balancer in front of Caddy.
+
+<Demo title="The L4 host editor" note="Create one or edit the sample. Saving shows what the form would send.">
+  <L4HostEditorDemo client:visible />
+</Demo>
 
 ## PROXY protocol
 

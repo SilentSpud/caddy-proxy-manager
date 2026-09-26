@@ -34,6 +34,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
+import { loadPage } from "@/src/lib/browser-navigation";
 
 /** How often to ask whether the app is there. Frequent enough to feel immediate, not a flood. */
 const POLL_INTERVAL_MS = 1000;
@@ -152,7 +153,7 @@ export default function RestartDialog({
     (origin?: string) => {
       // A full load rather than a router push: the process serving this page is not the one that
       // will serve the next, and nothing client-side should be carried across.
-      window.location.assign(origin ? `${origin}${next}` : next);
+      loadPage(origin ? `${origin}${next}` : next);
     },
     [next],
   );

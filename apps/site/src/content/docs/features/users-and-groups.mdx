@@ -4,6 +4,7 @@ description: Four roles, group-based delegation, and OAuth/OIDC single sign-on.
 ---
 
 import Demo from "../../../components/Demo.astro";
+import GroupAccessDemo from "../../../demos/samples/GroupAccessDemo";
 import SignInDemo from "../../../demos/samples/SignInDemo";
 
 ## The four roles
@@ -38,6 +39,10 @@ Groups are lists of users doing two jobs:
 1. Gating access to [forward-auth](../forward-auth/) protected apps.
 2. Deciding what an operator may manage, through **Groups → Access**: choose the capability - manage, or
    view only - then tick the proxy hosts, L4 hosts and agents the group should reach.
+
+<Demo title="Groups → Access" note="Open Access, change the grants and save; the card reads back what an operator in the group gets.">
+  <GroupAccessDemo client:visible />
+</Demo>
 
 ## Signing in
 
