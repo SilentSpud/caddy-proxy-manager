@@ -35,8 +35,15 @@ for (const page of pages) {
   test(`demos on /${page} hydrate cleanly`, async ({ page: browser }) => {
     const errors: string[] = [];
     browser.on("pageerror", (error) => errors.push(error.message));
+    // Chromium logs a failed request without its URL, so those are taken from the response
+    // instead, where the path says which endpoint a demo still reaches for.
     browser.on("console", (message) => {
-      if (message.type() === "error") errors.push(message.text());
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource")) {
+        errors.push(message.text());
+      }
+    });
+    browser.on("response", (response) => {
+      if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
     });
 
     await browser.goto(page ? `${page}/` : "./");
@@ -51,6 +58,9 @@ for (const page of pages) {
       await island.scrollIntoViewIfNeeded();
       await expect(island).not.toHaveAttribute("ssr", { timeout: 15_000 });
     }
+    // A demo that fetches on mount fails after it hydrates; without this the check below races
+    // the response, and a 404 passed locally only because the page was quicker than the request.
+    await browser.waitForLoadState("networkidle");
 
     expect(errors).toEqual([]);
   });

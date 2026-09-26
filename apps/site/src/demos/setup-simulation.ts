@@ -3,9 +3,8 @@
  *
  * The screens are the real ones. What they talk to is this: the stage derivation from
  * lib/setup.ts, the redirects each setup page performs, the server actions (via
- * shims/setup-actions.ts), the four `/api/setup/*` routes and `/api/health` (via a fetch wrapper
- * that answers only those paths), and sign-in (via shims/auth-client.ts). Nothing is persisted, and
- * nothing leaves the page.
+ * shims/setup-actions.ts), the four `/api/setup/*` routes and `/api/health` (via fake-api.ts),
+ * and sign-in (via shims/auth-client.ts). Nothing is persisted, and nothing leaves the page.
  *
  * One simulation per page: the shims reach it through `currentSimulation()`, which is null unless
  * a demo has started one - so the sign-in demo elsewhere keeps failing every attempt as before.
@@ -14,6 +13,7 @@ import { passwordPolicyMessage } from "@cpm/controller/src/lib/password-policy-m
 import type { MigrationGroupId } from "@cpm/controller/src/lib/migration/selection";
 import type { SetupStage } from "@cpm/controller/src/lib/setup";
 import { t } from "./catalog";
+import { json, serveApi } from "./fake-api";
 
 /** Where the reader "reached" the instance: a LAN name, so the dashboard host has one to claim. */
 const INITIAL_ORIGIN = "http://cpm.lan:3000";
@@ -167,13 +167,6 @@ function route(state: SimulationState, path: string): string {
       if (stage !== "complete") return home;
       return isSignedIn(state) ? "/" : "/login";
   }
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
 }
 
 const pause = (ms = LATENCY_MS) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -657,25 +650,12 @@ export function currentSimulation(): Simulation | null {
   return current;
 }
 
-/**
- * Make `simulation` the one the shims and `fetch` reach, until the returned function is called.
- *
- * `fetch` is wrapped rather than aliased because the screens call the global directly. Only this
- * simulation's paths on this origin are answered; everything else goes to the network untouched.
- */
+/** Make `simulation` the one the shims and the fake API reach, until the returned function is called. */
 export function startSimulation(simulation: Simulation): () => void {
   current = simulation;
-  const realFetch = window.fetch;
-  window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
-    if (url.origin === location.origin) {
-      const answer = await simulation.handle(url, init);
-      if (answer) return answer;
-    }
-    return realFetch(input, init);
-  }) as typeof fetch;
+  const stopServing = serveApi((url, init) => simulation.handle(url, init));
   return () => {
-    window.fetch = realFetch;
+    stopServing();
     if (current === simulation) current = null;
   };
 }
