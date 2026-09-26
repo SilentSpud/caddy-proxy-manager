@@ -31,6 +31,7 @@ import type {
   GeoBlockSettings,
   ErrorPagesSettings,
   TrustedProxiesSettings,
+  HttpProtocolsSettings,
   DefaultResponseSettings,
 } from "@/lib/settings";
 import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
@@ -84,6 +85,7 @@ import {
   updateGeoBlockSettingsAction,
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
+  updateHttpProtocolsSettingsAction,
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
   updateDashboardSettingsAction,
@@ -128,6 +130,7 @@ type Props = {
   dns: DnsSettings | null;
   upstreamDnsResolution: UpstreamDnsResolutionSettings | null;
   trustedProxies: TrustedProxiesSettings | null;
+  httpProtocols: HttpProtocolsSettings;
   defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
@@ -184,6 +187,7 @@ export default function SettingsClient({
   dns,
   upstreamDnsResolution,
   trustedProxies,
+  httpProtocols,
   defaultResponse,
   globalGeoBlock,
   globalErrorPages,
@@ -265,6 +269,10 @@ export default function SettingsClient({
   );
   const [trustedProxiesState, trustedProxiesFormAction] = useActionState(
     updateTrustedProxiesSettingsAction,
+    null,
+  );
+  const [httpProtocolsState, httpProtocolsFormAction] = useActionState(
+    updateHttpProtocolsSettingsAction,
     null,
   );
   const [defaultResponseState, defaultResponseFormAction] = useActionState(
@@ -390,6 +398,13 @@ export default function SettingsClient({
         trustedProxies={trustedProxies}
         trustedProxiesState={trustedProxiesState}
         trustedProxiesFormAction={trustedProxiesFormAction}
+      />
+    ),
+    "http-protocols": (
+      <HttpProtocolsSection
+        httpProtocols={httpProtocols}
+        state={httpProtocolsState}
+        formAction={httpProtocolsFormAction}
       />
     ),
     tailscale: (
@@ -1158,6 +1173,44 @@ function TrustedProxiesSection({
         {t("trustedProxiesInfoDescription")}
       </InfoAlert>
     </>
+  );
+}
+
+function HttpProtocolsSection({
+  httpProtocols,
+  state,
+  formAction,
+}: {
+  httpProtocols: HttpProtocolsSettings;
+  state: { success: boolean; message?: string } | null;
+  formAction: (payload: FormData) => void;
+}) {
+  const t = useTranslations("settings");
+  const [http2, setHttp2] = useState(httpProtocols.http2);
+  const [http3, setHttp3] = useState(httpProtocols.http3);
+
+  return (
+    <FormCard>
+      <form action={formAction}>
+        <VStack gap={3}>
+          {state?.message && <StatusAlert message={state.message} success={state.success} />}
+          <Switch
+            label={t("http2")}
+            description={t("http2Help")}
+            htmlName="http2"
+            value={http2}
+            onChange={setHttp2}
+          />
+          <Switch
+            label={t("http3")}
+            description={t("http3Help")}
+            htmlName="http3"
+            value={http3}
+            onChange={setHttp3}
+          />
+        </VStack>
+      </form>
+    </FormCard>
   );
 }
 

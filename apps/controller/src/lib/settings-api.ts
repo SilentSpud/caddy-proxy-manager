@@ -45,7 +45,9 @@ import {
   getDefaultResponseSettings,
   saveDefaultResponseSettings,
   getTrustedProxiesSettings,
+  getHttpProtocolsSettings,
   saveTrustedProxiesSettings,
+  saveHttpProtocolsSettings,
   getTailscaleSettings,
   saveTailscaleSettings,
   defaultTailscaleSettings,
@@ -161,6 +163,12 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     get: getTrustedProxiesSettings,
     save: saveTrustedProxiesSettings as (data: never) => Promise<void>,
     storageKey: "trusted_proxies",
+    applyCaddy: true,
+  },
+  "http-protocols": {
+    get: getHttpProtocolsSettings,
+    save: saveHttpProtocolsSettings as (data: never) => Promise<void>,
+    storageKey: "http_protocols",
     applyCaddy: true,
   },
   tailscale: {

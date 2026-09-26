@@ -350,6 +350,27 @@ export async function saveTrustedProxiesSettings(settings: TrustedProxiesSetting
   await setSetting("trusted_proxies", settings);
 }
 
+/**
+ * Which HTTP versions the main server offers. HTTP/1.1 is always on, since nothing can connect
+ * without it. Caddy can only set this per listener, so it is global rather than per host.
+ */
+export type HttpProtocolsSettings = { http2: boolean; http3: boolean };
+
+export const DEFAULT_HTTP_PROTOCOLS: HttpProtocolsSettings = { http2: true, http3: true };
+
+export function normalizeHttpProtocols(value: unknown): HttpProtocolsSettings {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return { http2: raw.http2 !== false, http3: raw.http3 !== false };
+}
+
+export async function getHttpProtocolsSettings(): Promise<HttpProtocolsSettings> {
+  return normalizeHttpProtocols(await getSetting<HttpProtocolsSettings>("http_protocols"));
+}
+
+export async function saveHttpProtocolsSettings(settings: unknown): Promise<void> {
+  await setSetting("http_protocols", normalizeHttpProtocols(settings));
+}
+
 export async function getDnsSettings(): Promise<DnsSettings | null> {
   return await getSetting<DnsSettings>("dns");
 }

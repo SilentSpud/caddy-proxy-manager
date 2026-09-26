@@ -41,6 +41,7 @@ import {
   getWafSettings,
   saveErrorPagesSettings,
   saveTrustedProxiesSettings,
+  saveHttpProtocolsSettings,
   saveDefaultResponseSettings,
   type DefaultResponseSettings,
   saveAvatarSettings,
@@ -1235,6 +1236,40 @@ async function updateTrustedProxiesSettingsActionUnlocked(
   }
 }
 
+async function updateHttpProtocolsSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    await saveHttpProtocolsSettings({
+      http2: formData.get("http2") === "on",
+      http3: formData.get("http3") === "on",
+    });
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return { success: true, message: t("results.httpProtocolsSaved") };
+    } catch (error) {
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      return {
+        success: true,
+        message: t("results.applyFailed", {
+          error: await errorText(error, t("results.unknownError")),
+        }),
+      };
+    }
+  } catch (error) {
+    console.error("Failed to save HTTP protocol settings:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.httpProtocolsFailed")),
+    };
+  }
+}
+
 async function updateDnsSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -2036,6 +2071,9 @@ export const updateLoggingSettingsAction = stagedSettingsAction(
 );
 export const updateTrustedProxiesSettingsAction = stagedSettingsAction(
   updateTrustedProxiesSettingsActionUnlocked,
+);
+export const updateHttpProtocolsSettingsAction = stagedSettingsAction(
+  updateHttpProtocolsSettingsActionUnlocked,
 );
 export const updateDashboardSettingsAction = stagedSettingsAction(
   updateDashboardSettingsActionUnlocked,

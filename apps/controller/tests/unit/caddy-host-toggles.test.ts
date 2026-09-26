@@ -29,7 +29,8 @@ import {
   listProxyHostsPaginated,
   updateProxyHost,
 } from '../../src/lib/models/proxy-hosts';
-import { buildCaddyDocument } from '../../src/lib/caddy';
+import { buildCaddyDocument, buildServerProtocols } from '../../src/lib/caddy';
+import { normalizeHttpProtocols } from '../../src/lib/settings';
 import { parseProxyHostOptionUpdates } from '../../src/lib/proxy-host-form';
 import * as schema from '../../src/lib/db/schema';
 
@@ -163,5 +164,26 @@ describe('parseProxyHostOptionUpdates', () => {
     const parsed = parseProxyHostOptionUpdates(new FormData());
     expect(parsed.sslForced).toBeUndefined();
     expect(parsed.allowWebsocket).toBeUndefined();
+  });
+});
+
+describe('HTTP versions', () => {
+  it("leaves Caddy's default alone while everything is on", () => {
+    expect(buildServerProtocols({ http2: true, http3: true })).toEqual({});
+  });
+
+  it('always keeps HTTP/1.1', () => {
+    expect(buildServerProtocols({ http2: false, http3: false })).toEqual({ protocols: ['h1'] });
+    expect(buildServerProtocols({ http2: true, http3: false })).toEqual({
+      protocols: ['h1', 'h2'],
+    });
+  });
+
+  it('reads anything but an explicit false as on', () => {
+    expect(normalizeHttpProtocols(null)).toEqual({ http2: true, http3: true });
+    expect(normalizeHttpProtocols({ http3: false, extra: 'x' })).toEqual({
+      http2: true,
+      http3: false,
+    });
   });
 });

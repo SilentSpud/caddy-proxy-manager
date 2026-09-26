@@ -43,6 +43,8 @@ import {
   getErrorPagesSettings,
   getDefaultResponseSettings,
   getTrustedProxiesSettings,
+  getHttpProtocolsSettings,
+  type HttpProtocolsSettings,
   getTailscaleSettings,
   defaultTailscaleSettings,
   type AcmeSettings,
@@ -890,6 +892,14 @@ function attachHostToRoute(route: CaddyHttpRoute, host: string | string[]): Cadd
 /** Normalize trusted-proxy ranges: trim, drop blanks, expand the "private_ranges" shorthand. */
 export function normalizeTrustedProxyRanges(ranges: string[] | undefined | null): string[] {
   return expandPrivateRanges((ranges ?? []).map((r) => r.trim()).filter(Boolean));
+}
+
+/** Omitted while everything is on, so the config keeps following Caddy's own default. */
+export function buildServerProtocols(settings: HttpProtocolsSettings): { protocols?: string[] } {
+  if (settings.http2 && settings.http3) return {};
+  return {
+    protocols: ["h1", ...(settings.http2 ? ["h2"] : []), ...(settings.http3 ? ["h3"] : [])],
+  };
 }
 
 /**
@@ -3326,6 +3336,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     globalErrorPages,
     metricsSettings,
     loggingSettings,
+    httpProtocols,
   ] = await Promise.all([
     getAccessRulesForHosts(enabledProxyHostIds),
     getGeneralSettings(),
@@ -3344,6 +3355,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     getErrorPagesSettings(),
     getMetricsSettings(),
     getLoggingSettings(),
+    getHttpProtocolsSettings(),
   ]);
 
   // Resolved before anything reads it, because both the routes and the servers depend on the same
@@ -3484,6 +3496,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
       ...(errorRoutes.length > 0 ? { errors: { routes: errorRoutes } } : {}),
       // Trusted proxies / client_ip_headers / trusted_proxies_strict (issue #222)
       ...serverTrustedProxies,
+      ...buildServerProtocols(httpProtocols),
       // Enable access logging if configured
       ...(loggingEnabled ? { logs: { default_logger_name: "http_access" } } : {}),
     };

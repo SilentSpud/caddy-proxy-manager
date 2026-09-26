@@ -208,13 +208,18 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       {
         id: "network",
         name: "Network",
-        desc: "Trusted proxies, and the tailnet hosts are served on",
+        desc: "Trusted proxies, HTTP versions, and the tailnet hosts are served on",
         icon: Waypoints,
         blocks: [
           {
             id: "trusted-proxies",
             name: "Trusted Proxies",
             desc: "Resolve real client IP behind an upstream proxy",
+          },
+          {
+            id: "http-protocols",
+            name: "HTTP Versions",
+            desc: "Turn HTTP/2 or HTTP/3 off for every host",
           },
           {
             id: "tailscale",

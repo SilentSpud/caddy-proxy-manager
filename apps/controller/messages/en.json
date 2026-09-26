@@ -2284,6 +2284,10 @@
     "trustedProxiesInfoDescription": "This fixes client-IP attribution everywhere at once - access logs, analytics, the country map, and any downstream handler using the client_ip placeholder.",
     "trustedProxiesInfoTitle": "Nothing else on the host has to change",
     "trustedProxiesScopeDescription": "Applied to the main HTTP server",
+    "http2": "HTTP/2",
+    "http2Help": "Offer HTTP/2 over TLS. HTTP/1.1 is always available, so clients that can't use it still connect",
+    "http3": "HTTP/3",
+    "http3Help": "Offer HTTP/3 over QUIC on UDP 443. Turn off if a firewall in front of Caddy drops UDP",
     "trustedProxyRanges": "Trusted proxy ranges",
     "trustedProxyRangesHelp": "CIDRs, IPs, or the private_ranges shorthand - one per line. When CPM runs behind another proxy, Caddy resolves the real client IP from these. Leave empty to keep the current behaviour.",
     "type": "Type",
@@ -2415,7 +2419,7 @@
       },
       "network": {
         "name": "Network",
-        "desc": "Trusted proxies, and the tailnet hosts are served on"
+        "desc": "Trusted proxies, HTTP versions, and the tailnet hosts are served on"
       },
       "authentication": {
         "name": "Authentication",
@@ -2494,6 +2498,10 @@
       "trustedProxies": {
         "name": "Trusted Proxies",
         "desc": "Resolve real client IP behind an upstream proxy"
+      },
+      "httpProtocols": {
+        "name": "HTTP Versions",
+        "desc": "Turn HTTP/2 or HTTP/3 off for every host"
       },
       "tailscale": {
         "name": "Tailscale",
@@ -2888,6 +2896,7 @@
       "dnsResolvers": "DNS Resolvers",
       "upstreamDns": "Upstream DNS",
       "trustedProxies": "Trusted Proxies",
+      "httpProtocols": "HTTP Versions",
       "tailscale": "Tailscale",
       "geoblock": "Geo-Block",
       "errorPages": "Error Pages",
@@ -2965,6 +2974,8 @@
       "dashboardFailed": "Failed to save dashboard settings",
       "trustedProxiesSaved": "Trusted proxies settings saved and applied successfully",
       "trustedProxiesFailed": "Failed to save trusted proxies settings",
+      "httpProtocolsSaved": "HTTP versions saved and applied",
+      "httpProtocolsFailed": "Failed to save HTTP versions",
       "dnsResolverRequired": "At least one DNS resolver is required when enabled",
       "dnsSaved": "DNS settings saved and applied successfully",
       "dnsFailed": "Failed to save DNS settings",

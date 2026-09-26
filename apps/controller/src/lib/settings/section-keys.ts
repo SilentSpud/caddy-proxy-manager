@@ -31,6 +31,7 @@ export const SECTION_STORAGE_KEYS: Record<string, SectionKeys> = {
   "dns-resolvers": { label: "DNS Resolvers", keys: ["dns"] },
   "upstream-dns": { label: "Upstream DNS", keys: ["upstream_dns_resolution"] },
   "trusted-proxies": { label: "Trusted Proxies", keys: ["trusted_proxies"] },
+  "http-protocols": { label: "HTTP Versions", keys: ["http_protocols"] },
   tailscale: { label: "Tailscale", keys: ["tailscale"] },
   geoblock: { label: "Geo-Block", keys: ["geoblock"] },
   "error-pages": { label: "Error Pages", keys: ["error_pages"] },
