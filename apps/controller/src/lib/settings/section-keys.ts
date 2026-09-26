@@ -26,6 +26,7 @@ export const SECTION_STORAGE_KEYS: Record<string, SectionKeys> = {
   avatars: { label: "User Avatars", keys: ["avatars"] },
   updates: { label: "Updates", keys: ["update_settings"] },
   "caddy-build": { label: "Caddy Build", keys: ["caddy_build"] },
+  "global-caddy-config": { label: "Global Caddyfile", keys: ["global_caddy_config"] },
   dashboard: { label: "Dashboard Host", keys: ["dashboard"] },
   "dns-providers": { label: "DNS Providers", keys: ["dns_provider", "cloudflare"] },
   "dns-resolvers": { label: "DNS Resolvers", keys: ["dns"] },

@@ -44,6 +44,7 @@ import {
   getDefaultResponseSettings,
   getTrustedProxiesSettings,
   getHttpProtocolsSettings,
+  getGlobalCaddyConfigSettings,
   type HttpProtocolsSettings,
   getTailscaleSettings,
   defaultTailscaleSettings,
@@ -120,6 +121,7 @@ import {
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
 import { buildRedirectRoute } from "./caddy-redirects";
 import { evictedNames, withRenewalOverrides } from "./certificate-renewals";
+import { withGlobalCaddyConfig } from "./caddy-global-config";
 import { reachabilityRoute } from "./domain-reachability";
 import { type AccessListRuntime, buildAccessListHandlers } from "./access-list-rules";
 import {
@@ -3098,7 +3100,11 @@ async function buildL4Servers(
  * `options.adaptVia` is the agent whose Caddy adapts the hosts' Caddyfile snippets, and must be the
  * agent this document is loaded onto.
  */
-export async function buildCaddyDocument(agentRowId?: number, options: { adaptVia?: string } = {}) {
+export async function buildCaddyDocument(
+  agentRowId?: number,
+  /** `globalCaddyfile` stands in for the saved one, which is how a save is checked before it lands. */
+  options: { adaptVia?: string; globalCaddyfile?: string } = {},
+) {
   const [
     proxyHostRecords,
     certRows,
@@ -3660,7 +3666,7 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
 
   const l4App = l4Servers ? { layer4: { servers: l4Servers } } : {};
 
-  return {
+  const document = {
     admin: {
       // A bare port binds every address family; "0.0.0.0:2019" bound only IPv4, so an agent
       // reaching Caddy over IPv6 found nothing listening.
@@ -3686,6 +3692,9 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
       ...tailscaleApp,
     },
   };
+  const globalCaddyfile =
+    options.globalCaddyfile ?? (await getGlobalCaddyConfigSettings()).caddyfile;
+  return await withGlobalCaddyConfig(document, globalCaddyfile, options.adaptVia);
 }
 
 /**

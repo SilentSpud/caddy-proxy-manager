@@ -52,3 +52,29 @@ commit. It is compiled from source at build time.
 
 The [agent](../agent/) runs the build and recreates the Caddy container when it finishes, reporting
 progress as it goes. The running Caddy keeps serving until the new binary is ready.
+
+## Global Caddyfile
+
+**Settings → Caddy Build → Global Caddyfile** takes raw Caddyfile text - a global options block,
+site blocks, or both - and adds it to every agent's config. Each agent's Caddy adapts it, so a
+directive from a module that agent was built with works there.
+
+It can only add to what CPM generates. CPM rebuilds the whole config on every change, so anything
+that would replace part of it is refused by name rather than merged:
+
+- the admin API and storage - the agent drives the first and reads certificates from the second;
+- TLS certificate automation, and any other setting CPM already writes;
+- ports 80 and 443, and every other port a CPM server listens on;
+- the `http_access` and `waf_rules` logs, and the layer 4 and Tailscale apps.
+
+A site block on a port of its own gets that port inside the Caddy container; publish it in
+`docker-compose.yml` to reach it from outside. A save is checked by every connected agent's Caddy,
+with `caddy validate` where the agent supports it, and refused with Caddy's own message. If a saved
+one later stops adapting - after a rebuild drops a module, say - it is skipped with a warning in the
+controller log and the rest of the config still loads.
+
+:::caution
+This is Caddy itself: a site block can serve any file the Caddy container can read, including its
+certificate storage. Only admins can see or change it, the same as per-host custom Caddyfile
+snippets.
+:::

@@ -687,6 +687,22 @@ export function validateSettingsGroup(group: string, input: unknown): unknown {
     case "tailscale":
       validateTailscale(value);
       break;
+    case "http-protocols":
+      onlyKeys(value, ["http2", "http3"], "HTTP version settings");
+      booleanValue(required(value, "http2", "HTTP version settings"), "http2");
+      booleanValue(required(value, "http3", "HTTP version settings"), "http3");
+      break;
+    case "two-factor":
+      onlyKeys(value, ["requireForAdmins"], "two-factor settings");
+      booleanValue(required(value, "requireForAdmins", "two-factor settings"), "requireForAdmins");
+      break;
+    case "global-caddy-config":
+      // Length, characters and whether Caddy takes it are checked on save, against a real Caddy.
+      onlyKeys(value, ["caddyfile"], "global Caddyfile settings");
+      if (typeof required(value, "caddyfile", "global Caddyfile settings") !== "string") {
+        invalid("caddyfile must be a string");
+      }
+      break;
     default:
       invalid("Unknown settings group");
   }

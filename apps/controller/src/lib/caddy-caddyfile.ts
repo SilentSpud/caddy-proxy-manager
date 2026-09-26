@@ -60,10 +60,26 @@ export async function adaptCaddyfileSnippet(
   const trimmed = snippet.trim();
   if (!trimmed) return { routes: [], warnings: [], ignoredApps: [] };
 
+  const parsed = await requestAdapt(wrapSnippet(trimmed), agentId);
+  const apps = parsed.result?.apps ?? {};
+  const servers = apps.http?.servers ?? {};
+  const routes: Record<string, unknown>[] = [];
+  for (const server of Object.values(servers)) {
+    for (const route of server.routes ?? []) {
+      routes.push(route);
+    }
+  }
+
+  const ignoredApps = Object.keys(apps).filter((key) => key !== "http");
+
+  return { routes, warnings: adaptWarnings(parsed), ignoredApps };
+}
+
+async function requestAdapt(caddyfile: string, agentId?: string): Promise<AdaptResponse> {
   const response = await caddyAdminRequest({
     path: "/adapt",
     method: "POST",
-    body: wrapSnippet(trimmed),
+    body: caddyfile,
     contentType: "text/caddyfile",
     // Adaptation is pure parsing - no answer in ten seconds means something is wrong with the
     // admin endpoint, not with the snippet.
@@ -85,24 +101,24 @@ export async function adaptCaddyfileSnippet(
       parsed.error ?? `Caddy rejected the Caddyfile (HTTP ${response.status})`,
     );
   }
+  return parsed;
+}
 
-  const apps = parsed.result?.apps ?? {};
-  const servers = apps.http?.servers ?? {};
-  const routes: Record<string, unknown>[] = [];
-  for (const server of Object.values(servers)) {
-    for (const route of server.routes ?? []) {
-      routes.push(route);
-    }
-  }
+function adaptWarnings(parsed: AdaptResponse): string[] {
+  return (parsed.warnings ?? [])
+    .map((w) => (w.line ? `line ${w.line}: ${w.message ?? ""}` : (w.message ?? "")))
+    .filter(Boolean);
+}
 
-  const ignoredApps = Object.keys(apps).filter((key) => key !== "http");
-
+/** A whole Caddyfile - global options and site blocks - as the JSON config Caddy would load. */
+export async function adaptCaddyfile(
+  caddyfile: string,
+  agentId?: string,
+): Promise<{ config: Record<string, unknown>; warnings: string[] }> {
+  const parsed = await requestAdapt(caddyfile, agentId);
   return {
-    routes,
-    warnings: (parsed.warnings ?? [])
-      .map((w) => (w.line ? `line ${w.line}: ${w.message ?? ""}` : (w.message ?? "")))
-      .filter(Boolean),
-    ignoredApps,
+    config: (parsed.result ?? {}) as Record<string, unknown>,
+    warnings: adaptWarnings(parsed),
   };
 }
 

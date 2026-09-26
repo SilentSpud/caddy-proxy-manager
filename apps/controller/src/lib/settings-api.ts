@@ -50,6 +50,8 @@ import {
   saveTrustedProxiesSettings,
   saveTwoFactorPolicySettings,
   saveHttpProtocolsSettings,
+  getGlobalCaddyConfigSettings,
+  saveGlobalCaddyConfigSettings,
   getTailscaleSettings,
   saveTailscaleSettings,
   defaultTailscaleSettings,
@@ -173,6 +175,12 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     storageKey: "http_protocols",
     applyCaddy: true,
   },
+  "global-caddy-config": {
+    get: getGlobalCaddyConfigSettings,
+    save: saveGlobalCaddyConfigSettings as (data: never) => Promise<void>,
+    storageKey: "global_caddy_config",
+    applyCaddy: true,
+  },
   "two-factor": {
     get: getTwoFactorPolicySettings,
     save: saveTwoFactorPolicySettings as (data: never) => Promise<void>,
@@ -191,6 +199,9 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
 };
 
 /** Own keys only: a group named `constructor` must not find Object's. */
+/** Every group the REST API serves; each needs a case in `validateSettingsGroup` too. */
+export const SETTINGS_GROUPS = Object.keys(SETTINGS_HANDLERS);
+
 export function isSettingsGroup(group: string): boolean {
   return Object.hasOwn(SETTINGS_HANDLERS, group);
 }

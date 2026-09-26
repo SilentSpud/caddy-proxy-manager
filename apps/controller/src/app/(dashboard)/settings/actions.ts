@@ -42,6 +42,7 @@ import {
   saveErrorPagesSettings,
   saveTrustedProxiesSettings,
   saveHttpProtocolsSettings,
+  saveGlobalCaddyConfigSettings,
   saveTwoFactorPolicySettings,
   saveDefaultResponseSettings,
   type DefaultResponseSettings,
@@ -1271,6 +1272,37 @@ async function updateHttpProtocolsSettingsActionUnlocked(
   }
 }
 
+async function updateGlobalCaddyConfigActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    await saveGlobalCaddyConfigSettings({ caddyfile: String(formData.get("caddyfile") ?? "") });
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return { success: true, message: t("results.globalCaddyConfigSaved") };
+    } catch (error) {
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      return {
+        success: true,
+        message: t("results.applyFailed", {
+          error: await errorText(error, t("results.unknownError")),
+        }),
+      };
+    }
+  } catch (error) {
+    console.error("Failed to save the global Caddyfile:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.globalCaddyConfigFailed")),
+    };
+  }
+}
+
 async function updateTwoFactorPolicySettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -2096,6 +2128,9 @@ export const updateTrustedProxiesSettingsAction = stagedSettingsAction(
 );
 export const updateHttpProtocolsSettingsAction = stagedSettingsAction(
   updateHttpProtocolsSettingsActionUnlocked,
+);
+export const updateGlobalCaddyConfigAction = stagedSettingsAction(
+  updateGlobalCaddyConfigActionUnlocked,
 );
 export const updateTwoFactorPolicySettingsAction = stagedSettingsAction(
   updateTwoFactorPolicySettingsActionUnlocked,

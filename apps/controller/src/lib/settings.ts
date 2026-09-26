@@ -371,6 +371,23 @@ export async function saveHttpProtocolsSettings(settings: unknown): Promise<void
   await setSetting("http_protocols", normalizeHttpProtocols(settings));
 }
 
+/** System > Caddy Build > Global Caddyfile. Merged into every agent's config by `caddy-global-config.ts`. */
+export type GlobalCaddyConfigSettings = { caddyfile: string };
+
+export async function getGlobalCaddyConfigSettings(): Promise<GlobalCaddyConfigSettings> {
+  const stored = await getSetting<GlobalCaddyConfigSettings>("global_caddy_config");
+  return { caddyfile: typeof stored?.caddyfile === "string" ? stored.caddyfile : "" };
+}
+
+/** Checked against a real Caddy first, from here so the form and the REST API can't differ. */
+export async function saveGlobalCaddyConfigSettings(settings: unknown): Promise<void> {
+  const raw = settings && typeof settings === "object" ? (settings as Record<string, unknown>) : {};
+  const caddyfile = typeof raw.caddyfile === "string" ? raw.caddyfile.replace(/\r\n?/g, "\n") : "";
+  const { assertGlobalCaddyConfigLoads } = await import("./caddy-global-config");
+  await assertGlobalCaddyConfigLoads(caddyfile);
+  await setSetting("global_caddy_config", { caddyfile });
+}
+
 /** Security > Authentication > Two-factor sign-in. */
 export type TwoFactorPolicySettings = { requireForAdmins: boolean };
 

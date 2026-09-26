@@ -9,6 +9,7 @@ import { Link } from "@astryxdesign/core/Link";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
 import { FormCard, InfoAlert, StatusAlert, WarnAlert } from "@/src/components/ui/FormLayout";
+import { CodeEditor } from "@/components/ui/CodeEditor";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -32,6 +33,7 @@ import type {
   ErrorPagesSettings,
   TrustedProxiesSettings,
   HttpProtocolsSettings,
+  GlobalCaddyConfigSettings,
   TwoFactorPolicySettings,
   DefaultResponseSettings,
 } from "@/lib/settings";
@@ -87,6 +89,7 @@ import {
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
   updateHttpProtocolsSettingsAction,
+  updateGlobalCaddyConfigAction,
   updateTwoFactorPolicySettingsAction,
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
@@ -133,6 +136,7 @@ type Props = {
   upstreamDnsResolution: UpstreamDnsResolutionSettings | null;
   trustedProxies: TrustedProxiesSettings | null;
   httpProtocols: HttpProtocolsSettings;
+  globalCaddyConfig: GlobalCaddyConfigSettings;
   twoFactorPolicy: TwoFactorPolicySettings;
   defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
@@ -191,6 +195,7 @@ export default function SettingsClient({
   upstreamDnsResolution,
   trustedProxies,
   httpProtocols,
+  globalCaddyConfig,
   twoFactorPolicy,
   defaultResponse,
   globalGeoBlock,
@@ -275,6 +280,10 @@ export default function SettingsClient({
     updateTrustedProxiesSettingsAction,
     null,
   );
+  const [globalCaddyConfigState, globalCaddyConfigFormAction] = useActionState(
+    updateGlobalCaddyConfigAction,
+    null,
+  );
   const [httpProtocolsState, httpProtocolsFormAction] = useActionState(
     updateHttpProtocolsSettingsAction,
     null,
@@ -333,6 +342,13 @@ export default function SettingsClient({
         globalErrorPages={globalErrorPages}
         errorPagesState={errorPagesState}
         errorPagesFormAction={errorPagesFormAction}
+      />
+    ),
+    "global-caddy-config": (
+      <GlobalCaddyConfigSection
+        globalCaddyConfig={globalCaddyConfig}
+        state={globalCaddyConfigState}
+        formAction={globalCaddyConfigFormAction}
       />
     ),
     "caddy-build": (
@@ -1188,6 +1204,38 @@ function TrustedProxiesSection({
         {t("trustedProxiesInfoDescription")}
       </InfoAlert>
     </>
+  );
+}
+
+function GlobalCaddyConfigSection({
+  globalCaddyConfig,
+  state,
+  formAction,
+}: {
+  globalCaddyConfig: GlobalCaddyConfigSettings;
+  state: { success: boolean; message?: string } | null;
+  formAction: (payload: FormData) => void;
+}) {
+  const t = useTranslations("settings");
+  const [caddyfile, setCaddyfile] = useState(globalCaddyConfig.caddyfile);
+
+  return (
+    <FormCard>
+      <form action={formAction}>
+        <VStack gap={3}>
+          {state?.message && <StatusAlert message={state.message} success={state.success} />}
+          <CodeEditor
+            label={t("globalCaddyfile")}
+            htmlName="caddyfile"
+            language="caddyfile"
+            value={caddyfile}
+            onChange={setCaddyfile}
+            height="md"
+            description={t("globalCaddyfileHelp")}
+          />
+        </VStack>
+      </form>
+    </FormCard>
   );
 }
 

@@ -145,6 +145,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             desc: "Which plugins the Caddy image is compiled with",
             env: ["CADDY_BUILD_TIMEOUT"],
           },
+          {
+            id: "global-caddy-config",
+            name: "Global Caddyfile",
+            desc: "Raw Caddy configuration added to every agent's config",
+          },
         ],
       },
       {

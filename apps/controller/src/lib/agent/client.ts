@@ -228,9 +228,13 @@ export async function caddyAdminViaAgent(
  */
 export async function caddyValidateViaAgent(
   config: string,
+  /** The agent whose Caddy must answer; any capable one when omitted. */
+  agentId?: string,
 ): Promise<CaddyAdminProxyResponse | null> {
-  const agent = connectedAgents().find((candidate) =>
-    candidate.status?.capabilities?.includes("caddy-validate"),
+  const agent = connectedAgents().find(
+    (candidate) =>
+      (!agentId || candidate.agentId === agentId) &&
+      candidate.status?.capabilities?.includes("caddy-validate"),
   );
   if (!agent) return null;
   try {

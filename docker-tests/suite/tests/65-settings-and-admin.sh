@@ -158,4 +158,51 @@ t_ne "the L4 port status carries a diff" "null" "$(jqr '.diff')"
 api GET /api/geoip-status
 t_eq "a bearer caller is redirected away from the non-v1 endpoints" "307" "$API_STATUS"
 
+# ── Global Caddyfile ────────────────────────────────────────────────────────
+#
+# Adapted by the real Caddy and merged by addition only: a site block on a port
+# of its own is served, and anything that would replace CPM's config is refused.
+
+put_global_caddyfile() {
+  api PUT /api/v1/settings/global-caddy-config "$(jq -nc --arg c "$1" '{caddyfile: $c}')"
+}
+
+put_global_caddyfile ':8081 {
+  respond "from the global caddyfile" 200
+}'
+t_eq "a global Caddyfile with a site block of its own can be saved" "200" "$API_STATUS"
+if wait_for "Caddy to serve :8081" 30 curl -sS --max-time 3 -o /dev/null http://caddy:8081/; then
+  t_eq "its site block is served on its own port" "from the global caddyfile"     "$(curl -sS --max-time 5 http://caddy:8081/)"
+else
+  fail "its site block is served on its own port" "nothing answered on caddy:8081"
+fi
+t_ne "CPM's own server keeps answering alongside it" "000"   "$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' http://caddy/ 2>/dev/null)"
+
+put_global_caddyfile '{
+  admin :3000
+}'
+t_eq "a global Caddyfile that would move the admin API is refused" "400" "$API_STATUS"
+t_contains "the refusal names what it would replace" "admin" "$API_BODY"
+
+put_global_caddyfile ':80 {
+  respond "hijack"
+}'
+t_eq "a global Caddyfile claiming port 80 is refused" "400" "$API_STATUS"
+
+put_global_caddyfile ':8082 {
+  not_a_directive
+}'
+t_eq "a global Caddyfile Caddy cannot read is refused" "400" "$API_STATUS"
+
+api GET /api/v1/settings/global-caddy-config
+t_contains "a refused save leaves the last good one in place" "8081" "$(jqr '.caddyfile')"
+
+api PUT /api/v1/settings/global-caddy-config '{"caddyfile":""}'
+t_eq "the global Caddyfile can be cleared" "200" "$API_STATUS"
+if wait_for "caddy:8081 to stop answering" 30 sh -c '! curl -sS --max-time 3 -o /dev/null http://caddy:8081/'; then
+  pass "clearing it removes its site block"
+else
+  fail "clearing it removes its site block" "caddy:8081 still answers"
+fi
+
 finish

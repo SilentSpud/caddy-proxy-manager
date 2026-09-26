@@ -963,6 +963,11 @@
     "seclangDanglingChain": "the rule starts a chain but no rule follows to continue it",
     "seclangUnclosedActionQuote": "a single quote in the action list is never closed",
     "wafDryRunRejectedGlobal": "Coraza refused to load the global WAF configuration: {detail}",
+    "globalCaddyfileTooLong": "The global Caddyfile is too long. Keep it under {max} characters.",
+    "globalCaddyfileControlCharacter": "The global Caddyfile contains a control character. Only tabs and line breaks are allowed.",
+    "globalCaddyfileInvalid": "Caddy couldn't read the global Caddyfile: {detail}",
+    "globalCaddyfileRefused": "The global Caddyfile would replace configuration CPM manages: {keys}. It can only add to it.",
+    "globalCaddyfileRejected": "Caddy refused the configuration the global Caddyfile produces: {detail}",
     "wafDryRunRejectedDashboard": "Coraza refused to load the dashboard host's WAF configuration: {detail}",
     "wafDryRunRejectedHost": "Coraza refused to load the WAF configuration of the host \"{name}\": {detail}",
     "wafDryRunRejectedPreset": "Coraza refused to load the preset: {detail}",
@@ -2492,6 +2497,8 @@
     "http2Help": "Offer HTTP/2 over TLS. HTTP/1.1 is always available, so clients that can't use it still connect",
     "http3": "HTTP/3",
     "http3Help": "Offer HTTP/3 over QUIC on UDP 443. Turn off if a firewall in front of Caddy drops UDP",
+    "globalCaddyfile": "Caddyfile",
+    "globalCaddyfileHelp": "A global options block, site blocks on ports of their own, or both. It can only add: settings CPM manages, like the admin API, storage, certificate automation and ports 80 and 443, are refused by name. Each agent's Caddy checks it before it's saved. A new port also has to be published on the Caddy container.",
     "trustedProxyRanges": "Trusted proxy ranges",
     "trustedProxyRangesHelp": "CIDRs, IPs, or the private_ranges shorthand - one per line. When CPM runs behind another proxy, Caddy resolves the real client IP from these. Leave empty to keep the current behaviour.",
     "type": "Type",
@@ -2678,6 +2685,10 @@
       "caddyBuild": {
         "name": "Caddy Build",
         "desc": "Which plugins the Caddy image is compiled with"
+      },
+      "globalCaddyConfig": {
+        "name": "Global Caddyfile",
+        "desc": "Raw Caddy configuration added to every agent's config"
       },
       "dashboard": {
         "name": "Dashboard Host",
@@ -3099,6 +3110,7 @@
       "avatars": "User Avatars",
       "updates": "Updates",
       "caddyBuild": "Caddy Build",
+      "globalCaddyConfig": "Global Caddyfile",
       "dashboard": "Dashboard Host",
       "dnsProviders": "DNS Providers",
       "dnsResolvers": "DNS Resolvers",
@@ -3184,6 +3196,8 @@
       "trustedProxiesSaved": "Trusted proxies settings saved and applied successfully",
       "trustedProxiesFailed": "Failed to save trusted proxies settings",
       "httpProtocolsSaved": "HTTP versions saved and applied",
+      "globalCaddyConfigSaved": "Global Caddyfile saved and applied",
+      "globalCaddyConfigFailed": "Failed to save the global Caddyfile",
       "httpProtocolsFailed": "Failed to save HTTP versions",
       "twoFactorPolicySaved": "Two-factor policy saved",
       "twoFactorPolicyFailed": "Failed to save the two-factor policy",
