@@ -89,21 +89,26 @@ export function toOptions(items: { id: number; name: string }[], noneLabel: stri
 
 type ProxyHostsT = ReturnType<typeof useTranslations<"proxyHosts">>;
 
+/** A list with neither users nor IP rules admits nobody. */
+export function accessListIsEmpty(list: Pick<AccessList, "entries" | "ipRules">): boolean {
+  return list.entries.length === 0 && (list.ipRules?.length ?? 0) === 0;
+}
+
 /** Access list options, naming the empty ones: picking one closes the host rather than guarding it. */
 export function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
   return toOptions(
     accessLists.map((list) => ({
       id: list.id,
-      name: list.entries.length === 0 ? t("accessListNoMembers", { name: list.name }) : list.name,
+      name: accessListIsEmpty(list) ? t("accessListNoMembers", { name: list.name }) : list.name,
     })),
     t("none"),
   );
 }
 
-/** A warning on the picker while the chosen list has no members. */
+/** A warning on the picker while the chosen list admits nobody. */
 export function accessListStatus(accessLists: AccessList[], accessListId: string, t: ProxyHostsT) {
   const chosen = accessLists.find((list) => String(list.id) === accessListId);
-  return chosen && chosen.entries.length === 0
+  return chosen && accessListIsEmpty(chosen)
     ? { type: "warning" as const, message: t("accessListEmptyWarning") }
     : undefined;
 }
@@ -220,7 +225,7 @@ export function CreateHostDialog({
           />
           <AgentAssignmentFields agents={agents} selected={[]} />
           <RedirectsFields initialData={initialData?.redirects} />
-          <LocationRulesFields initialData={initialData?.locationRules} />
+          <LocationRulesFields initialData={initialData?.locationRules} accessLists={accessLists} />
           <RewriteFields initialData={initialData?.rewrite} />
           <PathAllowsFields initialData={initialData?.pathAllows} />
           <PathBlocksFields initialData={initialData?.pathBlocks} />
@@ -360,7 +365,7 @@ export function EditHostDialog({
           />
           <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
           <RedirectsFields initialData={host.redirects} />
-          <LocationRulesFields initialData={host.locationRules} />
+          <LocationRulesFields initialData={host.locationRules} accessLists={accessLists} />
           <RewriteFields initialData={host.rewrite} />
           <PathAllowsFields initialData={host.pathAllows} />
           <PathBlocksFields initialData={host.pathBlocks} />

@@ -2,7 +2,7 @@ import db, { nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
 import { validateCaddyfileSnippet } from "../caddy-caddyfile";
 import { logAuditEvent } from "../audit";
-import { proxyHosts } from "../db/schema";
+import { accessLists, proxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { type GeoBlockSettings, getDnsProviderSettings, getTailscaleSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
@@ -111,12 +111,15 @@ export type LocationRule = {
   path: string; // Caddy path pattern, e.g. "/ws/*", "/api/*"
   upstreams: string[]; // e.g. ["backend:8080", "backend2:8080"]
   loadBalancer: LoadBalancerConfig | null; // optional per-rule load balancing / health checks
+  /** Absent: the host's access list applies. null: none. A number: that list instead. */
+  accessListId?: number | null;
 };
 
 export type LocationRuleInput = {
   path: string;
   upstreams: string[];
   loadBalancer?: LoadBalancerInput | null;
+  accessListId?: number | null;
 };
 
 // Stored (meta JSON) shape of a location rule. The load balancer uses the same snake_case meta
@@ -125,6 +128,8 @@ export type LocationRuleMeta = {
   path: string;
   upstreams: string[];
   load_balancer?: LoadBalancerMeta;
+  /** No FK behind it: deleting a list scrubs it from here (see access-lists.ts). */
+  access_list_id?: number | null;
 };
 
 export const PATH_BLOCK_STATUS_CODES = [400, 401, 403, 404, 410, 418, 451, 500, 502, 503] as const;
@@ -1697,6 +1702,12 @@ export function sanitizeErrorPageRules(value: unknown): ErrorPageRule[] {
   return valid;
 }
 
+/** A rule's own access list as stored: absent inherits the host's, null is none. */
+function parseLocationAccessListId(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
 // Extract a validated { path, upstreams } pair from a raw location-rule item, or null if it is
 // malformed. Shared by the meta and input sanitizers below.
 function parseLocationRuleBase(item: unknown): { path: string; upstreams: string[] } | null {
@@ -1729,6 +1740,10 @@ function sanitizeLocationRuleMetas(value: unknown): LocationRuleMeta[] {
       (item as { load_balancer?: LoadBalancerMeta }).load_balancer,
     );
     if (lb) rule.load_balancer = lb;
+    const accessListId = parseLocationAccessListId(
+      (item as { access_list_id?: unknown }).access_list_id,
+    );
+    if (accessListId !== undefined) rule.access_list_id = accessListId;
     valid.push(rule);
   }
   return valid;
@@ -1746,6 +1761,10 @@ function normalizeLocationRulesInput(value: unknown): LocationRuleMeta[] {
     const lbInput = (item as { loadBalancer?: LoadBalancerInput | null }).loadBalancer;
     const lb = normalizeLoadBalancerInput(lbInput ?? null, undefined);
     if (lb) rule.load_balancer = lb;
+    const accessListId = parseLocationAccessListId(
+      (item as { accessListId?: unknown }).accessListId,
+    );
+    if (accessListId !== undefined) rule.access_list_id = accessListId;
     valid.push(rule);
   }
   return valid;
@@ -1757,6 +1776,7 @@ function hydrateLocationRules(metaRules: LocationRuleMeta[] | undefined): Locati
     path: rule.path,
     upstreams: rule.upstreams,
     loadBalancer: hydrateLoadBalancer(rule.load_balancer),
+    ...(rule.access_list_id !== undefined && { accessListId: rule.access_list_id }),
   }));
 }
 
@@ -1767,8 +1787,26 @@ function dehydrateLocationRules(rules: LocationRule[]): LocationRuleMeta[] {
     const meta: LocationRuleMeta = { path: rule.path, upstreams: rule.upstreams };
     const lb = dehydrateLoadBalancer(rule.loadBalancer);
     if (lb) meta.load_balancer = lb;
+    if (rule.accessListId !== undefined) meta.access_list_id = rule.accessListId;
     return meta;
   });
+}
+
+/** A location rule's own list must exist; a dangling id would quietly refuse the path. */
+async function assertLocationAccessListsExist(rules: LocationRuleMeta[] | undefined) {
+  const ids = [
+    ...new Set(
+      (rules ?? [])
+        .map((rule) => rule.access_list_id)
+        .filter((id): id is number => typeof id === "number"),
+    ),
+  ];
+  if (ids.length === 0) return;
+  const found = await db
+    .select({ id: accessLists.id })
+    .from(accessLists)
+    .where(inArray(accessLists.id, ids));
+  if (found.length !== ids.length) throw domainError("accessListNotFound", {}, { status: 400 });
 }
 
 function parseMeta(value: string | null): ProxyHostMeta {
@@ -3282,6 +3320,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   const meta = buildMeta({}, input);
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
+  await assertLocationAccessListsExist(parseMeta(meta).location_rules);
   await assertCrsPluginIdsExist(parseMeta(meta).waf?.plugin_ids);
   await assertHostWafLoads(
     { kind: "host", name: input.name.trim() },
@@ -3432,6 +3471,7 @@ export async function updateProxyHost(
   const meta = buildMeta(existingMeta, input);
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
+  await assertLocationAccessListsExist(parseMeta(meta).location_rules);
   await assertCrsPluginIdsExist(parseMeta(meta).waf?.plugin_ids);
   await assertHostWafLoads(
     { kind: "host", name: input.name ?? existing.name },

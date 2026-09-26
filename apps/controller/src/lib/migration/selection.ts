@@ -109,7 +109,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     id: "accessLists",
     label: "Access lists",
     description: "Basic-auth lists and the usernames in them.",
-    tables: ["access_lists", "access_list_entries"],
+    tables: ["access_lists", "access_list_entries", "access_list_ip_rules"],
     requires: [],
   },
   {

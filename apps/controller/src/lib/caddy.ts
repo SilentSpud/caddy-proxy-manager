@@ -27,7 +27,7 @@ import {
   sortTlsPoliciesBySniPriority,
 } from "./host-pattern-priority";
 import db from "./db";
-import { eq, isNull } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { config } from "./config";
 import {
   getDashboardSettings,
@@ -74,6 +74,8 @@ import { caddyAdminRequest } from "./caddy-admin";
 import { getPublicBaseUrl } from "./public-url";
 import {
   accessListEntries,
+  accessListIpRules,
+  accessLists,
   certificates,
   caCertificates,
   issuedClientCertificates,
@@ -117,6 +119,7 @@ import {
 } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
 import { buildRedirectRoute } from "./caddy-redirects";
+import { type AccessListRuntime, buildAccessListHandlers } from "./access-list-rules";
 import {
   type CaddyModuleAvailability,
   getCaddyModuleAvailability,
@@ -986,7 +989,7 @@ function parseTailscaleConfig(
 
 type CaddyBuildContext = {
   rows: ProxyHostRow[];
-  accessAccounts: Map<number, AccessListEntryRow[]>;
+  accessLists: Map<number, AccessListRuntime>;
   tlsReadyCertificates: Set<number>;
   globalDnsSettings: DnsSettings | null;
   globalUpstreamDnsResolutionSettings: UpstreamDnsResolutionSettings | null;
@@ -1130,10 +1133,45 @@ function appendLocationRoutes(options: {
 
     hostRoutes.push({
       match: [matcher],
-      handle: [...handlers, ...extraHandlers, locationProxy],
+      handle: [...withLocationAccess(handlers, rule), ...extraHandlers, locationProxy],
       terminal: true,
     });
   }
+}
+
+/** A list nothing could be loaded for - deleted mid-build, say - admits nobody. */
+const EMPTY_ACCESS_LIST: AccessListRuntime = {
+  accounts: [],
+  ipRules: [],
+  ipDefault: "deny",
+  satisfy: "all",
+  passAuth: false,
+};
+
+/** A no-op placeholder: an empty subroute just continues the chain. */
+const ACCESS_SLOT = () => ({ handler: "subroute", routes: [] });
+
+/**
+ * The host's access-list handlers, by identity: every handler array a path mode builds is a copy
+ * with things added around the host's, so the objects themselves are what survives to be found.
+ */
+const HOST_ACCESS_HANDLERS = new WeakSet<object>();
+/** A location rule's own list (or `[]` for none), set while its host's chain is built. */
+const LOCATION_ACCESS = new WeakMap<LocationRuleMeta, Record<string, unknown>[]>();
+
+/** The chain with the host's access handlers swapped for the rule's own, when it has one. */
+function withLocationAccess(
+  handlers: Record<string, unknown>[],
+  rule: LocationRuleMeta,
+): Record<string, unknown>[] {
+  const own = LOCATION_ACCESS.get(rule);
+  if (!own) return handlers;
+  const at = handlers.findIndex((handler) => HOST_ACCESS_HANDLERS.has(handler));
+  const rest = handlers.filter((handler) => !HOST_ACCESS_HANDLERS.has(handler));
+  // Every host whose rules override got a slot above, so `at` is only -1 in a chain built
+  // elsewhere; the rule's list then goes first rather than being dropped.
+  const index = at === -1 ? 0 : at;
+  return [...rest.slice(0, index), ...own, ...rest.slice(index)];
 }
 
 type PathAuthMode =
@@ -1455,7 +1493,7 @@ type ProxyRouteSet = {
 };
 
 async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteSet> {
-  const { rows, accessAccounts, tlsReadyCertificates } = context;
+  const { rows, accessLists, tlsReadyCertificates } = context;
   const routes: CaddyHttpRoute[] = [];
   const tailnetRoutes = new Map<string, CaddyHttpRoute[]>();
   const tailscaleNodes = new Set<string>();
@@ -1680,28 +1718,26 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       });
     }
 
-    if (row.accessListId) {
-      const accounts = accessAccounts.get(row.accessListId) ?? [];
-      if (accounts.length > 0) {
-        handlers.push({
-          handler: "authentication",
-          providers: {
-            http_basic: {
-              accounts: accounts.map((entry) => ({
-                username: entry.username,
-                password: entry.passwordHash,
-              })),
-            },
-          },
-        });
-      } else {
-        // Fail closed: a list with no members admits nobody. Skipping the handler, as this once
-        // did, served the host to everyone. Caddy does load an empty http_basic, but that answers
-        // with a login prompt no credentials can pass, so the host refuses outright instead. It sits
-        // in the shared chain, so location rules, forward-auth path modes and mTLS subroutes all
-        // inherit it.
-        handlers.push({ handler: "static_response", status_code: 403, body: "Access denied" });
-      }
+    // In the shared chain, so location rules, forward-auth path modes and mTLS subroutes all
+    // inherit it - unless a location rule names a list of its own.
+    const hostAccess = row.accessListId
+      ? buildAccessListHandlers(accessLists.get(row.accessListId) ?? EMPTY_ACCESS_LIST)
+      : [];
+    const overridesAccess = (meta.location_rules ?? []).some(
+      (rule) => rule.access_list_id !== undefined,
+    );
+    // A host with no list still needs a place in the chain for a location's own list to go.
+    const accessSlot = hostAccess.length > 0 || !overridesAccess ? hostAccess : [ACCESS_SLOT()];
+    for (const handler of accessSlot) HOST_ACCESS_HANDLERS.add(handler);
+    handlers.push(...accessSlot);
+    for (const rule of meta.location_rules ?? []) {
+      if (rule.access_list_id === undefined) continue;
+      LOCATION_ACCESS.set(
+        rule,
+        rule.access_list_id === null
+          ? []
+          : buildAccessListHandlers(accessLists.get(rule.access_list_id) ?? EMPTY_ACCESS_LIST),
+      );
     }
 
     const lbConfig = parseLoadBalancerConfig(meta.load_balancer);
@@ -3065,6 +3101,8 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
     proxyHostRecords,
     certRows,
     accessListEntryRecords,
+    accessListRecords,
+    accessListIpRuleRecords,
     caCertRows,
     issuedClientCertRows,
     allIssuedCaCertIds,
@@ -3109,6 +3147,22 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
         passwordHash: accessListEntries.passwordHash,
       })
       .from(accessListEntries),
+    db
+      .select({
+        id: accessLists.id,
+        ipDefault: accessLists.ipDefault,
+        satisfy: accessLists.satisfy,
+        passAuth: accessLists.passAuth,
+      })
+      .from(accessLists),
+    db
+      .select({
+        accessListId: accessListIpRules.accessListId,
+        action: accessListIpRules.action,
+        cidr: accessListIpRules.cidr,
+      })
+      .from(accessListIpRules)
+      .orderBy(asc(accessListIpRules.accessListId), asc(accessListIpRules.sortOrder)),
     db
       .select({
         id: caCertificates.id,
@@ -3416,7 +3470,24 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
 
   const caddyBuildContext: CaddyBuildContext = {
     rows: proxyHostRows,
-    accessAccounts: accessMap,
+    accessLists: new Map(
+      accessListRecords.map((list) => [
+        list.id,
+        {
+          accounts: accessMap.get(list.id) ?? [],
+          ipRules: accessListIpRuleRecords
+            .filter((rule) => rule.accessListId === list.id)
+            .map((rule) => ({
+              action: rule.action === "allow" ? ("allow" as const) : ("deny" as const),
+              cidr: rule.cidr,
+              note: null,
+            })),
+          ipDefault: list.ipDefault === "allow" ? ("allow" as const) : ("deny" as const),
+          satisfy: list.satisfy === "any" ? ("any" as const) : ("all" as const),
+          passAuth: list.passAuth,
+        },
+      ]),
+    ),
     tlsReadyCertificates: readyCertificates,
     globalDnsSettings: dnsSettings,
     globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,

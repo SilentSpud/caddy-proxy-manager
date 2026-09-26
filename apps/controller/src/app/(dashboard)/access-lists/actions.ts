@@ -10,7 +10,9 @@ import {
   deleteAccessList,
   getAccessList,
   removeAccessListEntry,
+  setAccessListIpRules,
   updateAccessList,
+  type AccessListSettingsInput,
 } from "@/src/lib/models/access-lists";
 
 export async function createAccessListAction(input: {
@@ -32,15 +34,26 @@ export async function createAccessListAction(input: {
   return list;
 }
 
-export async function updateAccessListAction(
+export async function updateAccessListAction(id: number, input: AccessListSettingsInput) {
+  return withTranslatedErrors(async () => {
+    const session = await requireAdmin();
+    const list = await updateAccessList(id, input, Number(session.user.id));
+    revalidatePath("/access-lists");
+    return list;
+  });
+}
+
+/** The whole ordered set, replacing what was there. */
+export async function setAccessListIpRulesAction(
   id: number,
-  input: { name?: string; description?: string | null },
+  rules: { action: string; cidr: string; note?: string | null }[],
 ) {
-  const session = await requireAdmin();
-  const userId = Number(session.user.id);
-  const list = await updateAccessList(id, input, userId);
-  revalidatePath("/access-lists");
-  return list;
+  return withTranslatedErrors(async () => {
+    const session = await requireAdmin();
+    const list = await setAccessListIpRules(id, rules, Number(session.user.id));
+    revalidatePath("/access-lists");
+    return list;
+  });
 }
 
 export async function deleteAccessListAction(id: number) {

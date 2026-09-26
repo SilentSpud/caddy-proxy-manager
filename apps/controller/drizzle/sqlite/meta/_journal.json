@@ -57,6 +57,13 @@
       "when": 1790429823372,
       "tag": "0007_view_as",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790431763430,
+      "tag": "0008_access_list_rules",
+      "breakpoints": true
     }
   ]
 }

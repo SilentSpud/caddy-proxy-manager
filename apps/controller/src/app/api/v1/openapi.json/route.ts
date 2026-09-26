@@ -830,6 +830,55 @@ const spec = {
         },
       },
     },
+    "/api/v1/access-lists/{id}/ip-rules": {
+      get: {
+        tags: ["Access Lists"],
+        summary: "List an access list's IP rules, in the order they are checked",
+        operationId: "getAccessListIpRules",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": {
+            description: "The rules",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/AccessListIpRule" } },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["Access Lists"],
+        summary: "Replace an access list's IP rules",
+        description:
+          "The array sent becomes the whole set, in its order. An empty array removes every rule.",
+        operationId: "setAccessListIpRules",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { type: "array", items: { $ref: "#/components/schemas/AccessListIpRule" } },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "The rules as stored",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/AccessListIpRule" } },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
     "/api/v1/access-lists/{id}/entries/{entryId}": {
       delete: {
         tags: ["Access Lists"],
@@ -2645,6 +2694,11 @@ const spec = {
             description:
               "Optional per-rule load balancing and health checks for this path's upstreams",
           },
+          accessListId: {
+            type: ["integer", "null"],
+            description:
+              "This path's own access list instead of the host's. Omit to inherit the host's, or null for none.",
+          },
         },
         required: ["path", "upstreams"],
       },
@@ -3147,16 +3201,67 @@ const spec = {
           name: { type: "string" },
           description: { type: ["string", "null"] },
           entries: { type: "array", items: { $ref: "#/components/schemas/AccessListEntry" } },
+          ipRules: {
+            type: "array",
+            description: "Checked in order; the first rule matching the client decides.",
+            items: { $ref: "#/components/schemas/AccessListIpRule" },
+          },
+          ipDefault: {
+            type: "string",
+            enum: ["allow", "deny"],
+            description:
+              "What a request matching none of the IP rules gets. Only used while there are rules.",
+          },
+          satisfy: {
+            type: "string",
+            enum: ["all", "any"],
+            description:
+              "all: pass the IP rules and the password. any: an allowed address skips the password, and everyone else is asked for it.",
+          },
+          passAuth: {
+            type: "boolean",
+            description: "Forward the basic-auth Authorization header to the upstream.",
+          },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
         required: ["id", "name", "entries", "createdAt", "updatedAt"],
+      },
+      AccessListIpRule: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["allow", "deny"] },
+          cidr: {
+            type: "string",
+            example: "192.168.1.0/24",
+            description:
+              "An IPv4 or IPv6 address or CIDR range. A bare address is stored as a /32 or /128.",
+          },
+          note: { type: ["string", "null"] },
+        },
+        required: ["action", "cidr"],
       },
       AccessListInput: {
         type: "object",
         properties: {
           name: { type: "string", example: "Internal Users" },
           description: { type: ["string", "null"] },
+          ipDefault: {
+            type: "string",
+            enum: ["allow", "deny"],
+            description:
+              "What a request matching none of the IP rules gets. Only used while there are rules.",
+          },
+          satisfy: {
+            type: "string",
+            enum: ["all", "any"],
+            description:
+              "all: pass the IP rules and the password. any: an allowed address skips the password, and everyone else is asked for it.",
+          },
+          passAuth: {
+            type: "boolean",
+            description: "Forward the basic-auth Authorization header to the upstream.",
+          },
           users: {
             type: "array",
             description: "Seed members (only used during creation)",

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   KeyRound,
+  Network,
   Plus,
   Users,
   Globe,
@@ -39,6 +40,7 @@ import {
   useTableSelection,
   type TableColumn,
 } from "@astryxdesign/core/Table";
+import { Selector } from "@astryxdesign/core/Selector";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
@@ -51,6 +53,8 @@ import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTableDensity } from "@/components/ui/TableDensity";
 import { useTranslations } from "next-intl";
+import { Switch } from "@/components/ui/FormBooleanControls";
+import { NetworkTab } from "./NetworkTab";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp, UtcTooltip } from "@/components/ui/Timestamp";
 import { PanelResizeHandle, usePersistedPanelWidth } from "@/components/ui/PanelResizeHandle";
@@ -445,6 +449,17 @@ function SettingsTab({
   }, [list.id, list.name, list.description]);
 
   const dirty = name !== list.name || (desc || "") !== (list.description || "");
+  const canSatisfyAny = list.entries.length > 0 && list.ipRules.length > 0;
+
+  // Applied as soon as they're changed, like the IP default: each is one choice, not a draft.
+  const saveOption = async (input: { satisfy?: string; passAuth?: boolean }) => {
+    try {
+      onListUpdated(await updateAccessListAction(list.id, input));
+      toast.success(t("saved"));
+    } catch (failure) {
+      toast.error(failure instanceof Error ? failure.message : t("ipRulesSaveFailed"));
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -506,6 +521,30 @@ function SettingsTab({
             />
           )}
         </HStack>
+      </VStack>
+
+      <VStack gap={3}>
+        <Selector
+          label={t("satisfy")}
+          description={canSatisfyAny ? t("satisfyHelp") : t("satisfyNeedsBoth")}
+          size="sm"
+          width={420}
+          options={[
+            { value: "all", label: t("satisfyAll") },
+            { value: "any", label: t("satisfyAny") },
+          ]}
+          value={list.satisfy}
+          isDisabled={!canSatisfyAny}
+          onChange={(next) => saveOption({ satisfy: next as string })}
+        />
+        <Switch
+          label={t("passAuth")}
+          description={t("passAuthHelp")}
+          labelPosition="start"
+          labelSpacing="spread"
+          value={list.passAuth}
+          onChange={(next) => saveOption({ passAuth: next })}
+        />
       </VStack>
 
       <Card padding={3}>
@@ -613,7 +652,7 @@ function UsageTab({ hosts }: { hosts: AccessListUsage[] }) {
 
 // --- Detail Pane ---
 
-type DetailTab = "members" | "usage" | "settings";
+type DetailTab = "members" | "network" | "usage" | "settings";
 
 function DetailPane({
   list,
@@ -639,6 +678,8 @@ function DetailPane({
     );
   }
 
+  const isEmpty = list.entries.length === 0 && list.ipRules.length === 0;
+
   return (
     <VStack gap={4}>
       <HStack gap={4} vAlign="start">
@@ -655,7 +696,10 @@ function DetailPane({
               icon={<Clock />}
               label={t("updatedBadge", { when: fmtRelative(list.updatedAt, t) })}
             />
-            {list.entries.length === 0 && <Badge variant="error" label={t("noMembersBadge")} />}
+            {list.ipRules.length > 0 && (
+              <Badge icon={<Network />} label={t("ipRuleCount", { count: list.ipRules.length })} />
+            )}
+            {isEmpty && <Badge variant="error" label={t("noMembersBadge")} />}
             {usage.length === 0 && <Badge variant="warning" label={t("unusedBadge")} />}
           </HStack>
         </VStack>
@@ -663,7 +707,7 @@ function DetailPane({
 
       {/* Above the tabs, so it shows whichever one is open: an empty list in use is a host that
           answers nobody, which is worth knowing before anything else on this page. */}
-      {list.entries.length === 0 && usage.length > 0 && (
+      {isEmpty && usage.length > 0 && (
         <Banner
           status="warning"
           title={t("noMembersBannerTitle")}
@@ -679,6 +723,12 @@ function DetailPane({
           endContent={<Badge label={list.entries.length} />}
         />
         <Tab
+          value="network"
+          label={t("network")}
+          icon={<Network />}
+          endContent={<Badge label={list.ipRules.length} />}
+        />
+        <Tab
           value="usage"
           label={t("usedBy")}
           icon={<Globe />}
@@ -688,6 +738,7 @@ function DetailPane({
       </TabList>
 
       {tab === "members" && <MembersTab list={list} onListUpdated={onListUpdated} />}
+      {tab === "network" && <NetworkTab list={list} onListUpdated={onListUpdated} />}
       {tab === "usage" && <UsageTab hosts={usage} />}
       {tab === "settings" && (
         <SettingsTab
@@ -1000,7 +1051,7 @@ function ListsRail({
                 })}
                 endContent={
                   // No members outranks unused: it is the one that changes what a host serves.
-                  list.entries.length === 0 ? (
+                  list.entries.length === 0 && list.ipRules.length === 0 ? (
                     <Badge variant="error" label={t("noMembersBadge")} />
                   ) : hostCount === 0 ? (
                     <Badge variant="warning" label={t("unusedBadge")} />

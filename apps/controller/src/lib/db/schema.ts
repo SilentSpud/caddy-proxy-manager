@@ -28,6 +28,7 @@ export const {
   accounts,
   verifications,
   twoFactors,
+  accessListIpRules,
   oauthProviders,
   oauthStates,
   pendingOAuthLinks,

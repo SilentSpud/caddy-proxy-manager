@@ -94,7 +94,7 @@ export function DashboardHostOptionsFields({ data }: { data: DashboardHostOption
       />
       <AgentAssignmentFields agents={data.agents} selected={view.agentIds} />
       <RedirectsFields initialData={view.redirects} />
-      <LocationRulesFields initialData={view.locationRules} />
+      <LocationRulesFields initialData={view.locationRules} accessLists={data.accessLists} />
       <RewriteFields initialData={view.rewrite} />
       <PathAllowsFields initialData={view.pathAllows} />
       <PathBlocksFields initialData={view.pathBlocks} />

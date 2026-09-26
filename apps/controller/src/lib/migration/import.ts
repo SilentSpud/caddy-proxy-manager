@@ -291,7 +291,12 @@ export async function importLegacyDatabase(
         table,
         rows: rows.map((row) => {
           try {
-            return convertRow(row, table.columns, available, cleared, rekey);
+            const converted = convertRow(row, table.columns, available, cleared, rekey);
+            // Mirrors migration 0015: a list from before "Pass auth to host" always forwarded it.
+            if (table.name === "access_lists" && !available.has("passAuth")) {
+              converted.passAuth = true;
+            }
+            return converted;
           } catch (error) {
             if (error instanceof LegacySecretError) {
               // Named, because "which of thirty tables" is the first thing anyone asks. The row is

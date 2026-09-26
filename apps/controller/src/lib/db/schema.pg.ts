@@ -302,6 +302,12 @@ export const accessLists = pgTable("access_lists", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  // What a request matching none of the IP rules gets; only consulted while there are rules.
+  ipDefault: text("ipDefault").notNull().default("deny"),
+  // "all": pass the IP rules and the password. "any": either will do.
+  satisfy: text("satisfy").notNull().default("all"),
+  // Forward the basic-auth Authorization header to the upstream.
+  passAuth: boolean("passAuth").notNull().default(false),
   createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
@@ -321,6 +327,26 @@ export const accessListEntries = pgTable(
   },
   (table) => ({
     accessListIdIdx: index("access_list_entries_list_idx").on(table.accessListId),
+  }),
+);
+
+/** Ordered allow/deny rules on client IPs; the first that matches decides. */
+export const accessListIpRules = pgTable(
+  "access_list_ip_rules",
+  {
+    id: serial("id").primaryKey(),
+    accessListId: integer("accessListId")
+      .references(() => accessLists.id, { onDelete: "cascade" })
+      .notNull(),
+    action: text("action").notNull(),
+    cidr: text("cidr").notNull(),
+    note: text("note"),
+    sortOrder: integer("sortOrder").notNull(),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    accessListIdIdx: index("access_list_ip_rules_list_idx").on(table.accessListId),
   }),
 );
 
