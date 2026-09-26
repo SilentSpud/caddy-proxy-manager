@@ -34,7 +34,11 @@ export function assertUserStatus(value: unknown): UserStatus {
 export function assertNotSelf(
   actorId: number,
   targetId: number,
-  code: "cannotChangeOwnRole" | "cannotChangeOwnStatus" | "cannotDeleteOwnAccount",
+  code:
+    | "cannotChangeOwnRole"
+    | "cannotChangeOwnStatus"
+    | "cannotDeleteOwnAccount"
+    | "cannotResetOwnTwoFactor",
 ): void {
   if (actorId === targetId) throw domainError(code);
 }

@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { mustEnrollTwoFactor } from "./two-factor-policy";
 import { auth, checkSameOrigin } from "./auth";
 import { validateToken } from "./models/api-tokens";
 import { randomUUID } from "node:crypto";
 import { ApiClientError } from "./api-errors";
-import { DomainError } from "./domain-error";
+import { DomainError, domainErrorMessage } from "./domain-error";
 
 export class ApiAuthError extends Error {
   status: number;
@@ -58,6 +59,11 @@ export async function authenticateApiRequest(request: NextRequest): Promise<ApiA
   const role = session.user.role;
   if (!role) {
     throw new ApiAuthError("Session missing role claim", 401);
+  }
+
+  // /api/v1 and /api/graphql skip the proxy's gate, so the two-factor policy is enforced here too.
+  if (await mustEnrollTwoFactor(session)) {
+    throw new ApiAuthError(domainErrorMessage("twoFactorRequired"), 403);
   }
 
   return {

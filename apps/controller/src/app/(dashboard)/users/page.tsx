@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function UsersPage() {
-  await requireAdmin();
+  const session = await requireAdmin();
   const [allUsers, gravatarEnabled, lastSessions, allGroups, withPassword] = await Promise.all([
     listUsers(),
     isGravatarEnabled(),
@@ -35,6 +35,7 @@ export default async function UsersPage() {
     // The hash stays on the server; the detail only needs to know one exists.
     hasPassword: passwordHash !== null || withPassword.has(rest.id),
     isDemoAdmin: isDemoAdmin(rest.id),
+    isSelf: rest.id === Number(session.user.id),
   }));
   // Only what the detail's groups section needs: who is in each group, not their details.
   const groups = allGroups.map((group) => ({

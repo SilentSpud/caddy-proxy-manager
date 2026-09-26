@@ -32,6 +32,7 @@ import type {
   ErrorPagesSettings,
   TrustedProxiesSettings,
   HttpProtocolsSettings,
+  TwoFactorPolicySettings,
   DefaultResponseSettings,
 } from "@/lib/settings";
 import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
@@ -86,6 +87,7 @@ import {
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
   updateHttpProtocolsSettingsAction,
+  updateTwoFactorPolicySettingsAction,
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
   updateDashboardSettingsAction,
@@ -131,6 +133,7 @@ type Props = {
   upstreamDnsResolution: UpstreamDnsResolutionSettings | null;
   trustedProxies: TrustedProxiesSettings | null;
   httpProtocols: HttpProtocolsSettings;
+  twoFactorPolicy: TwoFactorPolicySettings;
   defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
@@ -188,6 +191,7 @@ export default function SettingsClient({
   upstreamDnsResolution,
   trustedProxies,
   httpProtocols,
+  twoFactorPolicy,
   defaultResponse,
   globalGeoBlock,
   globalErrorPages,
@@ -273,6 +277,10 @@ export default function SettingsClient({
   );
   const [httpProtocolsState, httpProtocolsFormAction] = useActionState(
     updateHttpProtocolsSettingsAction,
+    null,
+  );
+  const [twoFactorPolicyState, twoFactorPolicyFormAction] = useActionState(
+    updateTwoFactorPolicySettingsAction,
     null,
   );
   const [defaultResponseState, defaultResponseFormAction] = useActionState(
@@ -428,6 +436,13 @@ export default function SettingsClient({
         localUsersDisabled={localUsersDisabled}
         captchaState={captchaState}
         captchaFormAction={captchaFormAction}
+      />
+    ),
+    "two-factor": (
+      <TwoFactorPolicySection
+        policy={twoFactorPolicy}
+        state={twoFactorPolicyState}
+        formAction={twoFactorPolicyFormAction}
       />
     ),
     "password-policy": (
@@ -1207,6 +1222,35 @@ function HttpProtocolsSection({
             htmlName="http3"
             value={http3}
             onChange={setHttp3}
+          />
+        </VStack>
+      </form>
+    </FormCard>
+  );
+}
+
+function TwoFactorPolicySection({
+  policy,
+  state,
+  formAction,
+}: {
+  policy: TwoFactorPolicySettings;
+  state: { success: boolean; message?: string } | null;
+  formAction: (payload: FormData) => void;
+}) {
+  const t = useTranslations("settings");
+  const [requireForAdmins, setRequireForAdmins] = useState(policy.requireForAdmins);
+  return (
+    <FormCard>
+      <form action={formAction}>
+        <VStack gap={3}>
+          {state?.message && <StatusAlert message={state.message} success={state.success} />}
+          <Switch
+            label={t("requireAdminTwoFactor")}
+            description={t("requireAdminTwoFactorHelp")}
+            htmlName="requireForAdmins"
+            value={requireForAdmins}
+            onChange={setRequireForAdmins}
           />
         </VStack>
       </form>

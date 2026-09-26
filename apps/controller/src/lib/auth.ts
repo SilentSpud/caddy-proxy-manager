@@ -11,6 +11,9 @@ export type Session = {
     role: string;
     provider?: string;
     image?: string | null;
+    /** Whether a password is set, which is what a second factor protects. */
+    hasPassword?: boolean;
+    twoFactorEnabled?: boolean;
   };
 };
 
@@ -65,6 +68,8 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
       role: currentUser.role,
       provider: currentUser.provider || baUser.provider,
       image: currentUser.avatarUrl ?? (baUser.avatarUrl as string | null | undefined) ?? null,
+      hasPassword: Boolean(currentUser.passwordHash),
+      twoFactorEnabled: currentUser.twoFactorEnabled,
     },
   };
 }

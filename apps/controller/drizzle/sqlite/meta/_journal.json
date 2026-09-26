@@ -43,6 +43,13 @@
       "when": 1790426258602,
       "tag": "0005_host_descriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790428664676,
+      "tag": "0006_two_factor",
+      "breakpoints": true
     }
   ]
 }

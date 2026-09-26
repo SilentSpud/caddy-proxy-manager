@@ -187,3 +187,15 @@ export function clearSettingRow(key: string): void {
     await sql.close();
   `);
 }
+
+/** Turn off a user's 2FA, so a spec that enrols one can run again. */
+export function resetTwoFactor(email: string): void {
+  runSeedScript(`
+    const [user] = await sql\`SELECT id FROM users WHERE email = \${${JSON.stringify(email)}}\`;
+    if (user) {
+      await sql\`DELETE FROM two_factors WHERE "userId" = \${user.id}\`;
+      await sql\`UPDATE users SET "twoFactorEnabled" = false WHERE id = \${user.id}\`;
+    }
+    await sql.close();
+  `);
+}

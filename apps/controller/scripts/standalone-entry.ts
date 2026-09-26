@@ -11,6 +11,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import pkg from "../package.json";
 import { installPeerAddressStamp } from "../src/lib/peer-address";
+import { CONSOLE_RESET_TWO_FACTOR_PATH, signConsoleCommand } from "../src/lib/console-command";
 
 /** Directory holding the build output (`dist/`) and its runtime dependencies. */
 function resolveAppRoot(): string {
@@ -23,6 +24,51 @@ function runHealthCheck(port: number): void {
   fetch(url, { signal: AbortSignal.timeout(5_000) })
     .then((response) => process.exit(response.ok ? 0 : 1))
     .catch(() => process.exit(1));
+}
+
+/**
+ * `--reset-2fa <username>`: the way back in for an administrator who has lost their authenticator
+ * and their backup codes. Asks the running server rather than writing the database itself, so the
+ * reset is audited and a SQLite database never has a second writer. Console output, so English.
+ */
+function runResetTwoFactor(port: number, username: string): void {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    console.error("[cpm] SESSION_SECRET is not set. Run this inside the web container.");
+    process.exit(2);
+  }
+  const timestamp = Date.now();
+  fetch(`http://127.0.0.1:${port}${CONSOLE_RESET_TWO_FACTOR_PATH}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username,
+      timestamp,
+      signature: signConsoleCommand(secret, username, timestamp),
+    }),
+    signal: AbortSignal.timeout(15_000),
+  })
+    .then(async (response) => {
+      const body = (await response.json().catch(() => ({}))) as {
+        email?: string;
+        hadTwoFactor?: boolean;
+        error?: string;
+      };
+      if (!response.ok) {
+        console.error(`[cpm] Reset refused: ${body.error ?? response.status}`);
+        process.exit(1);
+      }
+      console.log(
+        body.hadTwoFactor
+          ? `[cpm] Two-factor sign-in reset for ${body.email}. They can sign in with their password and set it up again.`
+          : `[cpm] ${body.email} had no two-factor sign-in; nothing to reset. Their sessions were ended.`,
+      );
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("[cpm] Could not reach the running server:", error);
+      process.exit(1);
+    });
 }
 
 /**
@@ -54,6 +100,10 @@ const argv = yargs(hideBin(process.argv))
     default: false,
     describe: "Probe the running server's /api/health, then exit 0 if it answered",
   })
+  .option("reset-2fa", {
+    type: "string",
+    describe: "Turn off two-factor sign-in for a user on the running server, then exit",
+  })
   .version(pkg.version)
   // A mistyped flag in the container's HEALTHCHECK would otherwise fall through and start a second
   // server, which binds nothing and reports healthy.
@@ -66,7 +116,9 @@ if (!Number.isInteger(argv.port) || argv.port < 1 || argv.port > 65535) {
   process.exit(2);
 }
 
-if (argv.healthcheck) {
+if (argv["reset-2fa"] !== undefined) {
+  runResetTwoFactor(argv.port, argv["reset-2fa"]);
+} else if (argv.healthcheck) {
   // The resolved port, so probing a server started with --port still reaches it.
   runHealthCheck(argv.port);
 } else {

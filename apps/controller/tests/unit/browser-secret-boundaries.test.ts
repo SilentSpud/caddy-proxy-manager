@@ -70,4 +70,18 @@ describe('browser secret boundaries', () => {
     expect(props).not.toMatch(/dnsProvider|tailscale|acme=|geoip=|analytics=/);
     expect(props).toMatch(/sections=\{sections\}/);
   });
+
+  it("sends the profile page whether a password is set, never the user's hash", () => {
+    const profilePage = readFileSync(
+      join(process.cwd(), 'src/app/(dashboard)/profile/page.tsx'),
+      'utf8',
+    );
+    const profileClient = readFileSync(
+      join(process.cwd(), 'src/app/(dashboard)/profile/ProfileClient.tsx'),
+      'utf8',
+    );
+    expect(profilePage).not.toMatch(/user=\{user\}/);
+    expect(profilePage).toContain('hasPassword: Boolean(user.passwordHash)');
+    expect(profileClient).not.toContain('passwordHash');
+  });
 });

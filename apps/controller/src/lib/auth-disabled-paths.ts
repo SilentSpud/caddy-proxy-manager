@@ -22,4 +22,8 @@ export const DISABLED_AUTH_PATHS = [
   "/get-access-token",
   "/refresh-token",
   "/account-info",
+  // The two-factor plugin's emailed/texted codes. CPM sends neither, so TOTP and backup codes are
+  // the only second factors.
+  "/two-factor/send-otp",
+  "/two-factor/verify-otp",
 ];

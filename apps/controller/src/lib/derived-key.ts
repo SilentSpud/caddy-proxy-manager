@@ -11,7 +11,8 @@ export type KeyPurpose =
   | "secret:v1"
   | "reachability-probe:v1"
   | "forward-auth-proxy-proof:v2"
-  | "captcha-pass:v1";
+  | "captcha-pass:v1"
+  | "portal-2fa:v1";
 
 const derived = new Map<KeyPurpose, { secret: string; key: Buffer }>();
 

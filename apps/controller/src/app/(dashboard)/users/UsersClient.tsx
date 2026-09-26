@@ -43,6 +43,7 @@ import {
   updateUserStatusAction,
   updateUserInfoAction,
   deleteUserAction,
+  resetUserTwoFactorAction,
 } from "./actions";
 import { addGroupMemberAction, removeGroupMemberAction } from "../groups/actions";
 
@@ -50,6 +51,9 @@ type Role = "admin" | "operator" | "user" | "viewer";
 
 type UserEntry = {
   id: number;
+  twoFactorEnabled: boolean;
+  /** The admin looking at the page, who turns their own 2FA off from their Profile instead. */
+  isSelf: boolean;
   email: string;
   name: string | null;
   role: Role;
@@ -303,7 +307,7 @@ function UserDetail({
 }) {
   const t = useTranslations("users");
   const isDisabled = user.status !== "active";
-  const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | null>(null);
+  const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | "reset2fa" | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const name = userLabel(user);
 
@@ -410,6 +414,23 @@ function UserDetail({
                 t("passwordChangedUnknown")
               )}
             </MetadataListItem>
+            {user.hasPassword && (
+              <MetadataListItem label={t("twoFactor")}>
+                <HStack gap={2} vAlign="center">
+                  <Text type="body" size="sm">
+                    {user.twoFactorEnabled ? t("twoFactorOn") : t("twoFactorOff")}
+                  </Text>
+                  {user.twoFactorEnabled && !user.isSelf && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      label={t("resetTwoFactor")}
+                      onClick={() => setConfirmKind("reset2fa")}
+                    />
+                  )}
+                </HStack>
+              </MetadataListItem>
+            )}
             <MetadataListItem label={t("created")}>
               <Timestamp value={user.createdAt} style="date" />
             </MetadataListItem>
@@ -433,18 +454,34 @@ function UserDetail({
       <AlertDialog
         isOpen={confirmKind !== null}
         onOpenChange={(open) => !open && setConfirmKind(null)}
-        title={confirmKind === "delete" ? t("deleteUser") : t("disableUser")}
+        title={
+          confirmKind === "delete"
+            ? t("deleteUser")
+            : confirmKind === "reset2fa"
+              ? t("resetTwoFactor")
+              : t("disableUser")
+        }
         description={
           confirmKind === "delete"
             ? t("deleteUserConfirm", { name: user.name ?? user.email })
-            : t("disableUserConfirm", { name: user.name ?? user.email })
+            : confirmKind === "reset2fa"
+              ? t("resetTwoFactorConfirm", { name: user.name ?? user.email })
+              : t("disableUserConfirm", { name: user.name ?? user.email })
         }
-        actionLabel={confirmKind === "delete" ? t("deleteUser") : t("disableUser")}
+        actionLabel={
+          confirmKind === "delete"
+            ? t("deleteUser")
+            : confirmKind === "reset2fa"
+              ? t("resetTwoFactor")
+              : t("disableUser")
+        }
         onAction={async () => {
           const result =
             confirmKind === "delete"
               ? await deleteUserAction(user.id)
-              : await updateUserStatusAction(user.id, "disabled");
+              : confirmKind === "reset2fa"
+                ? await resetUserTwoFactorAction(user.id)
+                : await updateUserStatusAction(user.id, "disabled");
           setConfirmKind(null);
           onDone(result.status === "error" ? (result.message ?? null) : null);
         }}

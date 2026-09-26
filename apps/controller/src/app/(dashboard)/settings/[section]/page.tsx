@@ -17,6 +17,7 @@ import {
   getErrorPagesSettings,
   getTrustedProxiesSettings,
   getHttpProtocolsSettings,
+  getTwoFactorPolicySettings,
   getDefaultResponseSettings,
   getAvatarSettings,
   getPasswordPolicySettings,
@@ -109,6 +110,7 @@ export default async function SettingsSectionPage({
       globalErrorPages,
       trustedProxies,
       httpProtocols,
+      twoFactorPolicy,
       defaultResponse,
       oauthProviders,
       primaryProviderId,
@@ -146,6 +148,7 @@ export default async function SettingsSectionPage({
         getErrorPagesSettings(),
         getTrustedProxiesSettings(),
         getHttpProtocolsSettings(),
+        getTwoFactorPolicySettings(),
         getDefaultResponseSettings(),
         listOAuthProviders(),
         getPrimaryProviderId(),
@@ -231,6 +234,7 @@ export default async function SettingsSectionPage({
       upstreamDnsResolution={upstreamDnsResolution}
       trustedProxies={trustedProxies}
       httpProtocols={httpProtocols}
+      twoFactorPolicy={twoFactorPolicy}
       defaultResponse={defaultResponse}
       globalGeoBlock={globalGeoBlock}
       globalErrorPages={globalErrorPages}

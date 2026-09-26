@@ -10,8 +10,11 @@ import {
   updateUserRole,
   updateUserStatus,
   deleteUser,
+  getUserById,
   type User,
 } from "@/src/lib/models/user";
+import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
+import { resetTwoFactor } from "@/src/lib/two-factor";
 import { logAuditEvent } from "@/src/lib/audit";
 import { hashPassword } from "@/src/lib/password";
 import { getTranslations } from "next-intl/server";
@@ -210,5 +213,41 @@ export async function deleteUserAction(userId: number): Promise<ActionState> {
     const t = await getTranslations();
     console.error("deleteUserAction failed:", error);
     return actionError(t, error, t("errors.deleteUserFailed"));
+  }
+}
+
+/**
+ * For someone who lost their authenticator and their backup codes. Their sessions go too: the
+ * reset is often the aftermath of a lost or stolen device, and it is a clean point to sign in fresh.
+ */
+async function resetUserTwoFactorActionUntranslated(userId: number) {
+  const session = await requireAdmin();
+  const actorId = Number(session.user.id);
+  // Your own is turned off from the Profile page, with your password.
+  assertNotSelf(actorId, userId, "cannotResetOwnTwoFactor");
+  const target = await getUserById(userId);
+  if (!target) throw domainError("userNotFound");
+
+  await resetTwoFactor(userId);
+  await revokeSessionsAfterPasswordChange(userId, null);
+  await logAuditEvent({
+    userId: actorId,
+    action: "two_factor_reset",
+    entityType: "user",
+    entityId: userId,
+    summary: `Two-factor sign-in reset for user ${target.email} by an administrator`,
+  });
+  revalidatePath("/users");
+}
+
+export async function resetUserTwoFactorAction(userId: number): Promise<ActionState> {
+  try {
+    await resetUserTwoFactorActionUntranslated(userId);
+    const t = await getTranslations("users");
+    return actionSuccess(t("twoFactorResetDone"));
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("resetUserTwoFactorAction failed:", error);
+    return actionError(t, error, t("errors.resetTwoFactorFailed"));
   }
 }

@@ -27,6 +27,7 @@ export const {
   sessions,
   accounts,
   verifications,
+  twoFactors,
   oauthProviders,
   oauthStates,
   pendingOAuthLinks,

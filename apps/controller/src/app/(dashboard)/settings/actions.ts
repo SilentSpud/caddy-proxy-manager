@@ -42,6 +42,7 @@ import {
   saveErrorPagesSettings,
   saveTrustedProxiesSettings,
   saveHttpProtocolsSettings,
+  saveTwoFactorPolicySettings,
   saveDefaultResponseSettings,
   type DefaultResponseSettings,
   saveAvatarSettings,
@@ -1270,6 +1271,27 @@ async function updateHttpProtocolsSettingsActionUnlocked(
   }
 }
 
+async function updateTwoFactorPolicySettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    await saveTwoFactorPolicySettings({
+      requireForAdmins: formData.get("requireForAdmins") === "on",
+    });
+    revalidatePath("/settings");
+    return { success: true, message: t("results.twoFactorPolicySaved") };
+  } catch (error) {
+    console.error("Failed to save two-factor policy:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.twoFactorPolicyFailed")),
+    };
+  }
+}
+
 async function updateDnsSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
@@ -2074,6 +2096,9 @@ export const updateTrustedProxiesSettingsAction = stagedSettingsAction(
 );
 export const updateHttpProtocolsSettingsAction = stagedSettingsAction(
   updateHttpProtocolsSettingsActionUnlocked,
+);
+export const updateTwoFactorPolicySettingsAction = stagedSettingsAction(
+  updateTwoFactorPolicySettingsActionUnlocked,
 );
 export const updateDashboardSettingsAction = stagedSettingsAction(
   updateDashboardSettingsActionUnlocked,

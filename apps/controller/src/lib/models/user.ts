@@ -23,6 +23,7 @@ export type User = {
   subject: string | null;
   avatarUrl: string | null;
   status: string;
+  twoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -41,6 +42,7 @@ function parseDbUser(user: DbUser): User {
     subject: user.subject,
     avatarUrl: user.avatarUrl,
     status: user.status,
+    twoFactorEnabled: user.twoFactorEnabled,
     createdAt: toIso(user.createdAt)!,
     updatedAt: toIso(user.updatedAt)!,
   };

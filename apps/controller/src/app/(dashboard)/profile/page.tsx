@@ -49,7 +49,17 @@ export default async function ProfilePage() {
 
   return (
     <ProfileClient
-      user={user}
+      user={{
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        provider: user.provider,
+        subject: user.subject,
+        hasPassword: Boolean(user.passwordHash),
+        twoFactorEnabled: user.twoFactorEnabled,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+      }}
       linkedProviders={linkedProviders}
       enabledProviders={enabledProviders}
       apiTokens={apiTokens}

@@ -15,6 +15,8 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
 import { type SignInProvider, SignInProviders } from "@/src/components/auth/SignInProviders";
 import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
+import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
+import { twoFactorError } from "@/src/lib/two-factor-error";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import { AUTOFILL_CURRENT_PASSWORD, AUTOFILL_USERNAME } from "@/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
@@ -87,6 +89,8 @@ export default function PortalLoginForm({
   // The same two steps as /login, for the same reason: the password is only asked for once there
   // is a name to attach it to.
   const [onPasswordStep, setOnPasswordStep] = useState(false);
+  // Issued by the password step for an account with 2FA; the code step sends it back.
+  const [challenge, setChallenge] = useState<string | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const captchaStep = useCaptchaStep({ config: captcha, nonce: cspNonce, onError: setError });
 
@@ -152,6 +156,13 @@ export default function PortalLoginForm({
         return;
       }
 
+      if (data.needsSecondFactor) {
+        setChallenge(data.challenge);
+        setPassword("");
+        setPending(false);
+        return;
+      }
+
       window.location.href = data.redirectTo;
     } catch {
       // Whether the attempt reached the server is unknown, so assume the pass went with it.
@@ -159,6 +170,36 @@ export default function PortalLoginForm({
       setError(t("unexpectedErrorTryAgain"));
       setPending(false);
       setOnPasswordStep(true);
+    }
+  };
+
+  const startOver = () => {
+    setChallenge(null);
+    setOnPasswordStep(false);
+    setPassword("");
+    captchaStep.spent();
+  };
+
+  const submitCode = async ({ method, code }: TwoFactorSubmission) => {
+    setError(null);
+    setPending(true);
+    try {
+      const response = await fetch("/api/forward-auth/login/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challenge, rid, code, method }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? t("login.failed"));
+        setPending(false);
+        if (twoFactorError({ status: response.status, code: data.code }).restart) startOver();
+        return;
+      }
+      window.location.href = data.redirectTo;
+    } catch {
+      setError(t("unexpectedErrorTryAgain"));
+      setPending(false);
     }
   };
 
@@ -265,7 +306,16 @@ export default function PortalLoginForm({
 
       {!localLoginEnabled && hasProviders && providerList}
 
-      {localLoginEnabled && (
+      {localLoginEnabled && challenge && (
+        <TwoFactorStep
+          pending={pending}
+          allowTrustDevice={false}
+          onSubmit={submitCode}
+          onCancel={startOver}
+        />
+      )}
+
+      {localLoginEnabled && !challenge && (
         <>
           {/* One form across both steps - see LoginClient for why the password field stays
               mounted while it is hidden. */}

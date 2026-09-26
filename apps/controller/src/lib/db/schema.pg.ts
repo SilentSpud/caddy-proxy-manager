@@ -32,6 +32,8 @@ export const users = pgTable(
     username: text("username"),
     displayUsername: text("displayUsername"),
     emailVerified: boolean("emailVerified").notNull().default(false),
+    // Set by Better Auth's two-factor plugin once TOTP is verified; local accounts only.
+    twoFactorEnabled: boolean("twoFactorEnabled").notNull().default(false),
     createdAt: isoTimestamp("createdAt").notNull(),
     updatedAt: isoTimestamp("updatedAt").notNull(),
   },
@@ -104,6 +106,26 @@ export const verifications = pgTable("verifications", {
   createdAt: isoTimestamp("createdAt"),
   updatedAt: isoTimestamp("updatedAt"),
 });
+
+// Better Auth's `twoFactor` model. `secret` and `backupCodes` are encrypted by the plugin with the
+// auth secret; the lockout columns cap consecutive wrong codes per account.
+export const twoFactors = pgTable(
+  "two_factors",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backupCodes").notNull(),
+    verified: boolean("verified").notNull().default(true),
+    failedVerificationCount: integer("failedVerificationCount").notNull().default(0),
+    lockedUntil: isoTimestamp("lockedUntil"),
+  },
+  (table) => ({
+    userUnique: uniqueIndex("two_factors_user_unique").on(table.userId),
+  }),
+);
 
 export const oauthProviders = pgTable(
   "oauth_providers",

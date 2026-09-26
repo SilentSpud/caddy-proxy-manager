@@ -22,6 +22,8 @@ export const users = sqliteTable(
     username: text("username"),
     displayUsername: text("displayUsername"),
     emailVerified: integer("emailVerified", { mode: "boolean" }).notNull().default(false),
+    // Set by Better Auth's two-factor plugin once TOTP is verified; local accounts only.
+    twoFactorEnabled: integer("twoFactorEnabled", { mode: "boolean" }).notNull().default(false),
     createdAt: isoTimestamp("createdAt").notNull(),
     updatedAt: isoTimestamp("updatedAt").notNull(),
   },
@@ -94,6 +96,26 @@ export const verifications = sqliteTable("verifications", {
   createdAt: isoTimestamp("createdAt"),
   updatedAt: isoTimestamp("updatedAt"),
 });
+
+// Better Auth's `twoFactor` model. `secret` and `backupCodes` are encrypted by the plugin with the
+// auth secret; the lockout columns cap consecutive wrong codes per account.
+export const twoFactors = sqliteTable(
+  "two_factors",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backupCodes").notNull(),
+    verified: integer("verified", { mode: "boolean" }).notNull().default(true),
+    failedVerificationCount: integer("failedVerificationCount").notNull().default(0),
+    lockedUntil: isoTimestamp("lockedUntil"),
+  },
+  (table) => ({
+    userUnique: uniqueIndex("two_factors_user_unique").on(table.userId),
+  }),
+);
 
 export const oauthProviders = sqliteTable(
   "oauth_providers",

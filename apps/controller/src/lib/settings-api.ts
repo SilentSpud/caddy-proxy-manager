@@ -45,8 +45,10 @@ import {
   getDefaultResponseSettings,
   saveDefaultResponseSettings,
   getTrustedProxiesSettings,
+  getTwoFactorPolicySettings,
   getHttpProtocolsSettings,
   saveTrustedProxiesSettings,
+  saveTwoFactorPolicySettings,
   saveHttpProtocolsSettings,
   getTailscaleSettings,
   saveTailscaleSettings,
@@ -170,6 +172,12 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     save: saveHttpProtocolsSettings as (data: never) => Promise<void>,
     storageKey: "http_protocols",
     applyCaddy: true,
+  },
+  "two-factor": {
+    get: getTwoFactorPolicySettings,
+    save: saveTwoFactorPolicySettings as (data: never) => Promise<void>,
+    storageKey: "two_factor_policy",
+    applyCaddy: false,
   },
   tailscale: {
     // Defaulted rather than null, so a GET before anything is saved still describes the shape a

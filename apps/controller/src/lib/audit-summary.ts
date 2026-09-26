@@ -231,6 +231,12 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^Forward auth login failed for user (?<email>.+)$/s,
   },
   {
+    entityType: "user",
+    action: "forward_auth_login_failed",
+    message: "forwardAuthSecondFactorFailed",
+    pattern: /^Forward auth second factor failed for user (?<email>.+)$/s,
+  },
+  {
     entityType: "proxy_host",
     action: "forward_auth_access_denied",
     message: "forwardAuthAccessDenied",
@@ -366,6 +372,36 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     action: "password_changed",
     message: "passwordChanged",
     pattern: /^User changed their password$/,
+  },
+  {
+    entityType: "user",
+    action: "two_factor_enabled",
+    message: "twoFactorEnabled",
+    pattern: /^User turned on two-factor sign-in$/,
+  },
+  {
+    entityType: "user",
+    action: "two_factor_disabled",
+    message: "twoFactorDisabled",
+    pattern: /^User turned off two-factor sign-in$/,
+  },
+  {
+    entityType: "user",
+    action: "two_factor_backup_codes",
+    message: "twoFactorBackupCodes",
+    pattern: /^User replaced their backup codes$/,
+  },
+  {
+    entityType: "user",
+    action: "two_factor_reset",
+    message: "twoFactorReset",
+    pattern: /^Two-factor sign-in reset for user (?<email>.+?) by an administrator$/s,
+  },
+  {
+    entityType: "user",
+    action: "two_factor_reset",
+    message: "twoFactorResetConsole",
+    pattern: /^Two-factor sign-in reset for user (?<email>.+?) from the server console$/s,
   },
   {
     entityType: "user",

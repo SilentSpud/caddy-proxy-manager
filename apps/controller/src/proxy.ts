@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { domainErrorMessage } from "@/src/lib/domain-error";
+import { TWO_FACTOR_SETUP_PATH, mustEnrollTwoFactor } from "@/src/lib/two-factor-policy";
+import { CONSOLE_RESET_TWO_FACTOR_PATH } from "@/src/lib/console-command";
 import type { NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { auth } from "@/src/lib/auth";
@@ -111,7 +114,9 @@ export default async function proxy(req: NextRequest) {
     pathname.startsWith("/api/agent/") ||
     pathname.startsWith("/api/forward-auth/") ||
     // The sign-in CAPTCHA, solved before there is a session to have.
-    pathname === "/api/sign-in/captcha"
+    pathname === "/api/sign-in/captcha" ||
+    // Signed by `cpm-server --reset-2fa` and answered only to loopback; see the route.
+    pathname === CONSOLE_RESET_TWO_FACTOR_PATH
   ) {
     return publicResponse();
   }
@@ -144,6 +149,22 @@ export default async function proxy(req: NextRequest) {
   if (!isAuthenticated && !pathname.startsWith("/login")) {
     const loginUrl = new URL("/login", req.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // An admin the two-factor policy has caught can only turn it on, or sign out - which lives under
+  // /api/auth, public above. Everything else, server actions included, waits until then.
+  if (
+    isAuthenticated &&
+    pathname !== TWO_FACTOR_SETUP_PATH &&
+    (await mustEnrollTwoFactor(session))
+  ) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { code: "TWO_FACTOR_REQUIRED", error: domainErrorMessage("twoFactorRequired") },
+        { status: 403 },
+      );
+    }
+    return NextResponse.redirect(new URL(TWO_FACTOR_SETUP_PATH, req.url));
   }
 
   // Reached only once the setup gate above is satisfied, which is what lets an unconfigured

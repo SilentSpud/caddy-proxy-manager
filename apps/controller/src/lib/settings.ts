@@ -371,6 +371,19 @@ export async function saveHttpProtocolsSettings(settings: unknown): Promise<void
   await setSetting("http_protocols", normalizeHttpProtocols(settings));
 }
 
+/** Security > Authentication > Two-factor sign-in. */
+export type TwoFactorPolicySettings = { requireForAdmins: boolean };
+
+export async function getTwoFactorPolicySettings(): Promise<TwoFactorPolicySettings> {
+  const stored = await getSetting<TwoFactorPolicySettings>("two_factor_policy");
+  return { requireForAdmins: stored?.requireForAdmins === true };
+}
+
+export async function saveTwoFactorPolicySettings(settings: unknown): Promise<void> {
+  const raw = settings && typeof settings === "object" ? (settings as Record<string, unknown>) : {};
+  await setSetting("two_factor_policy", { requireForAdmins: raw.requireForAdmins === true });
+}
+
 export async function getDnsSettings(): Promise<DnsSettings | null> {
   return await getSetting<DnsSettings>("dns");
 }

@@ -1,6 +1,6 @@
 import { authPolicy } from "./auth-policy";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
-import { genericOAuth, username } from "better-auth/plugins";
+import { genericOAuth, twoFactor, username } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import db from "./db";
 import * as schema from "./db/schema";
@@ -26,6 +26,12 @@ import { hashPassword, verifyPassword } from "./password";
 import { MIN_PASSWORD_LENGTH } from "./password-policy";
 import { SIGN_UP_EMAIL_PATH, signUpPasswordError } from "./auth-signup-policy";
 import { DISABLED_AUTH_PATHS } from "./auth-disabled-paths";
+import { getAppName } from "./app-name";
+import {
+  hasTwoFactorChallengeCookie,
+  isCredentialSignInPath,
+  isTwoFactorVerifyPath,
+} from "./auth-sign-in-paths";
 
 // biome-ignore lint/suspicious/noExplicitAny: better-auth infers its instance type from the plugin list, which is assembled at runtime from the providers table
 let cachedAuth: any = null;
@@ -237,6 +243,7 @@ async function createAuth(baseURL: string): Promise<any> {
   // note on invalidateProviderCache, which the settings action calls after saving them.
   const policy = await authPolicy();
   const oauthConfigs = await loadProviders();
+  const appName = await getAppName();
   const trustedProviderIds = [...cachedTrustedProviderIds];
 
   return betterAuth({
@@ -418,9 +425,20 @@ async function createAuth(baseURL: string): Promise<any> {
       },
       session: {
         create: {
-          after: async (session) => {
+          after: async (session, context) => {
             const userId =
               typeof session.userId === "string" ? Number(session.userId) : session.userId;
+            // A password sign-in's session is created before the two-factor plugin decides whether
+            // it needs a code, and deleted again if so. The auth route audits it once it's final,
+            // and the verify endpoints' own session comes back through here.
+            if (isCredentialSignInPath(context?.path)) return;
+            // Turning 2FA on rotates the session through the verify endpoint; that isn't a sign-in.
+            if (
+              isTwoFactorVerifyPath(context?.path) &&
+              !hasTwoFactorChallengeCookie(context?.request?.headers.get("cookie"))
+            ) {
+              return;
+            }
 
             // Apply the IdP's group claim now that the user and account rows exist. Runs before
             // the audit entry so a role change is in effect for anything reading the session.
@@ -465,6 +483,12 @@ async function createAuth(baseURL: string): Promise<any> {
         usernameValidator: (username) => /^[a-zA-Z0-9_.@-]+$/.test(username),
       }) as unknown as BetterAuthPlugin,
       genericOAuth({ config: oauthConfigs }),
+      // TOTP and backup codes only: there is no mail or SMS to send a one-time code with.
+      twoFactor({
+        issuer: appName,
+        twoFactorTable: "twoFactors",
+        backupCodeOptions: { storeBackupCodes: "encrypted" },
+      }) as unknown as BetterAuthPlugin,
     ],
   });
 }

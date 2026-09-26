@@ -295,6 +295,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
             desc: "A challenge to solve before the password is asked for",
           },
           {
+            id: "two-factor",
+            name: "Two-factor Sign-in",
+            desc: "Require administrators to use an authenticator app",
+          },
+          {
             id: "password-policy",
             name: "Password Policy",
             desc: "Migrate users off older password hashes",

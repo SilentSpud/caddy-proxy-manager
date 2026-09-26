@@ -83,6 +83,36 @@ once it is solved.
 - **The sign-in pages load the provider's script** and are given a Content Security Policy that
   allows that provider's origins, on those pages only.
 
+### Two-factor sign-in
+
+Anyone with a password can add a code from an authenticator app, from **Profile → Two-factor
+sign-in**. Turning it on asks for the password, shows a QR code and the key behind it, and takes
+one code to prove the app is set up. Ten backup codes follow, shown once - each signs in a single
+time if the phone is lost.
+
+- **It applies to the forward-auth portal too.** A portal sign-in with a correct password asks for
+  the code before it lets anyone through to the host. The portal doesn't offer to remember the
+  device; the dashboard does, for 30 days.
+- **Wrong codes lock the second factor.** Ten in a row, across sign-ins and across the dashboard
+  and portal, locks it for fifteen minutes.
+- **Single sign-on accounts are left to their provider.** There is no password for a second
+  factor to protect, so the section says so rather than offering it.
+- **Administrators can be required to use it.** **Settings → Authentication → Two-factor
+  Sign-in** sends an administrator who signs in with a password and hasn't set it up to do that
+  first, before anything else in the dashboard or the API answers them.
+
+An administrator can reset another user's second factor from **Users**, which also signs that user
+out everywhere. For the one administrator who has lost both the phone and the backup codes, the
+server can reset it from inside its own container:
+
+```bash
+docker compose exec web /app/cpm-server --reset-2fa admin
+```
+
+It asks the running server to do it, so the reset is in the audit log like any other, and it only
+works from inside the container: the request is signed with a key derived from `SESSION_SECRET` and
+answered only on the container's own loopback.
+
 ## OAuth / SSO
 
 Any OAuth2/OIDC provider - Authentik, Keycloak, Auth0, and others. Accounts can be linked from the

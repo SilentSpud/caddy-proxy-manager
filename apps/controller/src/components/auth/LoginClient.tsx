@@ -15,6 +15,7 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
 import { type SignInProvider, SignInProviders } from "@/src/components/auth/SignInProviders";
 import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
+import { type TwoFactorSubmission, TwoFactorStep } from "@/src/components/auth/TwoFactorStep";
 import {
   AUTOFILL_CURRENT_PASSWORD,
   AUTOFILL_USERNAME,
@@ -24,6 +25,7 @@ import { authClient } from "@/src/lib/auth-client";
 import { formatAppVersion } from "@/src/lib/app-version";
 import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import { signInErrorMessage } from "@/src/lib/sign-in-error";
+import { twoFactorError } from "@/src/lib/two-factor-error";
 
 interface LoginClientProps {
   enabledProviders: SignInProvider[];
@@ -49,6 +51,7 @@ export default function LoginClient({
 }: LoginClientProps) {
   const t = useTranslations("auth.login");
   const tErrors = useTranslations("auth.errors");
+  const tApi = useTranslations("auth.apiErrors");
   const router = useRouter();
   const [loginError, setLoginError] = useState<string | null>(initialError);
   const [loginPending, setLoginPending] = useState(false);
@@ -58,6 +61,9 @@ export default function LoginClient({
   // Identifier first: the username is asked for on its own, and the password only once there is
   // a name to attach it to. Step one never checks whether that name exists - see below.
   const [onPasswordStep, setOnPasswordStep] = useState(false);
+  // The password was right and the account wants a code. The challenge lives in Better Auth's
+  // own short-lived cookie, so all this has to remember is that it was asked for.
+  const [onCodeStep, setOnCodeStep] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
   const captchaStep = useCaptchaStep({ config: captcha, nonce: cspNonce, onError: setLoginError });
 
@@ -77,10 +83,11 @@ export default function LoginClient({
     // $InferServerPlugin types fail to merge into the client signature in some environments,
     // so we cast a stable shape here.
     type SignInUsername = (input: { username: string; password: string }) => Promise<{
+      data: { twoFactorRedirect?: boolean } | null;
       error: { status?: number; code?: string; message?: string } | null;
     }>;
     const signInUsername = (authClient.signIn as unknown as { username: SignInUsername }).username;
-    const { error } = await signInUsername({ username: trimmedUsername, password });
+    const { data, error } = await signInUsername({ username: trimmedUsername, password });
 
     if (error?.code === "CAPTCHA_REQUIRED") {
       // The pass lapsed while the password was being typed. The widget comes back on this step,
@@ -102,6 +109,37 @@ export default function LoginClient({
       return;
     }
 
+    if (data?.twoFactorRedirect) {
+      setPassword("");
+      setOnCodeStep(true);
+      setLoginPending(false);
+      return;
+    }
+
+    router.replace("/");
+    router.refresh();
+  };
+
+  const startOver = () => {
+    setOnCodeStep(false);
+    setOnPasswordStep(false);
+    setPassword("");
+    captchaStep.spent();
+  };
+
+  const verifyCode = async ({ method, code, trustDevice }: TwoFactorSubmission) => {
+    setLoginError(null);
+    setLoginPending(true);
+    const verify =
+      method === "totp" ? authClient.twoFactor.verifyTotp : authClient.twoFactor.verifyBackupCode;
+    const { error } = await verify({ code, trustDevice });
+    if (error) {
+      const refused = twoFactorError(error);
+      setLoginError(tApi(refused.key));
+      setLoginPending(false);
+      if (refused.restart) startOver();
+      return;
+    }
     router.replace("/");
     router.refresh();
   };
@@ -166,9 +204,11 @@ export default function LoginClient({
 
   const subtitle = !localLoginEnabled
     ? t("subtitleSsoOnly")
-    : onPasswordStep
-      ? t("subtitlePassword")
-      : t("subtitleIdentify");
+    : onCodeStep
+      ? t("subtitleCode")
+      : onPasswordStep
+        ? t("subtitlePassword")
+        : t("subtitleIdentify");
 
   const providerList = (
     <SignInProviders
@@ -203,7 +243,11 @@ export default function LoginClient({
           {/* SSO only: there is no username to enter first, so the providers are the whole form. */}
           {!localLoginEnabled && hasProviders && providerList}
 
-          {localLoginEnabled && (
+          {localLoginEnabled && onCodeStep && (
+            <TwoFactorStep pending={loginPending} onSubmit={verifyCode} onCancel={startOver} />
+          )}
+
+          {localLoginEnabled && !onCodeStep && (
             <>
               {/*
                 One form across both steps, with the password field mounted throughout and hidden

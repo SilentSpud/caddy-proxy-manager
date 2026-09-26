@@ -5,14 +5,9 @@ import { verifyPassword } from "@/src/lib/password";
 import db from "@/src/lib/db";
 import { getClientIp } from "@/src/lib/client-ip";
 import { isPublicOrigin } from "@/src/lib/public-url";
-import {
-  createForwardAuthSession,
-  createExchangeCode,
-  checkHostAccess,
-  consumeRedirectIntent,
-  hasLiveRedirectIntent,
-  redirectIntentWantsCaptcha,
-} from "@/src/lib/models/forward-auth";
+import { hasLiveRedirectIntent, redirectIntentWantsCaptcha } from "@/src/lib/models/forward-auth";
+import { completePortalLogin } from "@/src/lib/forward-auth-portal-login";
+import { issuePortalChallenge } from "@/src/lib/portal-two-factor";
 import {
   CAPTCHA_PASS_CLEAR_COOKIE,
   captchaPassFromCookieHeader,
@@ -128,52 +123,16 @@ export async function POST(request: NextRequest) {
     resetAttempts(ip);
     resetAccountFailures(account);
 
-    // Consume the redirect intent - returns the server-stored redirect URI.
-    // This is a one-time operation: the intent is deleted after consumption.
-    const intent = await consumeRedirectIntent(rid);
-    if (!intent) {
+    // The password was right, but it's only half of a sign-in with 2FA on. The intent stays
+    // unspent until the code checks out.
+    if (user.twoFactorEnabled) {
       return NextResponse.json(
-        { error: t("invalidRedirectIntent") },
-        { status: 400, headers: spentHeaders },
+        { needsSecondFactor: true, challenge: issuePortalChallenge(user.id, rid) },
+        { headers: spentHeaders },
       );
     }
 
-    const targetUrl = new URL(intent.redirectUri);
-
-    // Check access against the exact proxy-host audience captured by the intent.
-    // Re-resolving only by hostname here would allow a changed wildcard mapping
-    // to silently change the authorization target mid-flow.
-    const hasAccess = await checkHostAccess(user.id, intent.audience.proxyHostId);
-    if (!hasAccess) {
-      await logAuditEvent({
-        userId: user.id,
-        action: "forward_auth_access_denied",
-        entityType: "proxy_host",
-        summary: `Forward auth access denied for user ${user.email} to host ${targetUrl.hostname}`,
-      });
-      return NextResponse.json(
-        { error: t("noAccessToApplication") },
-        { status: 403, headers: spentHeaders },
-      );
-    }
-
-    // Create session and exchange code
-    const { session } = await createForwardAuthSession(user.id, intent.audience);
-    const { rawCode } = await createExchangeCode(session.id, intent.redirectUri, intent.audience);
-
-    await logAuditEvent({
-      userId: user.id,
-      action: "forward_auth_login",
-      entityType: "user",
-      entityId: user.id,
-      summary: `Forward auth login for user ${user.email} to ${targetUrl.hostname}`,
-    });
-
-    // Build callback URL on the target domain
-    const callbackUrl = new URL("/.cpm-auth/callback", intent.audience.origin);
-    callbackUrl.searchParams.set("code", rawCode);
-
-    return NextResponse.json({ redirectTo: callbackUrl.toString() }, { headers: spentHeaders });
+    return await completePortalLogin(user, rid, t, spentHeaders);
   } catch (error) {
     console.error("Forward auth login error:", error);
     return NextResponse.json({ error: t("internalServerError") }, { status: 500 });

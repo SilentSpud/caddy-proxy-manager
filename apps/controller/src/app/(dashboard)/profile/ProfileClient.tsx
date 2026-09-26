@@ -38,11 +38,13 @@ import {
   Monitor,
   Plus,
   Rows3,
+  ShieldCheck,
   Trash2,
   Unlink,
   User,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { TwoFactorSection } from "./TwoFactorSection";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
@@ -107,7 +109,9 @@ interface UserData {
   name: string | null;
   provider: string | null;
   subject: string | null;
-  passwordHash: string | null;
+  /** Whether a password is set, never the hash itself - this crosses to the browser. */
+  hasPassword: boolean;
+  twoFactorEnabled: boolean;
   role: string;
   avatarUrl: string | null;
 }
@@ -255,7 +259,7 @@ export default function ProfileClient({
     return provider;
   };
 
-  const hasPassword = !!user.passwordHash;
+  const hasPassword = user.hasPassword;
   // Connection state comes from the accounts rows, not the users.provider projection, so a stale
   // projection cannot make a linked account look unlinked or vice versa (#261).
   const linkedNames = linkedProviders.map(
@@ -634,6 +638,16 @@ export default function ProfileClient({
                 </HStack>
               </VStack>
             )}
+          </ProfileSection>
+        )}
+
+        {localPasswordsEnabled && (
+          <ProfileSection icon={ShieldCheck} title={t("twoFactor.title")}>
+            <TwoFactorSection
+              enabled={user.twoFactorEnabled}
+              hasPassword={hasPassword}
+              locked={passwordLocked}
+            />
           </ProfileSection>
         )}
 
