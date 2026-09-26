@@ -445,6 +445,13 @@ export const SETTING_FIELDS: Array<{
     value: "http://caddy:2019",
   },
   {
+    key: "config:caddy_monitor_enabled",
+    env: "CADDY_MONITOR_ENABLED",
+    group: "application",
+    kind: "boolean",
+    value: true,
+  },
+  {
     key: "config:avatar_gravatar",
     env: "AVATAR_GRAVATAR",
     group: "application",
