@@ -73,9 +73,10 @@ export async function POST(request: Request) {
   // Enforced here, not only by the form: the endpoint is reachable without it. After the throttle,
   // so a request refused for that does not spend the solve.
   const captcha = await getActiveCaptcha();
+  // No name, no pass: an empty one would be the account key of the username "@localhost".
   if (
     captcha &&
-    !redeemCaptchaPass(captchaPassFromCookieHeader(request.headers.get("cookie")), name ?? "")
+    (!name || !redeemCaptchaPass(captchaPassFromCookieHeader(request.headers.get("cookie")), name))
   ) {
     const t = await getTranslations("auth.apiErrors");
     return Response.json(

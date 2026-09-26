@@ -29,6 +29,13 @@ describe('captcha pass', () => {
     expect(isValidCaptchaPass(pass, 'alice@localhost', now)).toBe(true);
   });
 
+  it('never matches a blank name', () => {
+    const pass = issueCaptchaPass('@localhost', now);
+    expect(isValidCaptchaPass(pass, '', now)).toBe(false);
+    expect(redeemCaptchaPass(pass, '  ', now)).toBe(false);
+    expect(redeemCaptchaPass(pass, '@localhost', now)).toBe(true);
+  });
+
   it('does not carry over to another name', () => {
     expect(isValidCaptchaPass(issueCaptchaPass('alice', now), 'bob', now)).toBe(false);
   });

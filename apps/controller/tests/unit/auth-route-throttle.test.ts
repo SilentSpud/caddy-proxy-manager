@@ -122,6 +122,13 @@ describe('/api/auth route', () => {
       expect(ctx.seen).toHaveLength(0);
     });
 
+    it('refuses a sign-in that names no one, even with the pass a blank name would map to', async () => {
+      // accountKey("") is "@localhost", the key of the username "@localhost".
+      const response = await signIn({ password: 'pw' }, passFor('@localhost'));
+      expect(response.status).toBe(403);
+      expect(ctx.seen).toHaveLength(0);
+    });
+
     it("refuses another name's pass", async () => {
       const response = await signIn({ username: 'alice', password: 'pw' }, passFor('bob'));
       expect(response.status).toBe(403);

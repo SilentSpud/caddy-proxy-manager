@@ -50,7 +50,8 @@ function verify(
   username: string,
   now: number,
 ): { nonce: string; expiresAt: number } | null {
-  if (!pass) return null;
+  // A blank name is the account key of "@localhost", so it must never match anything.
+  if (!pass || !username.trim()) return null;
   const [expiry, nonce, sig, ...rest] = pass.split(".");
   if (rest.length > 0 || !expiry || !nonce || !sig || !/^\d{1,15}$/.test(expiry)) return null;
   const expiresAt = Number(expiry);
