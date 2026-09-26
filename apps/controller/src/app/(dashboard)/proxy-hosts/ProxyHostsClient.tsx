@@ -242,6 +242,18 @@ function HostActions({
         items={[
           { label: t("edit"), onClick: onEdit },
           ...(canCreate ? [{ label: t("duplicate"), onClick: onDuplicate }] : []),
+          // Admins only, like the Logs page: access logs carry every client's address.
+          ...(canCreate
+            ? [
+                {
+                  label: t("viewLogs"),
+                  onClick: () =>
+                    window.location.assign(
+                      `/logs?source=access&host=${encodeURIComponent(host.domains[0] ?? "")}`,
+                    ),
+                },
+              ]
+            : []),
           { type: "divider" },
           { label: t("delete"), variant: "destructive", onClick: onDelete },
         ]}

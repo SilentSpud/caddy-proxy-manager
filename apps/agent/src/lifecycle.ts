@@ -26,6 +26,8 @@ import {
   type AgentServerEvent,
   CADDY_VALIDATE_REFUSED_STATUS,
   type CaddyValidateRequest,
+  type LogReadRequest,
+  type LogReadResponse,
   MANAGED_SERVICES,
   MAX_CADDY_CONFIG_BYTES,
   SHIPPED_CADDY_MODULES,
@@ -50,7 +52,14 @@ import {
   normalizePairingCode,
 } from "./controller-url";
 import type { AgentStore } from "./db";
-import type { DockerHost } from "./docker";
+import { type DockerHost, tail } from "./docker";
+import {
+  CONTAINER_LOG_CURSOR,
+  MAX_LOG_LINES,
+  logFileFor,
+  parseContainerLogs,
+  readLogFile,
+} from "./logs";
 import { OperationBusyError, type Operations } from "./operations";
 import { AGENT_VERSION, buildStatus } from "./status";
 
@@ -578,6 +587,7 @@ export class AgentLifecycle {
 
   private async runCommand(command: AgentCommand): Promise<AgentCommandResult> {
     if (command.kind === "caddy-validate") return this.runValidate(command.id, command.request);
+    if (command.kind === "log-read") return this.runLogRead(command.id, command.request);
     if (!isAllowedAdminPath(command.request.path)) {
       return {
         id: command.id,
@@ -617,6 +627,35 @@ export class AgentLifecycle {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /** A page of a log for the controller's log viewer. The answer is JSON in a 200's text. */
+  private async runLogRead(id: string, request: LogReadRequest): Promise<AgentCommandResult> {
+    const answer = (page: LogReadResponse): AgentCommandResult => ({
+      id,
+      ok: true,
+      response: { status: 200, text: JSON.stringify(page), headers: {} },
+    });
+    const file = logFileFor(request?.source);
+    if (file) {
+      try {
+        return answer(await readLogFile(file, request));
+      } catch (error) {
+        return { id, ok: false, code: "INTERNAL", error: String(error) };
+      }
+    }
+    if (request?.source !== "caddy") {
+      return { id, ok: false, code: "BAD_REQUEST", error: "Unknown log source." };
+    }
+    // Only a timestamp: it becomes a docker CLI argument, and anything else could read as a flag.
+    const cursor =
+      typeof request.cursor === "string" && CONTAINER_LOG_CURSOR.test(request.cursor)
+        ? request.cursor
+        : null;
+    const limit = Math.min(Math.max(Number(request.limit) || 200, 1), MAX_LOG_LINES);
+    const logs = await this.deps.docker.caddyLogs({ since: cursor, tail: limit });
+    if (!logs.ok) return { id, ok: false, code: "BUSY", error: tail(logs.output, 3) };
+    return answer(parseContainerLogs(logs.output, cursor, limit));
   }
 
   /**

@@ -1235,6 +1235,7 @@
     "networkError": "Network error"
   },
   "nav": {
+    "logs": "Logs",
     "viewAsBannerTitle": "Viewing as {role}",
     "viewAsBannerTitleGroups": "Viewing as {role} in {groups}",
     "viewAsBannerDescription": "Pages, menus and actions follow that role's permissions. Anything you change is still recorded as you. This view ends on its own after an hour.",
@@ -1820,6 +1821,7 @@
     "tls": "TLS",
     "toUrlPath": "To URL / Path",
     "preservePath": "Keep path",
+    "viewLogs": "Logs",
     "notes": "Notes",
     "notesHelp": "Anything worth remembering about this host. Only people who can see it can read these",
     "preservePathNone": "No",
@@ -3521,6 +3523,32 @@
     "save": "Save",
     "searchLabel": "Search",
     "searchPlaceholder": "Search…"
+  },
+  "logs": {
+    "title": "Logs",
+    "source": "Log",
+    "sources": {
+      "access": "Access",
+      "waf": "WAF",
+      "caddy": "Caddy",
+      "acme": "Certificates"
+    },
+    "agent": "Agent",
+    "filter": "Filter",
+    "pause": "Pause",
+    "follow": "Follow",
+    "clear": "Clear",
+    "waiting": "Waiting for new lines…",
+    "empty": "Nothing to show. Follow to read new lines.",
+    "readFailed": "Could not read that log",
+    "agentCannotRead": "That agent is not connected, or is too old to read logs. Update it to use the log viewer.",
+    "noAgentTitle": "No agent can read logs",
+    "noAgentDescription": "The log viewer reads Caddy's logs through an agent. Connect one, or update an older one, to see them here.",
+    "accessOffTitle": "Access logging is off",
+    "accessOffDescription": "Turn it on in Settings > Observability > Logging to record requests here.",
+    "missingTitle": "This log doesn't exist yet",
+    "missingDescription": "It appears once Caddy writes its first line.",
+    "showing": "{shown, plural, one {# line shown} other {# lines shown}} of {kept} kept"
   },
   "users": {
     "viewAs": {

@@ -29,6 +29,7 @@ import {
   type CaddyAdminProxyRequest,
   type CaddyAdminProxyResponse,
   type CaddyValidateRequest,
+  type LogReadRequest,
 } from "@cpm/shared";
 
 /** One attached agent. */
@@ -317,9 +318,18 @@ export function dispatchCaddyValidate(
   return dispatch(agentId, { kind: "caddy-validate", request });
 }
 
+/** A page of one agent's log. Only for an agent listing `log-read`; see dispatchCaddyValidate. */
+export function dispatchLogRead(
+  agentId: string,
+  request: LogReadRequest,
+): Promise<CaddyAdminProxyResponse> {
+  return dispatch(agentId, { kind: "log-read", request });
+}
+
 type CommandBody =
   | { kind: "caddy-admin"; request: CaddyAdminProxyRequest }
-  | { kind: "caddy-validate"; request: CaddyValidateRequest };
+  | { kind: "caddy-validate"; request: CaddyValidateRequest }
+  | { kind: "log-read"; request: LogReadRequest };
 
 function dispatch(agentId: string, body: CommandBody): Promise<CaddyAdminProxyResponse> {
   const connection = connections.get(agentId);

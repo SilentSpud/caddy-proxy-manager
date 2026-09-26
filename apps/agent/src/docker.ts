@@ -297,6 +297,28 @@ export class DockerHost {
     });
   }
 
+  /**
+   * Caddy's own output, which it writes to stderr rather than a file. Timestamped, so a later page
+   * can ask for what came since the last line it has.
+   */
+  async caddyLogs(options: { since?: string | null; tail: number }): Promise<CommandResult> {
+    return this.compose(
+      [
+        "--profile",
+        "caddy",
+        "logs",
+        "--no-color",
+        "--no-log-prefix",
+        "--timestamps",
+        "--tail",
+        String(options.tail),
+        ...(options.since ? [`--since=${options.since}`] : []),
+        "caddy",
+      ],
+      { timeoutSeconds: 20 },
+    );
+  }
+
   /** Recreate only the Caddy container, leaving everything else running. */
   async recreateCaddy(): Promise<CommandResult> {
     return this.compose(["up", "-d", "--no-deps", "--pull", "never", "--force-recreate", "caddy"]);

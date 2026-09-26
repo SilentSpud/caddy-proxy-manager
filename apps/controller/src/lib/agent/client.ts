@@ -21,6 +21,8 @@ import type {
   CaddyAdminProxyResponse,
   CaddyBuildStatus,
   L4PortsStatus,
+  LogReadRequest,
+  LogReadResponse,
 } from "@cpm/shared";
 import { type DomainErrorCode, domainErrorMessage } from "../domain-error";
 import { pushDesiredState } from "./desired-state";
@@ -31,6 +33,7 @@ import {
   connectedAgents,
   dispatchCaddyAdmin,
   dispatchCaddyValidate,
+  dispatchLogRead,
 } from "./registry";
 
 export class AgentUnavailableError extends Error {
@@ -227,6 +230,30 @@ export async function caddyValidateViaAgent(
   if (!agent) return null;
   try {
     return await dispatchCaddyValidate(agent.agentId, { config });
+  } catch (error) {
+    if (error instanceof AgentNotConnectedError) return null;
+    if (error instanceof AgentCommandError)
+      throw new AgentRequestError(error.message, error.status);
+    throw error;
+  }
+}
+
+/** Connected agents that can serve the log viewer, which an older agent can't. */
+export function logReadableAgents(): { agentId: string; name: string }[] {
+  return connectedAgents()
+    .filter((agent) => agent.status?.capabilities?.includes("log-read"))
+    .map(({ agentId, name }) => ({ agentId, name }));
+}
+
+/** A page of one agent's log, or null when that agent isn't connected or can't read logs. */
+export async function readAgentLog(
+  agentId: string,
+  request: LogReadRequest,
+): Promise<LogReadResponse | null> {
+  if (!logReadableAgents().some((agent) => agent.agentId === agentId)) return null;
+  try {
+    const response = await dispatchLogRead(agentId, request);
+    return JSON.parse(response.text) as LogReadResponse;
   } catch (error) {
     if (error instanceof AgentNotConnectedError) return null;
     if (error instanceof AgentCommandError)

@@ -171,7 +171,7 @@ export type AgentStatus = {
   capabilities?: AgentCapability[];
 };
 
-export const AGENT_CAPABILITIES = ["caddy-validate"] as const;
+export const AGENT_CAPABILITIES = ["caddy-validate", "log-read"] as const;
 export type AgentCapability = (typeof AGENT_CAPABILITIES)[number];
 
 /**
@@ -262,6 +262,24 @@ export const MAX_CADDY_CONFIG_BYTES = 8 * 1024 * 1024;
  * when it refused, and `text` the transcript `caddy validate` printed either way.
  */
 export type CaddyValidateRequest = { config: string };
+
+/** A page of one of the logs the agent can read, for the controller's log viewer. */
+export type LogReadRequest = {
+  source: "access" | "waf" | "caddy";
+  /** From the previous page; absent for the newest lines. Opaque to the controller. */
+  cursor?: string | null;
+  limit?: number;
+};
+
+export type LogReadResponse = {
+  lines: string[];
+  /** Hand back for the next page. Null when there is nothing to continue from yet. */
+  cursor: string | null;
+  /** More was waiting than one page carries. */
+  truncated?: boolean;
+  /** The log doesn't exist on this host, e.g. access logging is off. */
+  missing?: boolean;
+};
 
 /** Status `caddy-validate` answers with for a config Caddy refused. */
 export const CADDY_VALIDATE_REFUSED_STATUS = 422;
@@ -538,6 +556,8 @@ export type AgentCommand = {
   | { kind: "caddy-admin"; request: CaddyAdminProxyRequest }
   /** Only sent to an agent listing it in `AgentStatus.capabilities`. */
   | { kind: "caddy-validate"; request: CaddyValidateRequest }
+  /** Likewise. Answered as a 200 whose text is a `LogReadResponse`. */
+  | { kind: "log-read"; request: LogReadRequest }
 );
 
 /** Everything the controller can push down the stream. */

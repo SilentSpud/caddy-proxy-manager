@@ -57,3 +57,20 @@ existing tables' TTL is migrated and expired data is purged.
 ClickHouse's internal diagnostic log tables are turned off by a config override the stack mounts.
 Left on, they flush every few seconds whether or not anyone is using the proxy, which is several GB
 a day on an idle machine. CPM never queries them.
+
+## Logs
+
+**Logs** in the sidebar tails the raw logs, read through an agent so a remote host's are there too:
+
+- **Access** - every request Caddy logged, one line each, when access logging is on
+  (**Settings → Observability → Logging**). A proxy host's **Logs** action opens this, filtered to
+  its domain.
+- **WAF** - the rules the WAF matched.
+- **Caddy** - Caddy's own output, straight from its container.
+- **Certificates** - just the issuance and renewal lines from Caddy's output, for when a certificate
+  won't come through.
+
+It follows new lines as they arrive, pauses on request, and filters what it has on screen. Only
+administrators can open it: access logs name every client and every path they asked for. An agent
+older than the log viewer can't serve it; update it.
+

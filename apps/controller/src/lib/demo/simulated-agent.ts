@@ -153,7 +153,13 @@ export async function startSimulatedAgent(
     const response =
       command.kind === "caddy-validate"
         ? { status: 200, text: "Valid configuration", headers: {} }
-        : caddy(command.request);
+        : command.kind === "log-read"
+          ? {
+              status: 200,
+              text: JSON.stringify({ lines: [], cursor: null, missing: true }),
+              headers: {},
+            }
+          : caddy(command.request);
     settleResults(DEMO_AGENT_ID, [{ id: command.id, ok: true, response }]);
   }
 

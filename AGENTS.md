@@ -86,9 +86,10 @@ consequences worth knowing before touching either side:
   for that agent (the Re-pair action), never the shared code.
 - **A command kind an agent has not listed in `AgentStatus.capabilities` must not be sent.** An
   older agent answers an unknown kind with silence, and the caller waits out the command timeout.
-  `caddy-validate` is the one listed today: the agent runs `caddy validate` in a throwaway,
+  Two are listed today. `caddy-validate`: the agent runs `caddy validate` in a throwaway,
   network-less container from Caddy's image, which is how a WAF save is checked against the real
-  Coraza (`lib/waf-dry-run.ts`) without loading anything.
+  Coraza (`lib/waf-dry-run.ts`) without loading anything. `log-read`: a page of the access, WAF or
+  Caddy log for the log viewer, with a cursor the agent alone interprets (`apps/agent/src/logs.ts`).
 - **An agent is less trusted than the controller.** Whatever one agent answers may only shape that
   agent's own config: Caddyfile snippets are adapted by the agent the document is loaded onto
   (`CaddyAdminRequest.agentId`), and the health monitor re-applies per agent. The unpinned "primary"
