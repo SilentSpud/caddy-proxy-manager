@@ -114,6 +114,7 @@ import {
   resolveEffectiveWaf,
 } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
+import { buildRedirectRoute } from "./caddy-redirects";
 import {
   type CaddyModuleAvailability,
   getCaddyModuleAvailability,
@@ -1663,19 +1664,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
 
     // Structured redirects - emitted before auth so .well-known paths work without login
     if (meta.redirects && meta.redirects.length > 0) {
-      const redirectRoutes = meta.redirects.map((rule) => ({
-        match: [{ path: [rule.from] }],
-        handle: [
-          {
-            handler: "static_response",
-            status_code: rule.status,
-            headers: { Location: [rule.to] },
-          },
-        ],
-      }));
       handlers.push({
         handler: "subroute",
-        routes: redirectRoutes,
+        routes: meta.redirects.map(buildRedirectRoute),
       });
     }
 

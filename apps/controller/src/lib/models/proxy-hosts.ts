@@ -95,7 +95,12 @@ export type RedirectRule = {
   from: string; // path pattern e.g. "/.well-known/carddav"
   to: string; // destination e.g. "/remote.php/dav/"
   status: 301 | 302 | 307 | 308;
+  /** Append the request's path and query to `to`: all of it, or what follows `from`'s prefix. */
+  preservePath?: RedirectPathMode;
 };
+
+export const REDIRECT_PATH_MODES = ["full", "suffix"] as const;
+export type RedirectPathMode = (typeof REDIRECT_PATH_MODES)[number];
 
 export type RewriteConfig = {
   path_prefix: string; // e.g. "/recipes"
@@ -1578,6 +1583,7 @@ function sanitizeRedirectRules(value: unknown): RedirectRule[] {
         from: stripCaddyPlaceholders(item.from.trim()),
         to: stripCaddyPlaceholders(item.to.trim()),
         status: item.status,
+        ...(REDIRECT_PATH_MODES.includes(item.preservePath) && { preservePath: item.preservePath }),
       });
     }
   }

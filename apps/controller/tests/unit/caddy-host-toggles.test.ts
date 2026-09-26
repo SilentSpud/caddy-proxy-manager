@@ -47,7 +47,7 @@ async function hostConfig(domain: string): Promise<string> {
   return JSON.stringify(found);
 }
 
-async function host(domain: string, options: Record<string, boolean>) {
+async function host(domain: string, options: Record<string, unknown>) {
   await createProxyHost(
     { name: domain, domains: [domain], upstreams: ['10.0.0.5:8080'], ...options },
     1,
@@ -102,6 +102,20 @@ describe('host toggles', () => {
     expect(await host('upstream-host.example.com', { preserveHostHeader: false })).not.toContain(
       '"Host":["{http.request.host}"]',
     );
+  });
+});
+
+describe('redirect path modes', () => {
+  it('keeps a valid preservePath through the model and drops an unknown one', async () => {
+    const config = await host('redirects.example.com', {
+      redirects: [
+        { from: '/old/*', to: '/new', status: 301, preservePath: 'suffix' },
+        { from: '/legacy', to: '/v2', status: 302, preservePath: 'bogus' },
+      ],
+    });
+    expect(config).toContain('"strip_path_prefix":"/old"');
+    expect(config).toContain('/new{http.request.uri}');
+    expect(config).toContain('"Location":["/v2"]');
   });
 });
 

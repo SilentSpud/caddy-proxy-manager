@@ -9,7 +9,15 @@ export default function RedirectsDemo() {
     <DemoSurface>
       <VStack gap={6}>
         <RedirectsFields
-          initialData={[{ from: "/.well-known/carddav", to: "/remote.php/dav/", status: 301 }]}
+          initialData={[
+            { from: "/.well-known/carddav", to: "/remote.php/dav/", status: 301 },
+            {
+              from: "/blog/*",
+              to: "https://blog.example.com",
+              status: 308,
+              preservePath: "suffix",
+            },
+          ]}
         />
         <PathRewritesFields initialData={[{ from: "/legacy", to: "/v2" }]} />
       </VStack>

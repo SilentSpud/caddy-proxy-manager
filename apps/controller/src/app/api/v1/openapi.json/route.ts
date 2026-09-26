@@ -2607,6 +2607,12 @@ const spec = {
           },
           to: { type: "string", example: "/remote.php/dav/", description: "Redirect destination" },
           status: { type: "integer", enum: [301, 302, 307, 308], example: 301 },
+          preservePath: {
+            type: "string",
+            enum: ["full", "suffix"],
+            description:
+              "Append the request's path and query to `to`: all of it, or only what follows the part of `from` before its first `*`. Omit to redirect to `to` as is.",
+          },
         },
         required: ["from", "to", "status"],
       },

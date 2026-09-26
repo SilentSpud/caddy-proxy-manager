@@ -75,7 +75,10 @@ its own upstreams, load balancing and health checks.
 ## Redirects and rewrites
 
 Per-host redirect rules with a status of 301, 302, 307 or 308 - 307 and 308 preserve the request
-method, which matters for anything but a GET. A path prefix can be prepended before the request
+method, which matters for anything but a GET. **Keep path** carries the rest of the request
+along: **Full path** appends the whole path and query to the target, and **After prefix** drops
+the part of the pattern before its `*` first, so `/blog/*` sends `/blog/2024/post` to
+`https://blog.example.com/2024/post`. A path prefix can be prepended before the request
 reaches the upstream.
 
 <Demo title="Redirects and path rewrites">
