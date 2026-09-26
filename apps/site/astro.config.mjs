@@ -167,8 +167,9 @@ export default defineConfig({
        * component. Both resolve to a few lines each rather than dragging Next into a static site.
        *
        * The third replaces the controller's auth client, which would post sign-in attempts to
-       * `/api/auth/*` on this site, and the fourth its full page loads, which would leave it. Both
-       * have to come before the `@/src/` alias, which would otherwise match first.
+       * `/api/auth/*` on this site, and the fourth its full page loads, which would leave it. The
+       * two after them are host actions the editors import, answered in the browser instead. All of
+       * them have to come before the `@/src/` alias, which would otherwise match first.
        */
       alias: [
         {
@@ -180,6 +181,16 @@ export default defineConfig({
           replacement: fileURLToPath(
             new URL("./src/demos/shims/browser-navigation.ts", import.meta.url),
           ),
+        },
+        {
+          find: /^@\/src\/app\/\(dashboard\)\/proxy-hosts\/actions$/,
+          replacement: fileURLToPath(
+            new URL("./src/demos/shims/proxy-host-actions.ts", import.meta.url),
+          ),
+        },
+        {
+          find: /^@\/src\/app\/\(dashboard\)\/l4-proxy-hosts\/actions$/,
+          replacement: fileURLToPath(new URL("./src/demos/shims/l4-actions.ts", import.meta.url)),
         },
         { find: /^@\/components\//, replacement: `${controller("src/components")}/` },
         { find: /^@\/lib\//, replacement: `${controller("src/lib")}/` },

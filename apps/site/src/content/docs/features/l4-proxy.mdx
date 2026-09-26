@@ -4,6 +4,7 @@ description: Layer 4 stream proxying - SNI matching, PROXY protocol, health chec
 ---
 
 import Demo from "../../../components/Demo.astro";
+import L4HostEditorDemo from "../../../demos/samples/L4HostEditorDemo";
 import L4HostsTableDemo from "../../../demos/samples/L4HostsTableDemo";
 
 Not everything is HTTP. L4 proxy hosts forward raw TCP and UDP streams: a database, a game server,
@@ -18,6 +19,10 @@ an SSH endpoint, anything that speaks its own protocol.
 - **Port** - the listening port on the Caddy host.
 - **TLS SNI** - several TLS backends can share one port, routed by the name in the handshake. This
   works without terminating TLS, so the certificate stays with the backend.
+
+<Demo title="The L4 host editor" note="Create one or edit the sample. Saving shows what the form would send.">
+  <L4HostEditorDemo client:visible />
+</Demo>
 
 ## PROXY protocol
 

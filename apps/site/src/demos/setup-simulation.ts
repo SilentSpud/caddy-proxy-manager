@@ -10,13 +10,10 @@
  * One simulation per page: the shims reach it through `currentSimulation()`, which is null unless
  * a demo has started one - so the sign-in demo elsewhere keeps failing every attempt as before.
  */
-import { createTranslator } from "use-intl";
-import messages from "@cpm/controller/messages/en.json";
 import { passwordPolicyMessage } from "@cpm/controller/src/lib/password-policy-message";
 import type { MigrationGroupId } from "@cpm/controller/src/lib/migration/selection";
 import type { SetupStage } from "@cpm/controller/src/lib/setup";
-
-const t = createTranslator({ locale: "en", messages });
+import { t } from "./catalog";
 
 /** Where the reader "reached" the instance: a LAN name, so the dashboard host has one to claim. */
 const INITIAL_ORIGIN = "http://cpm.lan:3000";
