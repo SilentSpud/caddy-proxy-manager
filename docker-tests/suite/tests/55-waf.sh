@@ -119,23 +119,18 @@ fi
 #
 # Custom directives are operator input that ends up in Coraza's configuration.
 # Anything that could switch the engine off or pull in a file from the
-# container must be dropped rather than honoured.
+# container is refused at save, naming the lines, rather than quietly dropped.
 
 smuggle=$(domain_for "waf-smuggle")
-create_host_or_fail "a host with hostile directives can be created" "$(jq -nc --arg d "$smuggle" \
+api_expect "a host with hostile directives is refused" 400 POST /api/v1/proxy-hosts "$(jq -nc --arg d "$smuggle" \
   --arg rules "$BLOCK_RULE"$'\n'"SecRuleEngine Off"$'\n'"Include /etc/passwd" '{
   name: "docker-test waf smuggle",
   domains: [$d],
   upstreams: ["origin-a:8080"],
   waf: { enabled: true, mode: "On", load_owasp_crs: false, custom_directives: $rules, waf_mode: "override" }
-}')" && pass "a host with hostile directives can be created"
-
-wait_for "the smuggle host to answer" 120 \
-  bash -c "curl -sS --max-time 8 -o /dev/null --cacert '$CA_BUNDLE' 'https://$smuggle/'"
-
-t_eq "a smuggled SecRuleEngine Off does not disable the WAF" "403" \
-  "$(http_code "https://$smuggle/waf-tripwire")"
-t_eq "the host still serves ordinary traffic" "200" "$(http_code "https://$smuggle/")"
+}')"
+t_contains "the refusal names the engine directive" "SecRuleEngine Off" "$API_BODY"
+t_contains "the refusal names the Include" "Include /etc/passwd" "$API_BODY"
 
 # ── WebSocket carve-out ─────────────────────────────────────────────────────
 #
