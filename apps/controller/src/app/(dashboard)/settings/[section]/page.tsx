@@ -38,6 +38,7 @@ import { getPublicBaseUrl } from "@/src/lib/public-url";
 import { requireAdmin } from "@/src/lib/auth";
 import { stagedView } from "@/src/lib/settings/staged-view";
 import { registryFields } from "../registry-fields";
+import { captchaSettingsView, getCaptchaSettings } from "@/src/lib/captcha/settings";
 import { stagedOverlay } from "@/src/lib/settings/staging";
 import { withStagedReads } from "@/src/lib/settings/staging-context";
 import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
@@ -111,6 +112,7 @@ export default async function SettingsSectionPage({
       primaryProviderId,
       avatarSettings,
       passwordPolicySettings,
+      captchaSettings,
       caddyBuild,
       tailscale,
       dashboard,
@@ -146,6 +148,7 @@ export default async function SettingsSectionPage({
         getPrimaryProviderId(),
         getAvatarSettings(),
         getPasswordPolicySettings(),
+        getCaptchaSettings(),
         getCaddyBuildSettings(),
         getTailscaleSettings(),
         getDashboardSettings(),
@@ -243,6 +246,8 @@ export default async function SettingsSectionPage({
           false,
         fromEnv: config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null,
       }}
+      // The secret never leaves the server, as with Tailscale's auth key below.
+      captcha={captchaSettingsView(captchaSettings)}
       caddyBuild={caddyBuild}
       agentBuildTargets={pairedAgents.map((agent) => ({
         id: agent.id,

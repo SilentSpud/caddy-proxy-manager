@@ -2481,6 +2481,11 @@ const spec = {
             items: { type: "string" },
             description: "Paths to exclude from auth",
           },
+          require_captcha: {
+            type: "boolean",
+            description:
+              "Ask for the sign-in CAPTCHA on the portal, when one is configured. Defaults to true; omitted on update, the host keeps its current value.",
+          },
         },
       },
       TailscaleHostConfig: {

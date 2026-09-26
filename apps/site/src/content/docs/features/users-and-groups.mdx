@@ -62,6 +62,27 @@ and the [forward-auth portal](../forward-auth/) work the same way.
   <SignInDemo client:visible />
 </Demo>
 
+### CAPTCHA
+
+**Settings → Authentication → CAPTCHA** puts a challenge on the username step of both the
+dashboard and the forward-auth portal: Google reCAPTCHA v2, hCaptcha, Cloudflare Turnstile, or a
+self-hosted [Cap](https://capjs.js.org) instance. With one configured, **Continue** only moves on
+once it is solved.
+
+- **The server enforces it, not just the form.** A solve earns a pass for that one username,
+  and the password endpoint refuses any sign-in without one - a script posting straight to the
+  API gets nowhere.
+- **One solve, one password attempt.** The pass is spent by the attempt whether the password was
+  right or not, and the server remembers it was, so replaying it does nothing. After a wrong
+  password the CAPTCHA appears again beside the password field, rather than sending you back to
+  the username. An unused pass lapses after ten minutes, or when the controller restarts.
+- **Each portal host can opt out.** A host using the built-in forward auth has **Require the
+  sign-in CAPTCHA**, on by default. Turned off, that host's portal skips it - and its sign-in is
+  open to scripted guessing again, held back only by the login throttles.
+- **Single sign-on is untouched**, and in OIDC-only mode there is no username step to put it on.
+- **The sign-in pages load the provider's script** and are given a Content Security Policy that
+  allows that provider's origins, on those pages only.
+
 ## OAuth / SSO
 
 Any OAuth2/OIDC provider - Authentik, Keycloak, Auth0, and others. Accounts can be linked from the

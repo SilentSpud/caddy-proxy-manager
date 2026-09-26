@@ -1,7 +1,13 @@
 import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
-import { isForwardAuthDomain, createRedirectIntent } from "@/src/lib/models/forward-auth";
+import {
+  isForwardAuthDomain,
+  createRedirectIntent,
+  redirectIntentWantsCaptcha,
+} from "@/src/lib/models/forward-auth";
+import { getActiveCaptcha } from "@/src/lib/captcha/settings";
+import { cspNonce } from "@/src/lib/csp";
 import PortalLoginForm from "./PortalLoginForm";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -67,6 +73,10 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     getTranslations("auth.login"),
   ]);
   const oauthError = oauthCallbackErrorMessage(params.error, t);
+  const localLoginEnabled = !(await localUsersDisabled());
+  // Per host: an operator can switch it off for one whose users cannot solve it.
+  const configured = localLoginEnabled && rid ? await getActiveCaptcha() : null;
+  const captcha = configured && (await redirectIntentWantsCaptcha(rid)) ? configured : null;
 
   return (
     <PortalLoginForm
@@ -75,7 +85,9 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
       hasRedirect={!!redirectUri || !!existingRid}
       targetDomain={targetDomain}
       enabledProviders={enabledProviders}
-      localLoginEnabled={!(await localUsersDisabled())}
+      localLoginEnabled={localLoginEnabled}
+      captcha={captcha}
+      cspNonce={captcha ? cspNonce((await headers()).get("Content-Security-Policy")) : undefined}
       existingSession={
         session
           ? {

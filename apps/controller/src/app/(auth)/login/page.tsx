@@ -1,6 +1,9 @@
 import { localUsersDisabled } from "@/src/lib/auth-policy";
 import { getAppName } from "@/src/lib/app-name";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { getActiveCaptcha } from "@/src/lib/captcha/settings";
+import { cspNonce } from "@/src/lib/csp";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import LoginClient from "@/src/components/auth/LoginClient";
@@ -30,13 +33,18 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   const oauthError = oauthCallbackErrorMessage(params.error, t);
+  const localLoginEnabled = !(await localUsersDisabled());
+  // No local accounts, no username step to put it on.
+  const captcha = localLoginEnabled ? await getActiveCaptcha() : null;
 
   return (
     <LoginClient
       enabledProviders={enabledProviders}
-      localLoginEnabled={!(await localUsersDisabled())}
+      localLoginEnabled={localLoginEnabled}
       appName={await getAppName()}
       initialError={oauthError}
+      captcha={captcha}
+      cspNonce={captcha ? cspNonce((await headers()).get("Content-Security-Policy")) : undefined}
     />
   );
 }

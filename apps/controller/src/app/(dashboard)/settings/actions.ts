@@ -80,6 +80,9 @@ import { encryptProviderCredentials } from "@/src/lib/dns-provider-credentials";
 import { clearFavicon, FaviconValidationError, saveFavicon } from "@/src/lib/branding";
 import { parseCheckbox, parseCsv } from "@/src/lib/form-parse";
 import { checkTailscaleAuthKey } from "@/src/lib/tailscale-api";
+import { isCaptchaProvider } from "@/src/lib/captcha/providers";
+import { getCaptchaSettings, saveCaptchaSettings } from "@/src/lib/captcha/settings";
+import { hasForbiddenControlCharacter } from "@/src/lib/settings-validation";
 import { decryptSecret } from "@/src/lib/secret";
 import { checkForUpdates } from "@/src/lib/updates";
 import { config } from "@/src/lib/config";
@@ -610,6 +613,62 @@ async function updateTailscaleSettingsActionUnlocked(
       success: false,
       message: await errorText(error, t("results.tailscaleFailed")),
     };
+  }
+}
+
+/**
+ * The CAPTCHA in front of the sign-in screen's password step.
+ *
+ * An empty secret keeps the stored one, as Tailscale's auth key does - but only for the provider it
+ * was issued by: a key carried across a provider switch could never verify, and a gate that cannot
+ * verify refuses every local sign-in.
+ */
+async function updateCaptchaSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+
+    const existing = await getCaptchaSettings();
+    const rawProvider = String(formData.get("captchaProvider") ?? "none");
+    const provider = isCaptchaProvider(rawProvider) ? rawProvider : "none";
+    const siteKey = String(formData.get("captchaSiteKey") ?? "").trim();
+    const submittedSecret = String(formData.get("captchaSecretKey") ?? "").trim();
+    const capInstanceUrl = String(formData.get("captchaCapInstanceUrl") ?? "")
+      .trim()
+      .replace(/\/+$/, "");
+
+    if (provider === "none") {
+      // Kept rather than cleared, so switching it back on is one click.
+      await saveCaptchaSettings({ ...existing, provider });
+      revalidatePath("/settings");
+      return { success: true, message: t("results.captchaDisabled") };
+    }
+
+    const secretKey = submittedSecret || (existing.provider === provider ? existing.secretKey : "");
+    const fields = [siteKey, submittedSecret, capInstanceUrl];
+    if (fields.some((field) => field.length > 2048 || hasForbiddenControlCharacter(field))) {
+      return { success: false, message: t("results.captchaInvalid") };
+    }
+    if (!siteKey) return { success: false, message: t("results.captchaSiteKeyRequired") };
+    if (!secretKey) return { success: false, message: t("results.captchaSecretKeyRequired") };
+    if (provider === "cap" && !/^https?:\/\/[^\s/]+(\/[^\s]*)?$/.test(capInstanceUrl)) {
+      return { success: false, message: t("results.captchaCapUrlRequired") };
+    }
+
+    await saveCaptchaSettings({
+      provider,
+      siteKey,
+      secretKey,
+      capInstanceUrl: provider === "cap" ? capInstanceUrl : existing.capInstanceUrl,
+    });
+    revalidatePath("/settings");
+    return { success: true, message: t("results.captchaSaved") };
+  } catch (error) {
+    console.error("Failed to save CAPTCHA settings:", error);
+    return { success: false, message: await errorText(error, t("results.captchaFailed")) };
   }
 }
 
@@ -2017,6 +2076,10 @@ export const updateUpdateSettingsAction = stagedSettingsAction(updateUpdateSetti
 // them reaches a Caddy config, so there is nothing for "Review & apply" to apply.
 export const updateRegistrySettingsAction = serializedSettingsAction(
   updateRegistrySettingsActionUnlocked,
+);
+// Not staged, for the same reason: it guards this app's sign-in, not anything Caddy serves.
+export const updateCaptchaSettingsAction = serializedSettingsAction(
+  updateCaptchaSettingsActionUnlocked,
 );
 export const checkForUpdatesAction = serializedSettingsAction(checkForUpdatesActionUnlocked);
 export const updateAnalyticsSettingsAction = serializedSettingsAction(

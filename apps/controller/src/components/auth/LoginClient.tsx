@@ -14,6 +14,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
 import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
 import { type SignInProvider, SignInProviders } from "@/src/components/auth/SignInProviders";
+import { useCaptchaStep } from "@/src/components/auth/useCaptchaStep";
 import {
   AUTOFILL_CURRENT_PASSWORD,
   AUTOFILL_USERNAME,
@@ -21,6 +22,7 @@ import {
 } from "@/src/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
 import { formatAppVersion } from "@/src/lib/app-version";
+import type { CaptchaWidgetConfig } from "@/src/lib/captcha/providers";
 import { signInErrorMessage } from "@/src/lib/sign-in-error";
 
 interface LoginClientProps {
@@ -31,6 +33,10 @@ interface LoginClientProps {
   appName?: string;
   /** A refused single sign-on attempt, already put into words by the page. */
   initialError?: string | null;
+  /** Solved on the username step before the password is asked for. Null when none is configured. */
+  captcha?: CaptchaWidgetConfig | null;
+  /** The page's CSP nonce, which Cap needs for the scripts it injects. */
+  cspNonce?: string;
 }
 
 export default function LoginClient({
@@ -38,6 +44,8 @@ export default function LoginClient({
   localLoginEnabled = true,
   appName = "Caddy Proxy Manager",
   initialError = null,
+  captcha = null,
+  cspNonce,
 }: LoginClientProps) {
   const t = useTranslations("auth.login");
   const tErrors = useTranslations("auth.errors");
@@ -51,6 +59,7 @@ export default function LoginClient({
   // a name to attach it to. Step one never checks whether that name exists - see below.
   const [onPasswordStep, setOnPasswordStep] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const captchaStep = useCaptchaStep({ config: captcha, nonce: cspNonce, onError: setLoginError });
 
   // After the commit that unhides the field, not from the handler that asked for it: `focus()` on
   // an element still inside a `hidden` subtree is a no-op, and a handler - or a rAF scheduled from
@@ -73,7 +82,17 @@ export default function LoginClient({
     const signInUsername = (authClient.signIn as unknown as { username: SignInUsername }).username;
     const { error } = await signInUsername({ username: trimmedUsername, password });
 
+    if (error?.code === "CAPTCHA_REQUIRED") {
+      // The pass lapsed while the password was being typed. The widget comes back on this step,
+      // with the password kept, so solving it and pressing Sign in again is all it takes.
+      captchaStep.spent("expired");
+      setLoginPending(false);
+      return;
+    }
+
     if (error) {
+      // The attempt spent the pass, right password or not; the next one needs a new solve.
+      captchaStep.spent();
       // By code, not Better Auth's `message`: that is English whatever the reader's language.
       setLoginError(signInErrorMessage(error, (key) => tErrors(key)));
       setLoginPending(false);
@@ -105,6 +124,7 @@ export default function LoginClient({
     // unknown, or to send it to the provider it belongs to - would answer "does this name exist?"
     // for anyone who asks, which the single-screen form never did.
     if (!onPasswordStep) {
+      if (!(await captchaStep.pass(trimmedUsername))) return;
       // A password manager fills both fields at once even though only one is on screen, so a
       // filled password means there is nothing to ask for: submit rather than showing a step whose
       // only field is already complete.
@@ -112,9 +132,13 @@ export default function LoginClient({
         setOnPasswordStep(true);
         return;
       }
-    } else if (!password) {
-      setLoginError(t("passwordRequired"));
-      return;
+    } else {
+      if (!password) {
+        setLoginError(t("passwordRequired"));
+        return;
+      }
+      // After a failed attempt: the widget is back on this step, and this redeems it.
+      if (!(await captchaStep.pass(trimmedUsername))) return;
     }
 
     await signIn(trimmedUsername);
@@ -137,7 +161,7 @@ export default function LoginClient({
     }
   };
 
-  const disabled = loginPending || !!oauthPending;
+  const disabled = loginPending || captchaStep.pending || !!oauthPending;
   const hasProviders = enabledProviders.length > 0;
 
   const subtitle = !localLoginEnabled
@@ -197,21 +221,26 @@ export default function LoginClient({
                         setOnPasswordStep(false);
                         setPassword("");
                         setLoginError(null);
+                        captchaStep.spent();
                       }}
                     />
                   ) : (
-                    <TextInput
-                      {...AUTOFILL_USERNAME}
-                      {...NO_SPELLCHECK}
-                      label={t("username")}
-                      htmlName="username"
-                      value={username}
-                      onChange={setUsername}
-                      isRequired
-                      hasAutoFocus
-                      isDisabled={disabled}
-                      width="100%"
-                    />
+                    <>
+                      <TextInput
+                        {...AUTOFILL_USERNAME}
+                        {...NO_SPELLCHECK}
+                        label={t("username")}
+                        htmlName="username"
+                        value={username}
+                        onChange={setUsername}
+                        isRequired
+                        hasAutoFocus
+                        isDisabled={disabled}
+                        width="100%"
+                      />
+                      {/* A pass is for one name only, so going back for another means a new solve. */}
+                      {captchaStep.widget}
+                    </>
                   )}
                   <div hidden={!onPasswordStep}>
                     <TextInput
@@ -227,6 +256,8 @@ export default function LoginClient({
                       width="100%"
                     />
                   </div>
+                  {/* Back after a failed attempt, which spent the last solve. */}
+                  {onPasswordStep && captchaStep.widget}
                   <Button
                     type="submit"
                     variant="primary"
@@ -237,7 +268,7 @@ export default function LoginClient({
                           ? t("submit")
                           : t("continueStep")
                     }
-                    isLoading={loginPending}
+                    isLoading={loginPending || captchaStep.pending}
                     isDisabled={disabled}
                     width="100%"
                   />

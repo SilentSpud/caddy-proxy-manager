@@ -89,6 +89,7 @@ import {
   updateDashboardSettingsAction,
   checkDashboardDnsAction,
   updateTailscaleSettingsAction,
+  updateCaptchaSettingsAction,
   pairingCodeAction,
   unpairAgentAction,
   repairAgentAction,
@@ -107,6 +108,8 @@ import {
 import { EnvLabelledField } from "@/src/components/ui/EnvLabelledField";
 import { RegistrySettingsBlock, type RegistryField } from "./RegistrySettingsBlock";
 import { DashboardHostSection } from "./DashboardHostSection";
+import { CaptchaSection } from "./CaptchaSection";
+import type { CaptchaSettingsView } from "@/src/lib/captcha/settings";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -134,6 +137,8 @@ type Props = {
   localUsersDisabled: boolean;
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
+  /** The sign-in CAPTCHA, with the secret replaced by whether one is stored. */
+  captcha: CaptchaSettingsView;
   caddyBuild: CaddyBuildSettings | null;
   agentBuildTargets?: { id: number; name: string; connected: boolean }[];
   agentBuildSelections?: Record<number, CaddyBuildSettings | null>;
@@ -187,6 +192,7 @@ export default function SettingsClient({
   localUsersDisabled,
   avatars,
   passwordPolicy,
+  captcha,
   caddyBuild,
   agentBuildTargets,
   agentBuildSelections,
@@ -245,6 +251,7 @@ export default function SettingsClient({
     updatePasswordPolicySettingsAction,
     null,
   );
+  const [captchaState, captchaFormAction] = useActionState(updateCaptchaSettingsAction, null);
   const [loggingState, loggingFormAction] = useActionState(updateLoggingSettingsAction, null);
   const [dnsState, dnsFormAction] = useActionState(updateDnsSettingsAction, null);
   const [upstreamDnsResolutionState, upstreamDnsResolutionFormAction] = useActionState(
@@ -398,6 +405,14 @@ export default function SettingsClient({
         primaryProviderId={primaryProviderId}
         localUsersDisabled={localUsersDisabled}
         baseUrl={baseUrl}
+      />
+    ),
+    captcha: (
+      <CaptchaSection
+        captcha={captcha}
+        localUsersDisabled={localUsersDisabled}
+        captchaState={captchaState}
+        captchaFormAction={captchaFormAction}
       />
     ),
     "password-policy": (

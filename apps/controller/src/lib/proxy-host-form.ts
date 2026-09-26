@@ -206,6 +206,10 @@ export function parseCpmForwardAuthConfig(formData: FormData): CpmForwardAuthInp
   if (excludedPaths.length > 0 || formData.has("cpmForwardAuthExcludedPaths")) {
     result.excluded_paths = excludedPaths.length > 0 ? excludedPaths : null;
   }
+  // Only drawn while forward auth is on; absent, the host keeps what it had.
+  if (formData.has("cpmForwardAuthRequireCaptcha")) {
+    result.require_captcha = parseCheckbox(formData.get("cpmForwardAuthRequireCaptcha"));
+  }
 
   return Object.keys(result).length > 0 ? result : undefined;
 }

@@ -807,18 +807,23 @@ export type CpmForwardAuthConfig = {
   enabled: boolean;
   protected_paths: string[] | null;
   excluded_paths: string[] | null;
+  /** Whether the portal asks for the sign-in CAPTCHA, when one is configured. */
+  require_captcha: boolean;
 };
 
 export type CpmForwardAuthInput = {
   enabled?: boolean;
   protected_paths?: string[] | null;
   excluded_paths?: string[] | null;
+  require_captcha?: boolean;
 };
 
 type CpmForwardAuthMeta = {
   enabled?: boolean;
   protected_paths?: string[];
   excluded_paths?: string[];
+  /** Stored only as false: every host that predates the CAPTCHA gets it. */
+  require_captcha?: boolean;
 };
 
 /** Presets for an auth server this app does not run. "custom" asks for every field by hand. */
@@ -1373,6 +1378,9 @@ function sanitizeCpmForwardAuthMeta(
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
+  }
+  if (meta.require_captcha === false) {
+    normalized.require_captcha = false;
   }
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
@@ -2496,6 +2504,12 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
       if (input.cpmForwardAuth.excluded_paths && input.cpmForwardAuth.excluded_paths.length > 0) {
         cfa.excluded_paths = input.cpmForwardAuth.excluded_paths;
       }
+      // Left out of an update, the host keeps what it had.
+      const requireCaptcha =
+        input.cpmForwardAuth.require_captcha ?? next.cpm_forward_auth?.require_captcha;
+      if (requireCaptcha === false) {
+        cfa.require_captcha = false;
+      }
       next.cpm_forward_auth = cfa;
     } else {
       delete next.cpm_forward_auth;
@@ -2995,6 +3009,7 @@ export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
           enabled: true,
           protected_paths: meta.cpm_forward_auth.protected_paths ?? null,
           excluded_paths: meta.cpm_forward_auth.excluded_paths ?? null,
+          require_captcha: meta.cpm_forward_auth.require_captcha !== false,
         }
       : null,
     tailscale: hydrateTailscale(meta.tailscale),
@@ -3372,6 +3387,9 @@ export async function updateProxyHost(
               : {}),
             ...(existing.cpmForwardAuth.excluded_paths
               ? { excluded_paths: existing.cpmForwardAuth.excluded_paths }
+              : {}),
+            ...(existing.cpmForwardAuth.require_captcha === false
+              ? { require_captcha: false }
               : {}),
           },
         }
