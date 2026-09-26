@@ -54,6 +54,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "sessions",
       "accounts",
       "verifications",
+      "two_factors",
       "pending_oauth_links",
       "api_tokens",
       "groups",
