@@ -24,7 +24,11 @@ vi.mock('../../src/lib/db', () => ({
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
-import { createProxyHost } from '../../src/lib/models/proxy-hosts';
+import {
+  createProxyHost,
+  listProxyHostsPaginated,
+  updateProxyHost,
+} from '../../src/lib/models/proxy-hosts';
 import { buildCaddyDocument } from '../../src/lib/caddy';
 import { parseProxyHostOptionUpdates } from '../../src/lib/proxy-host-form';
 import * as schema from '../../src/lib/db/schema';
@@ -116,6 +120,28 @@ describe('redirect path modes', () => {
     expect(config).toContain('"strip_path_prefix":"/old"');
     expect(config).toContain('/new{http.request.uri}');
     expect(config).toContain('"Location":["/v2"]');
+  });
+});
+
+describe('host notes', () => {
+  it('stores, searches, keeps and clears them', async () => {
+    const host = await createProxyHost(
+      {
+        name: 'notes',
+        domains: ['notes.example.com'],
+        upstreams: ['10.0.0.5:8080'],
+        description: ' Ask Sam ',
+      },
+      1,
+    );
+    expect(host.description).toBe('Ask Sam');
+    expect((await listProxyHostsPaginated(50, 0, 'Sam')).map((h) => h.id)).toContain(host.id);
+
+    const renamed = await updateProxyHost(host.id, { name: 'renamed' }, 1);
+    expect(renamed.description).toBe('Ask Sam');
+
+    const cleared = await updateProxyHost(host.id, { description: '' }, 1);
+    expect(cleared.description).toBeNull();
   });
 });
 

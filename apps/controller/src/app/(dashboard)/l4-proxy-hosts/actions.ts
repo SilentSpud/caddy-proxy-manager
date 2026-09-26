@@ -256,6 +256,7 @@ export async function createL4ProxyHostAction(
 
     const input: L4ProxyHostInput = {
       name: String(formData.get("name") ?? "Untitled"),
+      description: formData.has("description") ? String(formData.get("description")) : undefined,
       protocol: parseProtocol(formData),
       listenAddress: String(formData.get("listenAddress") ?? "").trim(),
       upstreams: parseUpstreams(formData.get("upstreams")),
@@ -304,6 +305,7 @@ export async function updateL4ProxyHostAction(
 
     const input: Partial<L4ProxyHostInput> = {
       name: formData.get("name") ? String(formData.get("name")) : undefined,
+      description: formData.has("description") ? String(formData.get("description")) : undefined,
       protocol: parseProtocol(formData),
       listenAddress: formData.get("listenAddress")
         ? String(formData.get("listenAddress")).trim()

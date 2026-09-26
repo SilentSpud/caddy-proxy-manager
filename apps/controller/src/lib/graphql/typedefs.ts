@@ -25,6 +25,7 @@ export const typeDefs = /* GraphQL */ `
   type ProxyHost {
     id: Int!
     name: String!
+    description: String
     domains: [String!]!
     upstreams: [String!]!
     enabled: Boolean!
@@ -49,6 +50,7 @@ export const typeDefs = /* GraphQL */ `
   type L4ProxyHost {
     id: Int!
     name: String!
+    description: String
     protocol: String!
     listenAddress: String!
     upstreams: [String!]!

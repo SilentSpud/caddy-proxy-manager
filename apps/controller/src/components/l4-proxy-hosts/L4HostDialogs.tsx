@@ -25,6 +25,7 @@ import { Globe, Layers, MapPin, Pin } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
+import { HostNotesField } from "@/components/proxy-hosts/HostNotesField";
 import { useTranslations } from "next-intl";
 
 /**
@@ -148,6 +149,7 @@ function Section({
 /** Every free-text field in the form, keyed by its form field name. */
 type TextFields = {
   name: string;
+  description: string;
   listenAddress: string;
   upstreams: string;
   matcherValue: string;
@@ -178,6 +180,7 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
   const geo = initialData?.geoblock;
   return {
     name: initialData?.name ?? "",
+    description: initialData?.description ?? "",
     listenAddress: initialData?.listenAddress ?? "",
     upstreams: initialData?.upstreams.join("\n") ?? "",
     matcherValue: initialData?.matcherValue?.join(", ") ?? "",
@@ -228,7 +231,7 @@ function L4HostForm({
 
   // Astryx inputs are controlled, so every field that used defaultValue now
   // needs seeded state. They are grouped rather than declared one useState at
-  // a time, since there are twenty-six of them.
+  // a time, since there are dozens of them.
   const [text, setText] = useState<TextFields>(() => initialText(initialData));
   const set =
     <K extends keyof TextFields>(key: K) =>
@@ -304,6 +307,8 @@ function L4HostForm({
           onChange={set("name")}
           isRequired
         />
+
+        <HostNotesField value={text.description} onChange={set("description")} />
 
         <Selector
           label={t("protocol")}

@@ -348,6 +348,7 @@ export const issuedClientCertificates = pgTable(
 export const proxyHosts = pgTable("proxy_hosts", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  description: text("description"),
   domains: text("domains").notNull(),
   upstreams: text("upstreams").notNull(),
   certificateId: integer("certificateId").references(() => certificates.id, {
@@ -638,6 +639,7 @@ export const forwardAuthRedirectIntents = pgTable(
 export const l4ProxyHosts = pgTable("l4_proxy_hosts", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  description: text("description"),
   protocol: text("protocol").notNull(),
   listenAddress: text("listenAddress").notNull(),
   upstreams: text("upstreams").notNull(),

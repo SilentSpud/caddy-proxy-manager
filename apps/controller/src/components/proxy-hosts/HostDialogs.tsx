@@ -44,6 +44,7 @@ import type { IssuedClientCertificate } from "@/lib/models/issued-client-certifi
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
+import { HostNotesField } from "./HostNotesField";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = {
@@ -149,6 +150,7 @@ export function CreateHostDialog({
   const [state, formAction] = useActionState(createProxyHostAction, INITIAL_ACTION_STATE);
 
   const [name, setName] = useState(initialData ? t("copyName", { name: initialData.name }) : "");
+  const [description, setDescription] = useState(initialData?.description ?? "");
   const [domains, setDomains] = useState(initialData?.domains.join("\n") ?? defaultDomain ?? "");
   const [certificateId, setCertificateId] = useState(
     String(initialData?.certificateId ?? NONE_VALUE),
@@ -188,6 +190,7 @@ export function CreateHostDialog({
             onChange={setName}
             isRequired
           />
+          <HostNotesField value={description} onChange={setDescription} />
           <TextArea
             {...NO_SPELLCHECK}
             label={t("domains")}
@@ -298,6 +301,7 @@ export function EditHostDialog({
   );
 
   const [name, setName] = useState(host.name);
+  const [description, setDescription] = useState(host.description ?? "");
   const [domains, setDomains] = useState(host.domains.join("\n"));
   const [certificateId, setCertificateId] = useState(String(host.certificateId ?? NONE_VALUE));
   const [accessListId, setAccessListId] = useState(String(host.accessListId ?? NONE_VALUE));
@@ -328,6 +332,7 @@ export function EditHostDialog({
             enabled={host.enabled}
           />
           <TextInput label={t("name")} htmlName="name" value={name} onChange={setName} isRequired />
+          <HostNotesField value={description} onChange={setDescription} />
           <TextArea
             {...NO_SPELLCHECK}
             label={t("domains")}

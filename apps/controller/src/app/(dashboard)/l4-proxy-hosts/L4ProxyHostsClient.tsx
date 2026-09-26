@@ -8,6 +8,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
+import { HostNotesHint } from "@/components/proxy-hosts/HostNotesField";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -210,9 +211,12 @@ export default function L4ProxyHostsClient({
         <HStack gap={3} vAlign="center">
           <Icon icon={Network} size="sm" color={host.protocol === "tcp" ? "accent" : "warning"} />
           <VStack gap={0} className="cpm-cell-lines">
-            <Text type="body" size="sm" weight="semibold">
-              {host.name}
-            </Text>
+            <HStack gap={1} vAlign="center">
+              <Text type="body" size="sm" weight="semibold">
+                {host.name}
+              </Text>
+              <HostNotesHint notes={host.description} />
+            </HStack>
             <Tooltip content={formatMatcher(host, t)}>
               <Text type="body" size="xsm" color="secondary" maxLines={1}>
                 {formatMatcher(host, t)}
@@ -282,6 +286,11 @@ export default function L4ProxyHostsClient({
           <Text type="code" size="xsm" color="secondary" maxLines={1}>
             {host.listenAddress} &rarr; {summarizeUpstreams(host.upstreams)}
           </Text>
+          {host.description && (
+            <Text type="body" size="xsm" color="secondary" maxLines={2}>
+              {host.description}
+            </Text>
+          )}
           <StatusChip status={host.enabled ? "active" : "inactive"} />
         </VStack>
         {actionsFor(host)}

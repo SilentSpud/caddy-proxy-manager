@@ -68,6 +68,7 @@ import { DateTimeScalar, JSONScalar } from "./scalars";
 const PROXY_HOST_SCALAR_FIELDS = new Set([
   "id",
   "name",
+  "description",
   "domains",
   "upstreams",
   "enabled",
@@ -86,6 +87,7 @@ const PROXY_HOST_SCALAR_FIELDS = new Set([
 const L4_SCALAR_FIELDS = new Set([
   "id",
   "name",
+  "description",
   "protocol",
   "listenAddress",
   "upstreams",

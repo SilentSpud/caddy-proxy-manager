@@ -8,6 +8,7 @@ import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../domain-error";
 import { assertNoNewAdminDialTargets } from "./admin-dial-targets";
 import { setHostAgents } from "./host-agents";
+import { normalizeHostDescription } from "../host-description";
 
 export type L4Protocol = "tcp" | "udp";
 export type L4MatcherType = "none" | "tls_sni" | "http_host" | "proxy_protocol";
@@ -149,6 +150,7 @@ const VALID_L4_UPSTREAM_DNS_FAMILIES: L4UpstreamDnsResolutionConfig["family"][] 
 export type L4ProxyHost = {
   id: number;
   name: string;
+  description: string | null;
   protocol: L4Protocol;
   listenAddress: string;
   upstreams: string[];
@@ -170,6 +172,8 @@ export type L4ProxyHost = {
 
 export type L4ProxyHostInput = {
   name: string;
+  /** Free-text notes; blank clears them. */
+  description?: string | null;
   protocol: L4Protocol;
   listenAddress: string;
   upstreams: string[];
@@ -431,6 +435,7 @@ function parseL4ProxyHost(row: L4ProxyHostRow): L4ProxyHost {
   return {
     id: row.id,
     name: row.name,
+    description: row.description ?? null,
     protocol: row.protocol as L4Protocol,
     listenAddress: row.listenAddress,
     upstreams: safeJsonParse<string[]>(row.upstreams, []),
@@ -536,6 +541,7 @@ function l4ListFilter(search?: string, visibleIds?: number[] | null, protocol?: 
     clauses.push(
       or(
         like(l4ProxyHosts.name, `%${search}%`),
+        like(l4ProxyHosts.description, `%${search}%`),
         like(l4ProxyHosts.listenAddress, `%${search}%`),
         like(l4ProxyHosts.upstreams, `%${search}%`),
       ),
@@ -625,6 +631,7 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
     .insert(l4ProxyHosts)
     .values({
       name: input.name.trim(),
+      description: normalizeHostDescription(input.description) ?? null,
       protocol: input.protocol,
       listenAddress: input.listenAddress.trim(),
       upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
@@ -721,6 +728,9 @@ export async function updateL4ProxyHost(
     .update(l4ProxyHosts)
     .set({
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+      ...(input.description !== undefined
+        ? { description: normalizeHostDescription(input.description) }
+        : {}),
       ...(input.protocol !== undefined ? { protocol: input.protocol } : {}),
       ...(input.listenAddress !== undefined ? { listenAddress: input.listenAddress.trim() } : {}),
       ...(input.upstreams !== undefined

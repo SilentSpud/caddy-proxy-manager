@@ -17,6 +17,9 @@ import HostTogglesDemo from "../../../demos/samples/HostTogglesDemo";
 A proxy host maps one or more domains onto one or more upstreams. It is the thing this product is
 mostly for, and most of the other features attach to it.
 
+Every host, HTTP or L4, can carry **notes**: free text for whatever the next person needs to know.
+They show as an icon beside the host's name in the list, and the search box finds them.
+
 <Demo title="The proxy host list" note="Sort by domain or status, or switch to the enabled or disabled hosts.">
   <ProxyHostsTableDemo client:visible />
 </Demo>

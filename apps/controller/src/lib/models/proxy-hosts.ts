@@ -26,6 +26,7 @@ import { type WafDryRunTarget, assertWafLoads, wafCandidatesForHost } from "../w
 import { agentIdsForHost, setHostAgents } from "./host-agents";
 import { assertWafPresetIdsExist } from "./waf-presets";
 import { assertCrsPluginIdsExist } from "./crs-plugins";
+import { normalizeHostDescription } from "../host-description";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -933,6 +934,7 @@ type ProxyHostMeta = {
 export type ProxyHost = {
   id: number;
   name: string;
+  description: string | null;
   domains: string[];
   upstreams: string[];
   certificateId: number | null;
@@ -971,6 +973,8 @@ export type ProxyHost = {
 
 export type ProxyHostInput = {
   name: string;
+  /** Free-text notes; blank clears them. */
+  description?: string | null;
   domains: string[];
   upstreams: string[];
   /**
@@ -3087,6 +3091,7 @@ function parseProxyHost(row: ProxyHostRow): ProxyHost {
   return {
     id: row.id,
     name: row.name,
+    description: row.description ?? null,
     domains: JSON.parse(row.domains),
     upstreams: JSON.parse(row.upstreams),
     certificateId: row.certificateId ?? null,
@@ -3125,6 +3130,7 @@ function proxyHostListFilter(search?: string, visibleIds?: number[] | null, enab
     clauses.push(
       or(
         like(proxyHosts.name, `%${search}%`),
+        like(proxyHosts.description, `%${search}%`),
         like(proxyHosts.domains, `%${search}%`),
         like(proxyHosts.upstreams, `%${search}%`),
       ),
@@ -3286,6 +3292,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     .insert(proxyHosts)
     .values({
       name: input.name.trim(),
+      description: normalizeHostDescription(input.description) ?? null,
       domains: JSON.stringify(domains),
       upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
       certificateId: input.certificateId ?? null,
@@ -3437,6 +3444,10 @@ export async function updateProxyHost(
     .update(proxyHosts)
     .set({
       name: input.name ?? existing.name,
+      description:
+        input.description !== undefined
+          ? normalizeHostDescription(input.description)
+          : existing.description,
       domains,
       upstreams,
       certificateId: effectiveCertificateId,

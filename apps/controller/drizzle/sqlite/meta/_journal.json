@@ -36,6 +36,13 @@
       "when": 1790221148353,
       "tag": "0004_settings_revision_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790426258602,
+      "tag": "0005_host_descriptions",
+      "breakpoints": true
     }
   ]
 }

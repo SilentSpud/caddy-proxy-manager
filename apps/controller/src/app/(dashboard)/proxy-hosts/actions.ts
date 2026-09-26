@@ -67,6 +67,7 @@ export async function createProxyHostAction(
     const host = await createProxyHost(
       {
         name: String(formData.get("name") ?? "Untitled"),
+        description: formData.has("description") ? String(formData.get("description")) : undefined,
         domains: parseCsv(formData.get("domains")),
         upstreams: parseUpstreams(formData.get("upstreams")),
         // No checkboxes ticked is the empty list, which means every agent - the same thing the
@@ -179,6 +180,7 @@ export async function updateProxyHostAction(
       id,
       {
         name: formData.get("name") ? String(formData.get("name")) : undefined,
+        description: formData.has("description") ? String(formData.get("description")) : undefined,
         domains: formData.get("domains") ? parseCsv(formData.get("domains")) : undefined,
         upstreams: formData.get("upstreams")
           ? parseUpstreams(formData.get("upstreams"))

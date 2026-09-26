@@ -2756,6 +2756,7 @@ const spec = {
         properties: {
           id: { type: "integer" },
           name: { type: "string" },
+          description: { type: ["string", "null"], description: "Free-text notes" },
           domains: {
             type: "array",
             items: { type: "string" },
@@ -2845,6 +2846,11 @@ const spec = {
         type: "object",
         properties: {
           name: { type: "string", example: "My App" },
+          description: {
+            type: ["string", "null"],
+            maxLength: 2000,
+            description: "Free-text notes. Blank or null clears them.",
+          },
           domains: { type: "array", items: { type: "string" }, example: ["app.example.com"] },
           upstreams: { type: "array", items: { type: "string" }, example: ["localhost:3000"] },
           certificateId: { type: ["integer", "null"] },
@@ -2915,6 +2921,7 @@ const spec = {
         properties: {
           id: { type: "integer" },
           name: { type: "string" },
+          description: { type: ["string", "null"], description: "Free-text notes" },
           protocol: { type: "string", enum: ["tcp", "udp"] },
           listenAddress: {
             type: "string",
@@ -2967,6 +2974,11 @@ const spec = {
         type: "object",
         properties: {
           name: { type: "string", example: "PostgreSQL Proxy" },
+          description: {
+            type: ["string", "null"],
+            maxLength: 2000,
+            description: "Free-text notes. Blank or null clears them.",
+          },
           protocol: { type: "string", enum: ["tcp", "udp"] },
           listenAddress: {
             type: "string",

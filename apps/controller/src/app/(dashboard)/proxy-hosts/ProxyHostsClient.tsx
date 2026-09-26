@@ -25,6 +25,7 @@ import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
+import { HostNotesHint } from "@/components/proxy-hosts/HostNotesField";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -353,9 +354,12 @@ export default function ProxyHostsClient({
         <HStack gap={3} vAlign="center">
           <Icon icon={Globe} size="sm" color={host.enabled ? "success" : "disabled"} />
           <VStack gap={0} className="cpm-cell-lines">
-            <Text type="body" size="sm" weight="semibold">
-              {host.name}
-            </Text>
+            <HStack gap={1} vAlign="center">
+              <Text type="body" size="sm" weight="semibold">
+                {host.name}
+              </Text>
+              <HostNotesHint notes={host.description} />
+            </HStack>
             <Tooltip content={host.domains.join(", ")}>
               <Text type="code" size="xsm" color="secondary" maxLines={1}>
                 {summarize(host.domains)}
@@ -505,6 +509,11 @@ export default function ProxyHostsClient({
           <Text type="code" size="xsm" color="secondary" maxLines={1}>
             {summarize(host.domains)} &rarr; {host.upstreams[0]}
           </Text>
+          {host.description && (
+            <Text type="body" size="xsm" color="secondary" maxLines={2}>
+              {host.description}
+            </Text>
+          )}
           <HStack gap={2} vAlign="center">
             <StatusChip status={host.enabled ? "active" : "inactive"} />
             {host.certificateId && <Badge variant="info" label={t("tls")} />}
