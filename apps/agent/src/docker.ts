@@ -479,6 +479,62 @@ export class DockerHost {
   }
 
   /**
+   * Run a command against Caddy's storage, which only Caddy's user can read: a throwaway container
+   * of Caddy's image, with Caddy's volumes read-only and no network. Created, started and read back
+   * rather than `docker run`, which would need the attach endpoint the socket proxy doesn't open -
+   * the same steps validateCaddyConfig takes.
+   */
+  async runInCaddyStorage(argv: string[], timeoutSeconds = 30): Promise<CommandResult> {
+    const deadline = Date.now() + timeoutSeconds * 1000;
+    const remaining = () => Math.max(1, Math.round((deadline - Date.now()) / 1000));
+    const caddy = this.config.caddyContainerName;
+    const image = await run(["docker", "inspect", "--format", "{{.Image}}", caddy], {
+      timeoutSeconds: 15,
+    });
+    if (!image.ok || !image.output.trim().startsWith("sha256:")) {
+      return {
+        ok: false,
+        exitCode: -1,
+        output: "Caddy's container does not exist yet.",
+        timedOut: false,
+      };
+    }
+    const name = `cpm-caddy-storage-${randomUUID()}`;
+    try {
+      const create = await run(
+        [
+          "docker",
+          "create",
+          "--name",
+          name,
+          "--label",
+          "cpm.caddy-storage=1",
+          "--network",
+          "none",
+          "--cap-drop",
+          "ALL",
+          "--volumes-from",
+          `${caddy}:ro`,
+          "--entrypoint",
+          argv[0],
+          image.output.trim(),
+          ...argv.slice(1),
+        ],
+        { timeoutSeconds: remaining() },
+      );
+      if (!create.ok) return create;
+      const start = await run(["docker", "start", name], { timeoutSeconds: remaining() });
+      if (!start.ok) return start;
+      const wait = await run(["docker", "wait", name], { timeoutSeconds: remaining() });
+      if (!wait.ok) return wait;
+      const logs = await run(["docker", "logs", name], { timeoutSeconds: remaining() });
+      return { ...logs, ok: logs.ok && wait.output.trim() === "0" };
+    } finally {
+      await run(["docker", "rm", "--force", name], { timeoutSeconds: 15 });
+    }
+  }
+
+  /**
    * `caddy validate` on a config, run by the binary this host's Caddy runs, without loading it.
    *
    * A throwaway container from the Caddy container's own image, so a rebuilt Caddy validates with

@@ -23,6 +23,9 @@ import type {
   L4PortsStatus,
   LogReadRequest,
   LogReadResponse,
+  CaddyCertificate,
+  CertificateFileRequest,
+  CertificateFiles,
 } from "@cpm/shared";
 import { type DomainErrorCode, domainErrorMessage } from "../domain-error";
 import { pushDesiredState } from "./desired-state";
@@ -34,6 +37,8 @@ import {
   dispatchCaddyAdmin,
   dispatchCaddyValidate,
   dispatchLogRead,
+  dispatchCertificateList,
+  dispatchCertificateRead,
 } from "./registry";
 
 export class AgentUnavailableError extends Error {
@@ -236,6 +241,43 @@ export async function caddyValidateViaAgent(
       throw new AgentRequestError(error.message, error.status);
     throw error;
   }
+}
+
+function agentsWith(capability: "certificates" | "log-read") {
+  return connectedAgents().filter((agent) => agent.status?.capabilities?.includes(capability));
+}
+
+/**
+ * Every certificate in every reachable agent's Caddy storage. An agent that fails to answer is
+ * reported as such rather than failing the whole list: one wedged host shouldn't blank the page.
+ */
+export async function listAgentCertificates(): Promise<
+  { agentId: string; name: string; certificates: CaddyCertificate[] | null }[]
+> {
+  return await Promise.all(
+    agentsWith("certificates").map(async (agent) => {
+      try {
+        const response = await dispatchCertificateList(agent.agentId);
+        return {
+          agentId: agent.agentId,
+          name: agent.name,
+          certificates: JSON.parse(response.text) as CaddyCertificate[],
+        };
+      } catch {
+        return { agentId: agent.agentId, name: agent.name, certificates: null };
+      }
+    }),
+  );
+}
+
+/** One certificate's files from one agent's Caddy storage, or null if it isn't there. */
+export async function readAgentCertificate(
+  agentId: string,
+  request: CertificateFileRequest,
+): Promise<CertificateFiles | null> {
+  if (!agentsWith("certificates").some((agent) => agent.agentId === agentId)) return null;
+  const response = await dispatchCertificateRead(agentId, request);
+  return response.status === 200 ? (JSON.parse(response.text) as CertificateFiles) : null;
 }
 
 /** Connected agents that can serve the log viewer, which an older agent can't. */

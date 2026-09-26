@@ -26,6 +26,7 @@ import {
   type AgentServerEvent,
   CADDY_VALIDATE_REFUSED_STATUS,
   type CaddyValidateRequest,
+  type CertificateFileRequest,
   type LogReadRequest,
   type LogReadResponse,
   MANAGED_SERVICES,
@@ -53,6 +54,7 @@ import {
 } from "./controller-url";
 import type { AgentStore } from "./db";
 import { type DockerHost, tail } from "./docker";
+import { listCaddyCertificates, readCaddyCertificate } from "./certificates";
 import {
   CONTAINER_LOG_CURSOR,
   MAX_LOG_LINES,
@@ -588,6 +590,10 @@ export class AgentLifecycle {
   private async runCommand(command: AgentCommand): Promise<AgentCommandResult> {
     if (command.kind === "caddy-validate") return this.runValidate(command.id, command.request);
     if (command.kind === "log-read") return this.runLogRead(command.id, command.request);
+    if (command.kind === "certificate-list") return this.runCertificateList(command.id);
+    if (command.kind === "certificate-read") {
+      return this.runCertificateRead(command.id, command.request);
+    }
     if (!isAllowedAdminPath(command.request.path)) {
       return {
         id: command.id,
@@ -627,6 +633,27 @@ export class AgentLifecycle {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  private async runCertificateList(id: string): Promise<AgentCommandResult> {
+    const certificates = await listCaddyCertificates(this.deps.docker);
+    if (!certificates)
+      return { id, ok: false, code: "BUSY", error: "Caddy's storage is unreadable." };
+    return {
+      id,
+      ok: true,
+      response: { status: 200, text: JSON.stringify(certificates), headers: {} },
+    };
+  }
+
+  private async runCertificateRead(
+    id: string,
+    request: CertificateFileRequest,
+  ): Promise<AgentCommandResult> {
+    const files = await readCaddyCertificate(this.deps.docker, request);
+    return files
+      ? { id, ok: true, response: { status: 200, text: JSON.stringify(files), headers: {} } }
+      : { id, ok: true, response: { status: 404, text: "", headers: {} } };
   }
 
   /** A page of a log for the controller's log viewer. The answer is JSON in a 200's text. */

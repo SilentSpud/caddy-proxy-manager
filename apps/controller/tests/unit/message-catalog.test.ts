@@ -90,3 +90,25 @@ describe('message catalog', () => {
     }
   });
 });
+
+describe('message catalog source', () => {
+  it('names no key twice in one object, where the later would silently replace the earlier', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const text = readFileSync(join(import.meta.dir, '../../messages/en.json'), 'utf8');
+    const duplicates: string[] = [];
+    // JSON.parse keeps the last of a repeated key, so the keys are read off the text itself. Every
+    // string is a token, so a `{name}` placeholder inside a value never counts as a brace.
+    const stack: Set<string>[] = [];
+    for (const token of text.matchAll(/"((?:[^"\\]|\\.)*)"(\s*:)?|[{}]/g)) {
+      if (token[0] === '{') stack.push(new Set());
+      else if (token[0] === '}') stack.pop();
+      else if (token[2]) {
+        const keys = stack.at(-1);
+        if (keys?.has(token[1])) duplicates.push(token[1]);
+        keys?.add(token[1]);
+      }
+    }
+    expect(duplicates).toEqual([]);
+  });
+});

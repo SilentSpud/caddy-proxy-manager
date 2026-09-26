@@ -150,16 +150,24 @@ export async function startSimulatedAgent(
 
   function execute(command: AgentCommand): void {
     // Never sent: this agent lists no capabilities. Accepted anyway, as the in-memory Caddy would.
-    const response =
-      command.kind === "caddy-validate"
-        ? { status: 200, text: "Valid configuration", headers: {} }
-        : command.kind === "log-read"
-          ? {
-              status: 200,
-              text: JSON.stringify({ lines: [], cursor: null, missing: true }),
-              headers: {},
-            }
-          : caddy(command.request);
+    const answer = (text: string, status = 200) => ({ status, text, headers: {} });
+    let response: ReturnType<typeof answer>;
+    switch (command.kind) {
+      case "caddy-validate":
+        response = answer("Valid configuration");
+        break;
+      case "log-read":
+        response = answer(JSON.stringify({ lines: [], cursor: null, missing: true }));
+        break;
+      case "certificate-list":
+        response = answer("[]");
+        break;
+      case "certificate-read":
+        response = answer("", 404);
+        break;
+      default:
+        response = caddy(command.request);
+    }
     settleResults(DEMO_AGENT_ID, [{ id: command.id, ok: true, response }]);
   }
 

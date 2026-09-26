@@ -59,8 +59,13 @@ test.describe('Certificates', () => {
     try {
       // 3. Visit certificates page - the subdomain host should NOT appear in the ACME tab
       await page.goto('/certificates');
-      await expect(page.getByRole('button', { name: /acme/i })).toBeVisible();
-      await page.getByRole('button', { name: /acme/i }).click();
+      await expect(
+        page.getByRole('navigation', { name: 'Tabs' }).getByRole('button', { name: /acme/i }),
+      ).toBeVisible();
+      await page
+        .getByRole('navigation', { name: 'Tabs' })
+        .getByRole('button', { name: /acme/i })
+        .click();
 
       // The subdomain should not be listed as a separate ACME entry
       const acmeTab = page.getByRole('main');
@@ -118,8 +123,13 @@ test.describe('Certificates', () => {
 
       // 3. Visit certificates page - subdomain should be collapsed under the wildcard
       await page.goto('/certificates');
-      await expect(page.getByRole('button', { name: /acme/i })).toBeVisible();
-      await page.getByRole('button', { name: /acme/i }).click();
+      await expect(
+        page.getByRole('navigation', { name: 'Tabs' }).getByRole('button', { name: /acme/i }),
+      ).toBeVisible();
+      await page
+        .getByRole('navigation', { name: 'Tabs' })
+        .getByRole('button', { name: /acme/i })
+        .click();
 
       const acmeTab = page.getByRole('main');
       // The domain line is in three places: the hidden mobile card, the desktop table row, and
@@ -165,7 +175,10 @@ test.describe('Certificates', () => {
     try {
       await page.goto('/certificates');
       await waitForHydration(page);
-      await page.getByRole('button', { name: /imported/i }).click();
+      await page
+        .getByRole('navigation', { name: 'Tabs' })
+        .getByRole('button', { name: /imported/i })
+        .click();
 
       await expect(page.getByText(certName, { exact: true }).last()).toBeVisible({
         timeout: 10_000,
@@ -219,7 +232,10 @@ test.describe('Certificates', () => {
     try {
       await page.goto('/certificates');
       await waitForHydration(page);
-      await page.getByRole('button', { name: /imported/i }).click();
+      await page
+        .getByRole('navigation', { name: 'Tabs' })
+        .getByRole('button', { name: /imported/i })
+        .click();
 
       // Open the Import drawer. The "Add"/"Import" trigger varies by viewport,
       // so match any button that opens the import flow.

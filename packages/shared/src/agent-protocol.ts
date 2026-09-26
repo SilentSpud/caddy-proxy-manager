@@ -171,7 +171,7 @@ export type AgentStatus = {
   capabilities?: AgentCapability[];
 };
 
-export const AGENT_CAPABILITIES = ["caddy-validate", "log-read"] as const;
+export const AGENT_CAPABILITIES = ["caddy-validate", "log-read", "certificates"] as const;
 export type AgentCapability = (typeof AGENT_CAPABILITIES)[number];
 
 /**
@@ -270,6 +270,23 @@ export type LogReadRequest = {
   cursor?: string | null;
   limit?: number;
 };
+
+/** A certificate in Caddy's storage, as the Certificates page lists it. Never the key. */
+export type CaddyCertificate = {
+  /** The storage directory of the issuer, e.g. `acme-v02.api.letsencrypt.org-directory`. */
+  issuerKey: string;
+  /** The storage name, usually the domain. */
+  name: string;
+  /** Every DNS name and IP the certificate covers. */
+  names: string[];
+  issuer: string;
+  notBefore: string;
+  notAfter: string;
+  fingerprint: string;
+};
+
+export type CertificateFileRequest = { issuerKey: string; name: string; includeKey?: boolean };
+export type CertificateFiles = { certificatePem: string; keyPem?: string };
 
 export type LogReadResponse = {
   lines: string[];
@@ -558,6 +575,10 @@ export type AgentCommand = {
   | { kind: "caddy-validate"; request: CaddyValidateRequest }
   /** Likewise. Answered as a 200 whose text is a `LogReadResponse`. */
   | { kind: "log-read"; request: LogReadRequest }
+  /** Under the `certificates` capability: a 200 whose text is `CaddyCertificate[]`. */
+  | { kind: "certificate-list"; request: Record<string, never> }
+  /** Likewise: a 200 whose text is `CertificateFiles`, or a 404. */
+  | { kind: "certificate-read"; request: CertificateFileRequest }
 );
 
 /** Everything the controller can push down the stream. */

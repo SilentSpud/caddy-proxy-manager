@@ -25,6 +25,7 @@ import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
+import { ReachabilityDialog } from "@/components/certificates/ReachabilityDialog";
 import { HostNotesHint } from "@/components/proxy-hosts/HostNotesField";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
@@ -216,6 +217,7 @@ function HostActions({
   onEdit,
   onDuplicate,
   onDelete,
+  onTestReachability,
   canCreate,
 }: {
   host: ProxyHost;
@@ -223,6 +225,7 @@ function HostActions({
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onTestReachability: () => void;
   /** Duplicating makes a new host, so it goes with the Create button rather than with Edit. */
   canCreate: boolean;
 }) {
@@ -252,6 +255,7 @@ function HostActions({
                       `/logs?source=access&host=${encodeURIComponent(host.domains[0] ?? "")}`,
                     ),
                 },
+                { label: t("testReachability"), onClick: onTestReachability },
               ]
             : []),
           { type: "divider" },
@@ -295,6 +299,7 @@ export default function ProxyHostsClient({
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<ProxyHost | null>(null);
   const [deleteHost, setDeleteHost] = useState<ProxyHost | null>(null);
+  const [checkingHost, setCheckingHost] = useState<ProxyHost | null>(null);
   // Counter forces CreateHostDialog to remount on each open, resetting useFormState
   const [dialogKey, setDialogKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
@@ -504,6 +509,7 @@ export default function ProxyHostsClient({
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
           onEdit={() => setEditHost(host)}
           onDuplicate={() => openDuplicate(host)}
+          onTestReachability={() => setCheckingHost(host)}
           canCreate={canCreate}
           onDelete={() => setDeleteHost(host)}
         />
@@ -536,6 +542,7 @@ export default function ProxyHostsClient({
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
           onEdit={() => setEditHost(host)}
           onDuplicate={() => openDuplicate(host)}
+          onTestReachability={() => setCheckingHost(host)}
           canCreate={canCreate}
           onDelete={() => setDeleteHost(host)}
         />
@@ -681,6 +688,15 @@ export default function ProxyHostsClient({
           open={!!deleteHost}
           host={deleteHost}
           onClose={() => setDeleteHost(null)}
+        />
+      )}
+
+      {checkingHost && (
+        <ReachabilityDialog
+          open
+          hostId={checkingHost.id}
+          hostName={checkingHost.name}
+          onClose={() => setCheckingHost(null)}
         />
       )}
     </VStack>

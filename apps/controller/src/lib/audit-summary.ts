@@ -374,6 +374,18 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^User changed their password$/,
   },
   {
+    entityType: "certificate",
+    action: "certificate_renew_requested",
+    message: "certificateRenewRequested",
+    pattern: /^Asked Caddy to renew the certificate for (?<name>.+)$/s,
+  },
+  {
+    entityType: "certificate",
+    action: "certificate_key_exported",
+    message: "certificateKeyExported",
+    pattern: /^Downloaded the private key of the certificate for (?<name>.+)$/s,
+  },
+  {
     entityType: "backup",
     action: "backup_created",
     message: "backupCreated",

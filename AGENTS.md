@@ -86,10 +86,12 @@ consequences worth knowing before touching either side:
   for that agent (the Re-pair action), never the shared code.
 - **A command kind an agent has not listed in `AgentStatus.capabilities` must not be sent.** An
   older agent answers an unknown kind with silence, and the caller waits out the command timeout.
-  Two are listed today. `caddy-validate`: the agent runs `caddy validate` in a throwaway,
+  Three are listed today. `caddy-validate`: the agent runs `caddy validate` in a throwaway,
   network-less container from Caddy's image, which is how a WAF save is checked against the real
   Coraza (`lib/waf-dry-run.ts`) without loading anything. `log-read`: a page of the access, WAF or
   Caddy log for the log viewer, with a cursor the agent alone interprets (`apps/agent/src/logs.ts`).
+  `certificates`: `certificate-list` and `certificate-read` look into Caddy's storage from a
+  throwaway container mounting its volumes read-only (`apps/agent/src/certificates.ts`).
 - **An agent is less trusted than the controller.** Whatever one agent answers may only shape that
   agent's own config: Caddyfile snippets are adapted by the agent the document is loaded onto
   (`CaddyAdminRequest.agentId`), and the health monitor re-applies per agent. The unpinned "primary"
@@ -161,6 +163,21 @@ Keep in mind when touching it:
   two `:?` variables, so a variable the `caddy` or `clickhouse` definitions
   interpolate must also be forwarded under `agent.environment`, or the agent's compose sees its
   default.
+
+### Adding a DNS provider
+
+Only on request - each module grows the Caddy image. It must build against libdns v1 (Caddy
+2.10+), which many `caddy-dns/*` repositories still don't; check that before anything else. Then,
+in one commit:
+
+- the entry in `apps/controller/src/lib/dns-providers.ts` (`password` fields are encrypted at rest)
+  and its `settings.dnsProviders.<name>` labels in `en.json`;
+- the module path in `SHIPPED_CADDY_MODULES` (`packages/shared/src/caddy-modules.ts`), the
+  `CADDY_MODULES` ARG in `docker/caddy/Dockerfile`, and the import in `docker/caddy/tools.go`, with
+  its pin in `docker/caddy/go.mod` from `go get`;
+- a test in `tests/unit/dns-providers.test.ts` for the challenge JSON it emits;
+- its name in the provider list, and the count, in `apps/site/src/content/docs/features/certificates.mdx`
+  and `index.mdx`.
 
 ## User-facing text
 

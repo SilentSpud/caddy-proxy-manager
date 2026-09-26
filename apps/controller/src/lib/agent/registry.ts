@@ -30,6 +30,7 @@ import {
   type CaddyAdminProxyResponse,
   type CaddyValidateRequest,
   type LogReadRequest,
+  type CertificateFileRequest,
 } from "@cpm/shared";
 
 /** One attached agent. */
@@ -326,10 +327,24 @@ export function dispatchLogRead(
   return dispatch(agentId, { kind: "log-read", request });
 }
 
+/** Caddy's stored certificates, or one of them. Only for an agent listing `certificates`. */
+export function dispatchCertificateList(agentId: string): Promise<CaddyAdminProxyResponse> {
+  return dispatch(agentId, { kind: "certificate-list", request: {} });
+}
+
+export function dispatchCertificateRead(
+  agentId: string,
+  request: CertificateFileRequest,
+): Promise<CaddyAdminProxyResponse> {
+  return dispatch(agentId, { kind: "certificate-read", request });
+}
+
 type CommandBody =
   | { kind: "caddy-admin"; request: CaddyAdminProxyRequest }
   | { kind: "caddy-validate"; request: CaddyValidateRequest }
-  | { kind: "log-read"; request: LogReadRequest };
+  | { kind: "log-read"; request: LogReadRequest }
+  | { kind: "certificate-list"; request: Record<string, never> }
+  | { kind: "certificate-read"; request: CertificateFileRequest };
 
 function dispatch(agentId: string, body: CommandBody): Promise<CaddyAdminProxyResponse> {
   const connection = connections.get(agentId);

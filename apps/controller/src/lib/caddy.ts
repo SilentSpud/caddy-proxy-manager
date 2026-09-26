@@ -119,6 +119,8 @@ import {
 } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
 import { buildRedirectRoute } from "./caddy-redirects";
+import { evictedNames, withRenewalOverrides } from "./certificate-renewals";
+import { reachabilityRoute } from "./domain-reachability";
 import { type AccessListRuntime, buildAccessListHandlers } from "./access-list-rules";
 import {
   type CaddyModuleAvailability,
@@ -2831,7 +2833,7 @@ export async function buildTlsAutomation(
   return {
     tlsApp: {
       automation: {
-        policies: sortAutomationPoliciesBySubjectPriority(policies),
+        policies: sortAutomationPoliciesBySubjectPriority(withRenewalOverrides(policies)),
       },
     },
     managedCertificateIds,
@@ -3558,10 +3560,13 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
   if (mainRoutes.length > 0) {
     servers.cpm = {
       listen: hasTls ? [":80", ":443"] : [":80"],
-      routes: mainRoutes,
+      // First, so every domain pointed here answers the reachability check the same way.
+      routes: [reachabilityRoute(), ...mainRoutes],
       // Only disable automatic HTTPS if we have TLS automation policies
       // This allows Caddy to handle HTTP-01 challenges for managed certificates
-      ...(tlsApp ? {} : { automatic_https: { disable: true } }),
+      ...(tlsApp
+        ? evictedNames().length > 0 && { automatic_https: { skip_certificates: evictedNames() } }
+        : { automatic_https: { disable: true } }),
       ...(hasTls ? { tls_connection_policies: tlsConnectionPolicies } : {}),
       // Custom error pages (handle_errors)
       ...(errorRoutes.length > 0 ? { errors: { routes: errorRoutes } } : {}),
