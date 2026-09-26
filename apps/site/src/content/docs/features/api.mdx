@@ -6,7 +6,8 @@ description: Every resource under one GraphQL endpoint, with Bearer token authen
 import Demo from "../../../components/Demo.astro";
 import ApiExplorerDemo from "../../../demos/samples/ApiExplorerDemo";
 
-Everything the dashboard does, it does through an API you can use too.
+Most of what the dashboard does, it does through an API you can use too - certificates and
+agents are read-only there, and users are managed rather than created.
 
 <Demo title="The GraphQL API" note="Nothing leaves the page - the responses are canned.">
   <ApiExplorerDemo client:visible />

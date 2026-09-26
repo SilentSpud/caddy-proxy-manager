@@ -15,10 +15,10 @@ you what exists, and to hold the credentials that DNS challenges need.
 
 ## Automatic
 
-Every proxy host gets HTTPS by default through ACME - Let's Encrypt, ZeroSSL, or any directory you
-point it at. Caddy renews these on the agent, so the Certificates page lists which hosts use them
+Every proxy host gets HTTPS by default through ACME - Let's Encrypt, or any directory you point
+it at. Caddy renews these on the agent, so the Certificates page lists which hosts use them
 rather than an expiry date the controller never sees; imported certificates, whose PEM it holds,
-show their issuer and expiry, and the page counts down to the next one to lapse.
+show their expiry, and the page counts down to the next one to lapse.
 
 For an internal CA, set the ACME directory URL under **Settings → General → ACME Server** and supply its root
 so Caddy trusts it.
@@ -33,7 +33,8 @@ Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, netcup, deSEC, Dynu, acme-dns, 
 Credentials are encrypted at rest, and propagation delay and timeout are configurable per provider
 - netcup ships with slow-propagation defaults because it needs them.
 
-A provider can be overridden per certificate when one domain lives somewhere else.
+A provider can be overridden per certificate when one domain lives somewhere else - through the
+[API](../api/) only; the dashboard uses the global provider.
 
 :::note
 A DNS provider is a compiled-in Caddy module. If the one you want is greyed out, turn it on in
@@ -42,8 +43,8 @@ A DNS provider is a compiled-in Caddy module. If the one you want is greyed out,
 
 ## Manual imports
 
-Bring your own certificate and key. Expiry is tracked and surfaced the same way managed ones are,
-so an import that is about to lapse is visible rather than a surprise.
+Bring your own certificate and key. Expiry is tracked, and the page counts down to the next import
+to lapse, so one that is about to expire is visible rather than a surprise.
 
 ## The built-in CA
 

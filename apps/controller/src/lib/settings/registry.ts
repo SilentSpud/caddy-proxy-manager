@@ -293,6 +293,18 @@ export const caddyApiUrl = stringSetting({
   maxLength: 512,
 });
 
+export const caddyMonitorEnabled = booleanSetting({
+  name: "caddy_monitor_enabled",
+  env: "CADDY_MONITOR_ENABLED",
+  group: "application",
+  label: "Re-apply after a Caddy restart",
+  description:
+    "Watch every Caddy for a restart onto a config this controller did not send, and push its " +
+    "configuration back. Turn it off only on a controller sharing a Caddy it does not own, or " +
+    "the two push their own idea of the config at each other every pass.",
+  default: true,
+});
+
 export const gravatarEnabled = booleanSetting({
   name: "avatar_gravatar",
   env: "AVATAR_GRAVATAR",
@@ -337,8 +349,9 @@ export const updateCheckEnabled = booleanSetting({
   group: "application",
   label: "Check for updates",
   description:
-    "Ask the registry below, a few times a day, whether a newer release has been published. The " +
-    "only request this app makes to the internet on its own; turn it off to make none.",
+    "Ask the registry below, a few times a day, whether a newer release has been published. Turn " +
+    "it off to make no such request; the CRS plugin registry check and GeoIP downloads have " +
+    "switches of their own.",
   default: true,
 });
 
@@ -636,6 +649,7 @@ export const SETTING_DEFINITIONS = [
   appName,
   baseUrl,
   caddyApiUrl,
+  caddyMonitorEnabled,
   gravatarEnabled,
   forwardAuthInternalUrl,
   caddyBuildTimeout,

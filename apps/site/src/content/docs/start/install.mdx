@@ -18,7 +18,7 @@ One compose file and two generated secrets. Everything else is entered in the br
    it into a directory of its own:
 
    ```bash
-   VERSION=v3.2.1   # the release you downloaded
+   VERSION=v3.3.0   # the release you downloaded
    mkdir caddy-proxy-manager && cd caddy-proxy-manager
    tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
    ```
@@ -97,18 +97,19 @@ not in the archive, so it is left alone; the compose file is replaced with one n
 images.
 
 ```bash
-VERSION=v3.2.1   # the release you are moving to
+VERSION=v3.3.0   # the release you are moving to
 tar -xzf ~/Downloads/caddy-proxy-manager-$VERSION-deploy.tar.gz
 docker compose pull
 docker compose up -d
 ```
 
-Settings reports when a newer release is published to the registry you pull from. That check is the
-only request the app makes to the internet on its own, and it can be switched off.
+Settings reports when a newer release is published to the registry you pull from. It can be switched
+off; the only other requests the app makes to the internet on its own are the CRS plugin registry
+check and the GeoIP downloads, each with a switch of its own.
 
 ### From PostgreSQL 17
 
-The bundled database moved from PostgreSQL 17 to 18 during the 3.0 beta. PostgreSQL does not read
+The bundled database moved from PostgreSQL 17 to 18 during the 3.0 release candidates. PostgreSQL does not read
 another major version's data files, so this one upgrade is a dump and restore rather than a pull.
 It applies if your `docker-compose.yml` still says `image: postgres:17-alpine`.
 

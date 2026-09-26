@@ -560,7 +560,7 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
  */
 export type TailscaleHostConfig = {
   serve: boolean;
-  /** Tailnet machine name. Empty means the node named in Settings → Tailscale. */
+  /** Tailnet machine name. Empty means the node named in Settings → Network → Tailscale. */
   node: string;
   /** Keep the host off the public :80/:443 listener, so it exists only on the tailnet. */
   tailnetOnly: boolean;

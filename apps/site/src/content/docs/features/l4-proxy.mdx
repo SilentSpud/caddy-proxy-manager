@@ -18,7 +18,11 @@ an SSH endpoint, anything that speaks its own protocol.
 
 - **Port** - the listening port on the Caddy host.
 - **TLS SNI** - several TLS backends can share one port, routed by the name in the handshake. This
-  works without terminating TLS, so the certificate stays with the backend.
+  works without terminating TLS, so the certificate stays with the backend - though a host can
+  terminate TLS itself when that is what you want.
+- **HTTP Host** - plain-HTTP backends share a port the same way, routed by the Host header.
+- **PROXY protocol** - connections that arrive wrapped in a PROXY protocol header, from a load
+  balancer in front of Caddy.
 
 <Demo title="The L4 host editor" note="Create one or edit the sample. Saving shows what the form would send.">
   <L4HostEditorDemo client:visible />
@@ -26,14 +30,16 @@ an SSH endpoint, anything that speaks its own protocol.
 
 ## PROXY protocol
 
-Both v1 and v2, so the backend sees the real client address instead of Caddy's. The backend has to
+Sent to the backend in v1 or v2, so it sees the real client address instead of Caddy's, and
+accepted from a load balancer in front for the same reason. The backend has to
 be configured to expect it - sending PROXY protocol to something that is not listening for it
 breaks the connection outright.
 
 ## Load balancing and health
 
-Seven selection policies, with active and passive health checks in the same shape the
-[HTTP hosts](../reverse-proxy/) use.
+Seven selection policies, with active and passive health checks - a smaller set than the
+[HTTP hosts](../reverse-proxy/) have, since a stream has no URI or status to check: port, interval
+and timeout for active checks, fail duration and max fails for passive ones, and no retries.
 
 ## Geo blocking below HTTP
 
@@ -45,7 +51,8 @@ send, so a blocked connection is closed rather than answered.
 A published port has to exist on the container, and container ports are fixed when the container is
 created. Adding an L4 host therefore needs the Caddy container recreated - the [agent](../agent/)
 writes a compose override with the new port list and recreates Caddy, so the port appears without
-you editing a compose file. The dashboard shows when a port change is pending a recreate.
+you editing a compose file. The dashboard shows when a port change is pending, and **Apply Ports**
+is what recreates the container - it is not done behind your back.
 
 :::note
 Layer 4 is a compiled-in Caddy module. If L4 hosts are greyed out, turn the module on in

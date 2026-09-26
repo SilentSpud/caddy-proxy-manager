@@ -1,21 +1,29 @@
 name: DNS challenge provider request
-description: Suggest a new provider for certificate DNS challenge
+description: Suggest a new provider for the DNS-01 certificate challenge
 labels: [dns provider request]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Certificates are issued by Caddy, so a provider needs a Caddy DNS module. Most live under
+        [caddy-dns](https://github.com/caddy-dns) and build on a [libdns](https://github.com/libdns)
+        package; one that exists is a day's work to add, one that does not is a request to those
+        projects first.
+
   - type: input
     id: provider
     attributes:
       label: What provider would you like to see added?
       description: The name of the DNS provider.
-      placeholder: "e.g. Namecheap"
+      placeholder: "e.g. Bunny.net"
     validations:
       required: true
 
   - type: input
-    id: certbot_plugin
+    id: caddy_module
     attributes:
-      label: Does a certbot plugin exist?
-      description: A certbot plugin is required. Search [PyPI](https://pypi.org) for `certbot-dns-<provider>`.
-      placeholder: "e.g. certbot-dns-namecheap"
+      label: Which Caddy DNS module provides it?
+      description: The Go module path, if one exists.
+      placeholder: "e.g. github.com/caddy-dns/bunny"
     validations:
       required: true

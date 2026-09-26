@@ -237,6 +237,10 @@ export default function SettingsClient({
   // One action for both, told apart by the block the form posts with its values.
   const [instanceState, instanceFormAction] = useActionState(updateRegistrySettingsAction, null);
   const [signInState, signInFormAction] = useActionState(updateRegistrySettingsAction, null);
+  const [agentRegistryState, agentRegistryFormAction] = useActionState(
+    updateRegistrySettingsAction,
+    null,
+  );
   const [passwordPolicyState, passwordPolicyFormAction] = useActionState(
     updatePasswordPolicySettingsAction,
     null,
@@ -326,7 +330,17 @@ export default function SettingsClient({
         checkDns={checkDashboardDnsAction}
       />
     ),
-    agent: <AgentSection agents={agents} pairingHost={pairingHostFor(dashboard)} />,
+    agent: (
+      <>
+        <AgentSection agents={agents} pairingHost={pairingHostFor(dashboard)} />
+        <RegistrySettingsBlock
+          block="agent"
+          fields={registry.agent ?? []}
+          state={agentRegistryState}
+          formAction={agentRegistryFormAction}
+        />
+      </>
+    ),
     instance: (
       <RegistrySettingsBlock
         block="instance"

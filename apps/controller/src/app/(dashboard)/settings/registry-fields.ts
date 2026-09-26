@@ -22,6 +22,7 @@ import {
   authRateLimitMax,
   authRateLimitWindow,
   baseUrl,
+  caddyMonitorEnabled,
   disableLocalUsers,
   loginBlockMs,
   loginMaxAttempts,
@@ -40,6 +41,7 @@ type AnySetting = SettingDefinition<SettingValue>;
 /** The blocks that render them, in the order each block lists its settings. */
 const BLOCKS: Record<string, readonly AnySetting[]> = {
   instance: [appName, baseUrl] as AnySetting[],
+  agent: [caddyMonitorEnabled] as AnySetting[],
   "sign-in": [
     allowSelfRegistration,
     allowOauthRegistration,

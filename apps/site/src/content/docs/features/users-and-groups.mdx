@@ -13,8 +13,8 @@ import SignInDemo from "../../../demos/samples/SignInDemo";
 | ---------- | ------ | ---- | -------- | ----- |
 | Log in to the dashboard | Yes | Yes | Yes | Yes |
 | Access forward-auth apps (when granted) | Yes | Yes | Yes | Yes |
-| Manage hosts and agents | No | No | Only what their groups were granted | Yes |
-| Create or delete hosts | No | No | No | Yes |
+| Manage hosts and agents - edit, enable, delete | No | No | Only what their groups were granted | Yes |
+| Create hosts | No | No | No | Yes |
 | Manage certificates and access lists | No | No | No | Yes |
 | Manage users, groups and settings | No | No | No | Yes |
 | View analytics and the audit log | No | No | No | Yes |
@@ -30,15 +30,15 @@ makes grants safe to add: viewer and user gain nothing from a grant, so creating
 widen an existing account. Someone has to be made an operator deliberately.
 
 Grants apply to the dashboard. The management endpoints under `/api/v1/` stay admin-only - an
-operator's [API token](../rest-api/) gets the same user-scoped endpoints a user's does.
+operator's [API token](../api/) gets the same user-scoped endpoints a user's does.
 
 ## Groups
 
 Groups are lists of users doing two jobs:
 
 1. Gating access to [forward-auth](../forward-auth/) protected apps.
-2. Deciding what an operator may manage, through **Groups → Access**: tick the proxy hosts, L4
-   hosts and agents the group should reach, then choose the capability.
+2. Deciding what an operator may manage, through **Groups → Access**: choose the capability - manage, or
+   view only - then tick the proxy hosts, L4 hosts and agents the group should reach.
 
 <Demo title="Groups → Access" note="Open Access, change the grants and save; the card reads back what an operator in the group gets.">
   <GroupAccessDemo client:visible />

@@ -20,13 +20,12 @@ import WafDemo from "../../../demos/samples/WafDemo";
   <WafEventLogDemo client:visible />
 </Demo>
 
-## Two modes
+## Block, or only detect
 
-- **Block** - matching requests are rejected with 403.
-- **Detect** - matching requests are logged and allowed through.
-
-Detect first is the usual order. It tells you what the rules would have done to your traffic before
-they start doing it.
+On, matching requests are rejected with 403. The global settings also take a detection-only mode
+through the [API](../api/) - `waf.mode` set to `DetectionOnly` - in which matching requests are
+logged and allowed through. Detect first is the usual order: it tells you what the rules would
+have done to your traffic before they start doing it.
 
 ## The rule set
 
@@ -36,10 +35,12 @@ and more. It is enabled by default when the WAF is on.
 ## When a rule is wrong
 
 Real applications trip generic rules. Two ways out, both from the event detail panel beside the
-list or the Suppressed Rules tab:
+list:
 
-- **Suppress globally** - the rule stops firing everywhere.
-- **Suppress for one host** - it keeps protecting everything else.
+- **Suppress Globally** - the rule stops firing everywhere. The Suppressed Rules tab lists these,
+  and takes a rule id typed in by hand.
+- **Suppress for the host** - it keeps protecting everything else. A host's suppressions are also
+  edited in its WAF card.
 
 ## Presets
 
@@ -62,7 +63,7 @@ anything still selects it; the error names what does.
 
 The [CRS plugin registry](https://github.com/coreruleset/plugin-registry) lists plugins for the
 Core Rule Set: rule exclusions for WordPress, Nextcloud, Drupal, phpMyAdmin and other applications,
-and extra detections. **WAF → Plugins** lists the registry with who maintains each plugin, how far
+and extra detections. **WAF → Plugins** lists the registry with whether each plugin is official or third party, how far
 it has been tested and its license, and installs one with a click.
 
 Installing fetches the plugin's latest release from its GitHub repository - or the newest commit,
@@ -93,7 +94,7 @@ Each registry is re-read on the interval set there (daily by default, 0 for only
 One that cannot run here is greyed out and marked **Unsupported**, with the reason on hover. A
 release is checked once: later checks only look for a newer one.
 
-Some plugins cannot run here, and are refused - both by the check and at install:
+Some plugins cannot run here, and are refused by the check and at install:
 
 - A rule that reads a file - a Lua script (`@inspectFile`), a data file (`@pmFromFile`,
   `@ipMatchFromFile`) or a GeoIP database (`@geoLookup`). Caddy runs on your agents and only has
@@ -103,10 +104,10 @@ Some plugins cannot run here, and are refused - both by the check and at install
   the whole config, for every host.
 - A rule id outside the range the registry gave the plugin. That range is what keeps a plugin
   from redefining a CRS rule, which would stop Caddy loading its config.
-- A rule id range that overlaps a plugin already installed. Registries allocate ranges
-  independently, so two of them can clash.
-- A directive other than `SecRule`, `SecAction`, `SecMarker` and the `SecRuleRemove*` and
-  `SecRuleUpdateTarget*` exclusions, or `ctl:ruleEngine`.
+- A rule id range that overlaps a plugin already installed - checked at install, since registries
+  allocate ranges independently and two of them can clash.
+- A directive other than `SecRule`, `SecAction`, `SecMarker` and the `SecRuleRemoveById`,
+  `SecRuleRemoveByTag` and `SecRuleUpdateTargetBy*` exclusions, or `ctl:ruleEngine`.
 
 An install, an update and a configuration edit also go through the checks in
 [Before anything is saved](#before-anything-is-saved), Caddy's own included. A plugin that gets
@@ -115,8 +116,9 @@ checked while no agent could run Caddy - and Coraza building the WAF is part of 
 config, so one such plugin would stop every host's config from loading. When that happens the
 plugin is found and switched off, and the config loads without it: hosts that select it keep the
 rest of their WAF.
-The plugin is marked **Disabled**, with the reason and a **Retry** button in its row, and the
-audit log records it. Updating it or editing its configuration tries it again.
+The plugin is marked **Disabled** in its row, the audit log records it, and opening the plugin
+shows what happened with a **Retry** button. Updating it or editing its configuration tries it
+again too.
 
 :::caution
 The registry records who vetted a plugin; it is not a code audit. A plugin's rules run in front of
@@ -124,7 +126,7 @@ every host that selects it, so install what you would be willing to paste into a
 :::
 
 The controller needs outbound HTTPS to `api.github.com`, `raw.githubusercontent.com` and any
-registry you add. GitHub allows 60 unauthenticated API requests an hour: an install takes about
+registry you add. GitHub allows 60 unauthenticated API requests an hour: an install takes two or
 three, and a first check of the OWASP registry most of them. A GitHub token in the registry
 settings - one with no scopes - raises that to 5,000. It is stored encrypted and sent only to
 `api.github.com`.
@@ -160,11 +162,11 @@ before they are stored - custom directives, presets and a CRS plugin's files ali
 - **On save.** The agent has its own Caddy validate the WAFs the change produces - the edited one,
   and every host that merges or selects it - without loading them. This is what catches the rest:
   a rule id the CRS already uses, rules from the global settings and a host colliding once merged,
-  or a pattern Go refuses to compile. The error names the host and quotes Coraza.
+  or a pattern Go refuses to compile. The error says which WAF was refused and quotes Coraza.
 
 The second check runs in a short-lived container from the Caddy image, with no network, and takes
-a second or two. It needs a paired agent with Caddy started; without one the save goes ahead on
-the first check alone.
+a second or two. It needs a paired agent whose Caddy container exists; without one the save goes
+ahead on the first check alone.
 
 ## The event log
 

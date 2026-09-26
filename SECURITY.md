@@ -34,7 +34,7 @@ Our CI/CD pipeline implements multiple security layers:
    end-to-end suites and never touches the registry, so there is no build-and-push path for
    untrusted code to reach.
 2. **Only a release tag on `main` publishes**: `release.yml` tags a release when `package.json`'s
-   version changes on `main`, then dispatches the image build at that tag. The build's first job
+   version changes on `main`, then dispatches the image build at that tag and the docs site build on `main`. The build's first job
    refuses any ref that is not a `vX.Y.Z` tag whose commit is reachable from `main`, so a manual
    dispatch on a branch publishes nothing. Anyone who can push tags can still start a build, but
    only of a commit that already landed on `main`.
@@ -150,11 +150,11 @@ Once setup completes the flag is stored, and the setup screens redirect away for
 ### Controller and Agent
 
 The agent dials the controller; the controller never dials the agent. Pairing, the event stream
-(`/api/agent/v1/events`, one SSE stream per agent), status reports, command results
-(`POST /api/agent/v1/command-results`), relayed analytics events and the GeoLite2 download are all agent-to-controller
-requests. Configuration goes down the stream as desired state. A Caddy admin call is the one
-command the controller waits on: it goes down the stream with a correlation id, and the agent posts
-the answer back.
+(a GraphQL subscription at `/api/graphql`, delivered as SSE, one per agent), status reports, command
+results and relayed analytics events (mutations on the same endpoint) and the GeoLite2 download are
+all agent-to-controller requests. Configuration goes down the stream as desired state. A Caddy admin
+call is the one command the controller waits on: it goes down the stream with a correlation id, and
+the agent posts the answer back.
 
 Those requests are signed rather than bearer-authenticated. Each carries an HMAC-SHA256, keyed by
 the pairing secret, over the method, path, timestamp, a nonce and a hash of the body:

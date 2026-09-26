@@ -141,6 +141,7 @@ export default defineConfig({
           label: "Operations",
           items: [
             { label: "Analytics", slug: "features/analytics" },
+            { label: "Settings", slug: "features/settings" },
             { label: "Users, roles & groups", slug: "features/users-and-groups" },
             { label: "The agent", slug: "features/agent" },
             { label: "Caddy Build", slug: "features/caddy-build" },

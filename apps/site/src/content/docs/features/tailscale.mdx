@@ -26,7 +26,7 @@ the container's environment.
 | **Tags** | ACL tags applied at registration. Most reusable keys need at least one, e.g. `tag:caddy` |
 | **Control server URL** | Point at Headscale or another coordination server. Empty uses Tailscale's own |
 | **State directory** | Where each node keeps its identity. Keep it on a volume, or every restart registers a new machine |
-| **Ephemeral** | Nodes leave the tailnet when Caddy stops rather than lingering as offline machines |
+| **Register nodes as ephemeral** | Nodes leave the tailnet when Caddy stops rather than lingering as offline machines |
 
 ## Per host
 
@@ -46,7 +46,7 @@ the certificate for that name from Tailscale - no ACME, no DNS provider, nothing
 tailnet login, with the same protected and excluded path lists the other authentication
 integrations use. The identity can be forwarded upstream as headers.
 
-**Proxy to a tailnet backend** reaches a service that only exists on the tailnet, without exposing
+**Reach upstreams over the tailnet** reaches a service that only exists on the tailnet, without exposing
 it anywhere else.
 
 ## Fail-closed
@@ -59,5 +59,4 @@ listener. Falling back would expose a service deliberately kept private.
 
 Separately from serving hosts, an [agent](../agent/) can reach its controller across a tailnet -
 it only needs an outbound route, so point `CONTROLLER_URL` at the controller's tailnet address.
-Tested against a real tailnet: pairing, the event stream and long-lived connections all behave as
-they do on a flat network.
+Pairing, the event stream and long-lived connections behave as they do on a flat network.

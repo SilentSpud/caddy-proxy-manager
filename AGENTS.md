@@ -61,8 +61,11 @@ build) opens every page and fails if a demo does not hydrate or throws while it 
 
 ## The agent connects inwards
 
-The agent dials the controller and holds one SSE stream open (`/api/agent/v1/events`); the
-controller never dials the agent. Three consequences worth knowing before touching either side:
+The agent dials the controller and holds one GraphQL subscription open at `/api/graphql`,
+delivered as SSE; the controller never dials the agent. Status, command results and analytics go
+back as mutations to the same endpoint, and pairing is the one plain REST route
+(`/api/agent/v1/pair`), because it runs before the secret every signed call needs exists. Three
+consequences worth knowing before touching either side:
 
 - **`lib/agent/registry.ts` is the only way to reach an agent.** It is in-memory, because a
   connection is a property of *this* process. "Configured" and "reachable" are therefore the same
@@ -71,7 +74,7 @@ controller never dials the agent. Three consequences worth knowing before touchi
 - **Everything is desired state except Caddy admin.** The controller pushes the full desired state
   and the agent diffs it against what it has applied, so a dropped stream costs only a reconnect.
   The one exception is a Caddy admin call, which the controller blocks on: it goes down the stream
-  with a correlation id and comes back via `POST /api/agent/v1/command-results`.
+  with a correlation id and comes back through the `agentCommandResults` mutation.
 - **The bundled agent pairs itself.** While no bundled agent is paired, the controller writes a
   single-use token to its data volume at startup (`lib/agent/bootstrap.ts`), mode 0640, which
   expires in 30 minutes and is deleted on redemption; the agent mounts that volume read-only at

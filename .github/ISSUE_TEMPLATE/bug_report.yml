@@ -1,13 +1,12 @@
 name: Bug report
-description: Create a report to help us improve
+description: Something Caddy Proxy Manager does wrong
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        **Are you in the right place?**
-        - If you are looking for support, please use [Discussions](https://github.com/silentspud/caddy-proxy-manager/discussions).
-        - If you think you found a bug with Caddy Proxy Manager, you are in the *right place*.
+        Check the [documentation](https://silentspud.github.io/caddy-proxy-manager/) first - the install and feature pages cover the
+        common surprises. If you have, and it still looks wrong, you are in the right place.
 
   - type: checkboxes
     id: checklist
@@ -18,11 +17,11 @@ body:
           required: true
 
   - type: input
-    id: docker_digest
+    id: version
     attributes:
-      label: Docker image SHA256 digest
-      description: Run `docker inspect --format='{{index .RepoDigests 0}}' <container>` to get the exact digest.
-      placeholder: "e.g. sha256:abc123..."
+      label: Version
+      description: The release tag, or the image digest from `docker inspect --format='{{index .RepoDigests 0}}' <container>` for a `latest` deployment.
+      placeholder: "e.g. v3.0.0 or sha256:abc123..."
     validations:
       required: true
 
@@ -30,7 +29,7 @@ body:
     id: description
     attributes:
       label: Describe the bug
-      description: A clear and concise description of what the bug is.
+      description: What happened, and what you expected instead.
     validations:
       required: true
 
@@ -38,20 +37,11 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: Provide detailed steps so we can reproduce the issue.
+      description: Enough detail to see it ourselves.
       placeholder: |
         1. Go to '...'
         2. Click on '....'
-        3. Scroll down to '....'
-        4. See error
-    validations:
-      required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected behavior
-      description: A clear and concise description of what you expected to happen.
+        3. See error
     validations:
       required: true
 
@@ -59,7 +49,7 @@ body:
     id: screenshots
     attributes:
       label: Screenshots
-      description: If applicable, drag and drop screenshots here to help explain your problem.
+      description: If applicable, drag and drop screenshots here.
 
   - type: input
     id: os
@@ -70,24 +60,20 @@ body:
     validations:
       required: true
 
-  - type: checkboxes
-    id: docker_compose
+  - type: dropdown
+    id: deployment
     attributes:
-      label: Docker Compose
+      label: Deployment
       options:
-        - label: I have NOT modified the default docker-compose.yml
-          required: false
-        - label: I HAVE modified the docker-compose.yml (please describe modifications below)
-          required: false
-
-  - type: textarea
-    id: compose_modifications
-    attributes:
-      label: Docker Compose modifications
-      description: If you checked "I HAVE modified", describe what you changed.
+        - The bundled docker-compose.yml, unmodified
+        - The bundled docker-compose.yml, modified (describe below)
+        - A remote agent on another host
+        - Something else (describe below)
+    validations:
+      required: true
 
   - type: textarea
     id: context
     attributes:
       label: Additional context
-      description: Docker version, docker-compose.yml, logs, browser version, etc. Too much info is better than too little.
+      description: Compose modifications, `.env` with secrets removed, container logs, browser version. Too much is better than too little.
