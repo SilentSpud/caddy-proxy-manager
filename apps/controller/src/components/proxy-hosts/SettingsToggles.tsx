@@ -9,15 +9,42 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { useTranslations } from "next-intl";
 
+type ToggleKey =
+  | "sslForced"
+  | "hstsEnabled"
+  | "hstsSubdomains"
+  | "allowWebsocket"
+  | "preserveHostHeader"
+  | "skipHttpsHostnameValidation";
+
 type ToggleSetting = {
-  stateKey: "hstsSubdomains" | "skipHttpsHostnameValidation";
-  fieldName: "hstsSubdomains" | "skipHttpsHostnameValidation";
-  labelKey: "hstsSubdomains" | "skipHttpsValidation";
-  descriptionKey: "hstsSubdomainsHelp" | "skipHttpsValidationHelp";
+  key: ToggleKey;
+  labelKey:
+    | "forceHttps"
+    | "hsts"
+    | "hstsSubdomains"
+    | "websocketSupport"
+    | "preserveHostHeader"
+    | "skipHttpsValidation";
+  descriptionKey:
+    | "forceHttpsHelp"
+    | "hstsHelp"
+    | "hstsSubdomainsHelp"
+    | "websocketSupportHelp"
+    | "preserveHostHeaderHelp"
+    | "skipHttpsValidationHelp";
+  /** Only meaningful while this other toggle is on; disabled (and so submitted off) otherwise. */
+  requires?: ToggleKey;
+  /** Hidden on the managed dashboard host, which derives these from its own settings. */
+  hostOnly?: boolean;
 };
 
 type SettingsTogglesProps = {
+  sslForced?: boolean;
+  hstsEnabled?: boolean;
   hstsSubdomains?: boolean;
+  allowWebsocket?: boolean;
+  preserveHostHeader?: boolean;
   skipHttpsValidation?: boolean;
   enabled?: boolean;
   /**
@@ -27,33 +54,68 @@ type SettingsTogglesProps = {
   showEnabled?: boolean;
 };
 
+// HSTS follows NPM: it pins browsers to HTTPS, which is only safe once HTTP is redirected.
 const SETTINGS: ToggleSetting[] = [
+  { key: "sslForced", labelKey: "forceHttps", descriptionKey: "forceHttpsHelp", hostOnly: true },
   {
-    stateKey: "hstsSubdomains",
-    fieldName: "hstsSubdomains",
-    labelKey: "hstsSubdomains",
-    descriptionKey: "hstsSubdomainsHelp",
+    key: "hstsEnabled",
+    labelKey: "hsts",
+    descriptionKey: "hstsHelp",
+    requires: "sslForced",
+    hostOnly: true,
   },
   {
-    stateKey: "skipHttpsHostnameValidation",
-    fieldName: "skipHttpsHostnameValidation",
+    key: "hstsSubdomains",
+    labelKey: "hstsSubdomains",
+    descriptionKey: "hstsSubdomainsHelp",
+    requires: "hstsEnabled",
+  },
+  {
+    key: "allowWebsocket",
+    labelKey: "websocketSupport",
+    descriptionKey: "websocketSupportHelp",
+    hostOnly: true,
+  },
+  {
+    key: "preserveHostHeader",
+    labelKey: "preserveHostHeader",
+    descriptionKey: "preserveHostHeaderHelp",
+    hostOnly: true,
+  },
+  {
+    key: "skipHttpsHostnameValidation",
     labelKey: "skipHttpsValidation",
     descriptionKey: "skipHttpsValidationHelp",
   },
 ];
 
 export function SettingsToggles({
+  sslForced = true,
+  hstsEnabled = true,
   hstsSubdomains = true,
+  allowWebsocket = true,
+  preserveHostHeader = true,
   skipHttpsValidation = false,
   enabled = true,
   showEnabled = true,
 }: SettingsTogglesProps) {
   const t = useTranslations("proxyHosts");
   const [values, setValues] = useState({
+    sslForced,
+    hstsEnabled,
     hstsSubdomains,
+    allowWebsocket,
+    preserveHostHeader,
     skipHttpsHostnameValidation: skipHttpsValidation,
     enabled,
   });
+  const settings = showEnabled ? SETTINGS : SETTINGS.filter((setting) => !setting.hostOnly);
+  // Walks the `requires` chain. A prerequisite that isn't rendered (the dashboard host has no HSTS
+  // toggle) never blocks.
+  const isBlocked = (setting: ToggleSetting): boolean => {
+    const parent = settings.find((s) => s.key === setting.requires);
+    return parent !== undefined && (!values[parent.key] || isBlocked(parent));
+  };
 
   const handleChange = (name: keyof typeof values) => (checked: boolean) =>
     setValues((prev) => ({ ...prev, [name]: checked }));
@@ -91,21 +153,25 @@ export function SettingsToggles({
             {t("advancedOptions")}
           </Text>
           <Divider />
-          {SETTINGS.map((setting, index) => (
-            <VStack key={setting.stateKey} gap={3}>
-              {index > 0 && <Divider />}
-              <input type="hidden" name={`${setting.fieldName}Present`} value="1" />
-              <Switch
-                label={t(setting.labelKey)}
-                description={t(setting.descriptionKey)}
-                htmlName={setting.fieldName}
-                labelPosition="start"
-                labelSpacing="spread"
-                value={values[setting.stateKey]}
-                onChange={handleChange(setting.stateKey)}
-              />
-            </VStack>
-          ))}
+          {settings.map((setting, index) => {
+            const blocked = isBlocked(setting);
+            return (
+              <VStack key={setting.key} gap={3}>
+                {index > 0 && <Divider />}
+                <input type="hidden" name={`${setting.key}Present`} value="1" />
+                <Switch
+                  label={t(setting.labelKey)}
+                  description={t(setting.descriptionKey)}
+                  htmlName={setting.key}
+                  labelPosition="start"
+                  labelSpacing="spread"
+                  value={blocked ? false : values[setting.key]}
+                  isDisabled={blocked}
+                  onChange={handleChange(setting.key)}
+                />
+              </VStack>
+            );
+          })}
         </VStack>
       </Card>
     </VStack>

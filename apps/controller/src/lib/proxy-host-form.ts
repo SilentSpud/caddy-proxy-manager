@@ -785,7 +785,11 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
   const boolField = (key: string) =>
     formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined;
   return {
+    sslForced: boolField("sslForced"),
+    hstsEnabled: boolField("hstsEnabled"),
     hstsSubdomains: boolField("hstsSubdomains"),
+    allowWebsocket: boolField("allowWebsocket"),
+    preserveHostHeader: boolField("preserveHostHeader"),
     skipHttpsHostnameValidation: boolField("skipHttpsHostnameValidation"),
     customPreHandlersJson: formData.has("customPreHandlersJson")
       ? parseOptionalText(formData.get("customPreHandlersJson"))

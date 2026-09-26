@@ -12,12 +12,29 @@ import LoadBalancerDemo from "../../../demos/samples/LoadBalancerDemo";
 import LocationRulesDemo from "../../../demos/samples/LocationRulesDemo";
 import RedirectsDemo from "../../../demos/samples/RedirectsDemo";
 import UpstreamDnsDemo from "../../../demos/samples/UpstreamDnsDemo";
+import HostTogglesDemo from "../../../demos/samples/HostTogglesDemo";
 
 A proxy host maps one or more domains onto one or more upstreams. It is the thing this product is
 mostly for, and most of the other features attach to it.
 
 <Demo title="The proxy host list" note="Sort by domain or status, or switch to the enabled or disabled hosts.">
   <ProxyHostsTableDemo client:visible />
+</Demo>
+
+## HTTPS and connection options
+
+Each host has switches at the top of its editor:
+
+- **Force HTTPS** answers plain HTTP with a 308 redirect to the same URL over HTTPS.
+- **HSTS** tells browsers to use only HTTPS for the host for two years, optionally including its
+  subdomains. It needs Force HTTPS, because a browser pinned to HTTPS never tries HTTP again.
+- **WebSocket support** lets upgrade requests through. They skip the WAF, which cannot inspect
+  them; with it off, an upgrade is refused with a 403.
+- **Preserve Host header** sends the domain the client asked for rather than the upstream's
+  own address.
+
+<Demo title="Host options" note="Turn off Force HTTPS and HSTS follows.">
+  <HostTogglesDemo client:visible />
 </Demo>
 
 ## Upstreams and load balancing
@@ -80,6 +97,6 @@ because a single pinned address cannot carry more than one SNI name.
 
 ## Headers
 
-The host header is forwarded by default, which is what most applications behind a proxy expect.
-Other request and response headers are set through the host's advanced configuration fields, which
+The host header is forwarded by default, which is what most applications behind a proxy expect;
+the **Preserve Host header** switch turns that off. Other request and response headers are set through the host's advanced configuration fields, which
 take raw Caddy JSON and are admin-only.

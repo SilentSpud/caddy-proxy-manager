@@ -172,7 +172,11 @@ export function CreateHostDialog({
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
           <SettingsToggles
+            sslForced={initialData?.sslForced}
+            hstsEnabled={initialData?.hstsEnabled}
             hstsSubdomains={initialData?.hstsSubdomains}
+            allowWebsocket={initialData?.allowWebsocket}
+            preserveHostHeader={initialData?.preserveHostHeader}
             skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
             enabled={true}
           />
@@ -315,7 +319,11 @@ export function EditHostDialog({
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
           <SettingsToggles
+            sslForced={host.sslForced}
+            hstsEnabled={host.hstsEnabled}
             hstsSubdomains={host.hstsSubdomains}
+            allowWebsocket={host.allowWebsocket}
+            preserveHostHeader={host.preserveHostHeader}
             skipHttpsValidation={host.skipHttpsHostnameValidation}
             enabled={host.enabled}
           />

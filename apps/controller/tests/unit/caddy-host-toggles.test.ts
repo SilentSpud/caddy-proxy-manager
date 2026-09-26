@@ -1,0 +1,127 @@
+/**
+ * The per-host switches in the editor: Force HTTPS, HSTS and WebSocket support each change the
+ * generated config, and turning one off must actually remove what it adds.
+ */
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import type { TestDb } from '../helpers/db';
+
+const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
+
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+ctx.db = await createTestDb();
+
+vi.mock('../../src/lib/db', () => ({
+  default: ctx.db,
+  sqlite: undefined,
+  schema: schemaModule,
+  nowIso: () => new Date().toISOString(),
+  toIso: (value: string | Date | null | undefined): string | null =>
+    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
+}));
+
+vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
+
+import { createProxyHost } from '../../src/lib/models/proxy-hosts';
+import { buildCaddyDocument } from '../../src/lib/caddy';
+import { parseProxyHostOptionUpdates } from '../../src/lib/proxy-host-form';
+import * as schema from '../../src/lib/db/schema';
+
+const NOW = new Date().toISOString();
+
+/** The JSON of every route whose matcher names the domain. */
+async function hostConfig(domain: string): Promise<string> {
+  const found: unknown[] = [];
+  const walk = (node: unknown) => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== 'object') return;
+    const route = node as { match?: { host?: string[] }[]; handle?: unknown[] };
+    if (Array.isArray(route.handle) && route.match?.some((m) => m.host?.includes(domain))) {
+      found.push(route);
+    }
+    Object.values(node).forEach(walk);
+  };
+  walk(await buildCaddyDocument());
+  return JSON.stringify(found);
+}
+
+async function host(domain: string, options: Record<string, boolean>) {
+  await createProxyHost(
+    { name: domain, domains: [domain], upstreams: ['10.0.0.5:8080'], ...options },
+    1,
+  );
+  return hostConfig(domain);
+}
+
+beforeEach(async () => {
+  await ctx.db.delete(schema.proxyHosts);
+  await ctx.db.delete(schema.users).catch(() => {});
+  await ctx.db.insert(schema.users).values({
+    id: 1,
+    email: 'admin@example.com',
+    name: 'Admin',
+    role: 'admin',
+    provider: 'credentials',
+    subject: 'admin',
+    status: 'active',
+    createdAt: NOW,
+    updatedAt: NOW,
+  });
+});
+
+describe('host toggles', () => {
+  it('redirects HTTP and sends HSTS by default', async () => {
+    const config = await host('default.example.com', {});
+    expect(config).toContain('"status_code":308');
+    expect(config).toContain('Strict-Transport-Security');
+  });
+
+  it('drops the redirect and HSTS when both are off', async () => {
+    const config = await host('plain.example.com', { sslForced: false, hstsEnabled: false });
+    expect(config).not.toContain('"status_code":308');
+    expect(config).not.toContain('Strict-Transport-Security');
+  });
+
+  it('refuses WebSocket upgrades only when WebSocket support is off', async () => {
+    const off = await host('no-ws.example.com', { allowWebsocket: false });
+    // Case-insensitive, and HTTP/2's extended CONNECT carries no Upgrade header to match.
+    expect(off).toContain('"pattern":"(?i)websocket"');
+    expect(off).toContain('"method":["CONNECT"]');
+    expect(off).toContain('"status_code":403');
+
+    const on = await host('ws.example.com', { allowWebsocket: true });
+    expect(on).not.toContain('(?i)websocket');
+  });
+
+  it('sets the Host header only while preserveHostHeader is on', async () => {
+    expect(await host('keep-host.example.com', { preserveHostHeader: true })).toContain(
+      '{http.request.host}"]',
+    );
+    expect(await host('upstream-host.example.com', { preserveHostHeader: false })).not.toContain(
+      '"Host":["{http.request.host}"]',
+    );
+  });
+});
+
+describe('parseProxyHostOptionUpdates', () => {
+  it('reads each toggle behind its presence marker', () => {
+    const form = new FormData();
+    for (const key of ['sslForced', 'hstsEnabled', 'allowWebsocket', 'preserveHostHeader']) {
+      form.set(`${key}Present`, '1');
+    }
+    form.set('sslForced', 'on');
+    const parsed = parseProxyHostOptionUpdates(form);
+    expect(parsed.sslForced).toBe(true);
+    expect(parsed.hstsEnabled).toBe(false);
+    expect(parsed.allowWebsocket).toBe(false);
+    expect(parsed.preserveHostHeader).toBe(false);
+  });
+
+  it('leaves a toggle alone when its marker is absent', () => {
+    const parsed = parseProxyHostOptionUpdates(new FormData());
+    expect(parsed.sslForced).toBeUndefined();
+    expect(parsed.allowWebsocket).toBeUndefined();
+  });
+});

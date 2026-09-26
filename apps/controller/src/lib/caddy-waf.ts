@@ -433,6 +433,16 @@ export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
 };
 
 /**
+ * Anything that could become a WebSocket, for refusing them. Wider than the matcher above, which
+ * only has to recognise real browsers: the token is case-insensitive in HTTP/1.1, and HTTP/2
+ * opens one with an extended CONNECT that carries no Upgrade header at all.
+ */
+export const WEBSOCKET_ATTEMPT_MATCHERS: Record<string, unknown>[] = [
+  { header_regexp: { Upgrade: { pattern: "(?i)websocket" } } },
+  { method: ["CONNECT"] },
+];
+
+/**
  * Builds the Caddy `waf` handler. @-prefixed SecLang paths resolve from the embedded
  * coraza-coreruleset filesystem, mounted only when `load_owasp_crs` is true - so every @-include
  * is gated on that flag, or the config load fails.

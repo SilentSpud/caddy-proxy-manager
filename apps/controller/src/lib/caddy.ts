@@ -107,7 +107,12 @@ import { getAccessRulesForHosts } from "./models/mtls-access-rules";
 import { getWafPresetDirectives } from "./models/waf-presets";
 import { getCrsPluginRules } from "./models/crs-plugins";
 import { loadWithCrsPluginRecovery } from "./crs-plugins/recovery";
-import { type CrsPluginRules, buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
+import {
+  type CrsPluginRules,
+  WEBSOCKET_ATTEMPT_MATCHERS,
+  buildWafHandlerEntry,
+  resolveEffectiveWaf,
+} from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
 import {
   type CaddyModuleAvailability,
@@ -1554,6 +1559,17 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           context.crsPlugins,
         ),
       );
+    }
+
+    // Refused ahead of the WAF: coraza mangles an upgrade it wraps (see buildWafHandlerEntry).
+    if (!row.allowWebsocket) {
+      handlers.unshift({
+        handler: "subroute",
+        routes: WEBSOCKET_ATTEMPT_MATCHERS.map((matcher) => ({
+          match: [matcher],
+          handle: [{ handler: "static_response", status_code: 403 }],
+        })),
+      });
     }
 
     if (row.hstsEnabled) {

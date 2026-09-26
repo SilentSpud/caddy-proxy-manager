@@ -51,6 +51,8 @@ export async function createProxyHostAction(
   try {
     const session = await requireAdmin();
     const userId = Number(session.user.id);
+    const boolField = (key: string) =>
+      formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined;
 
     // Parse certificateId safely, then validate it exists and get the sanitized value
     const { certificateId, warning, missing } = await validateAndSanitizeCertificateId(
@@ -72,10 +74,12 @@ export async function createProxyHostAction(
         agentIds: parseAgentIds(formData.getAll("agentId")),
         certificateId: certificateId,
         accessListId: parseAccessListId(formData.get("accessListId")),
-        sslForced: formData.has("sslForcedPresent")
-          ? parseCheckbox(formData.get("sslForced"))
-          : undefined,
+        // Absent markers fall back to the model's defaults, so a form without a toggle keeps it on.
+        sslForced: boolField("sslForced"),
+        hstsEnabled: boolField("hstsEnabled"),
         hstsSubdomains: parseCheckbox(formData.get("hstsSubdomains")),
+        allowWebsocket: boolField("allowWebsocket"),
+        preserveHostHeader: boolField("preserveHostHeader"),
         skipHttpsHostnameValidation: parseCheckbox(formData.get("skipHttpsHostnameValidation")),
         enabled: parseCheckbox(formData.get("enabled")),
         customPreHandlersJson: parseOptionalText(formData.get("customPreHandlersJson")),
