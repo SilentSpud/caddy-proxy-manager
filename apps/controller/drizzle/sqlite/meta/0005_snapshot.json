@@ -53,9 +53,7 @@
       "indexes": {
         "access_list_entries_list_idx": {
           "name": "access_list_entries_list_idx",
-          "columns": [
-            "accessListId"
-          ],
+          "columns": ["accessListId"],
           "isUnique": false
         }
       },
@@ -64,12 +62,8 @@
           "name": "access_list_entries_accessListId_access_lists_id_fk",
           "tableFrom": "access_list_entries",
           "tableTo": "access_lists",
-          "columnsFrom": [
-            "accessListId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accessListId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -130,12 +124,8 @@
           "name": "access_lists_createdBy_users_id_fk",
           "tableFrom": "access_lists",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -242,17 +232,12 @@
       "indexes": {
         "accounts_provider_account_idx": {
           "name": "accounts_provider_account_idx",
-          "columns": [
-            "providerId",
-            "accountId"
-          ],
+          "columns": ["providerId", "accountId"],
           "isUnique": true
         },
         "accounts_user_idx": {
           "name": "accounts_user_idx",
-          "columns": [
-            "userId"
-          ],
+          "columns": ["userId"],
           "isUnique": false
         }
       },
@@ -261,12 +246,8 @@
           "name": "accounts_userId_users_id_fk",
           "tableFrom": "accounts",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -353,9 +334,7 @@
       "indexes": {
         "agents_agentId_unique": {
           "name": "agents_agentId_unique",
-          "columns": [
-            "agentId"
-          ],
+          "columns": ["agentId"],
           "isUnique": true
         }
       },
@@ -420,9 +399,7 @@
       "indexes": {
         "api_tokens_token_hash_unique": {
           "name": "api_tokens_token_hash_unique",
-          "columns": [
-            "tokenHash"
-          ],
+          "columns": ["tokenHash"],
           "isUnique": true
         }
       },
@@ -431,12 +408,8 @@
           "name": "api_tokens_createdBy_users_id_fk",
           "tableFrom": "api_tokens",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -511,12 +484,8 @@
           "name": "audit_events_userId_users_id_fk",
           "tableFrom": "audit_events",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -584,12 +553,8 @@
           "name": "ca_certificates_createdBy_users_id_fk",
           "tableFrom": "ca_certificates",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -686,12 +651,8 @@
           "name": "certificates_createdBy_users_id_fk",
           "tableFrom": "certificates",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -813,9 +774,7 @@
       "indexes": {
         "crs_plugins_name_unique": {
           "name": "crs_plugins_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -824,12 +783,8 @@
           "name": "crs_plugins_createdBy_users_id_fk",
           "tableFrom": "crs_plugins",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -880,25 +835,17 @@
       "indexes": {
         "faa_host_idx": {
           "name": "faa_host_idx",
-          "columns": [
-            "proxyHostId"
-          ],
+          "columns": ["proxyHostId"],
           "isUnique": false
         },
         "faa_user_unique": {
           "name": "faa_user_unique",
-          "columns": [
-            "proxyHostId",
-            "userId"
-          ],
+          "columns": ["proxyHostId", "userId"],
           "isUnique": true
         },
         "faa_group_unique": {
           "name": "faa_group_unique",
-          "columns": [
-            "proxyHostId",
-            "groupId"
-          ],
+          "columns": ["proxyHostId", "groupId"],
           "isUnique": true
         }
       },
@@ -907,12 +854,8 @@
           "name": "forward_auth_access_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "forward_auth_access",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -920,12 +863,8 @@
           "name": "forward_auth_access_userId_users_id_fk",
           "tableFrom": "forward_auth_access",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -933,12 +872,8 @@
           "name": "forward_auth_access_groupId_groups_id_fk",
           "tableFrom": "forward_auth_access",
           "tableTo": "groups",
-          "columnsFrom": [
-            "groupId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["groupId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1025,9 +960,7 @@
       "indexes": {
         "fae_code_hash_unique": {
           "name": "fae_code_hash_unique",
-          "columns": [
-            "codeHash"
-          ],
+          "columns": ["codeHash"],
           "isUnique": true
         }
       },
@@ -1036,12 +969,8 @@
           "name": "forward_auth_exchanges_sessionId_forward_auth_sessions_id_fk",
           "tableFrom": "forward_auth_exchanges",
           "tableTo": "forward_auth_sessions",
-          "columnsFrom": [
-            "sessionId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sessionId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1049,12 +978,8 @@
           "name": "forward_auth_exchanges_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "forward_auth_exchanges",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1127,16 +1052,12 @@
       "indexes": {
         "fari_rid_hash_unique": {
           "name": "fari_rid_hash_unique",
-          "columns": [
-            "ridHash"
-          ],
+          "columns": ["ridHash"],
           "isUnique": true
         },
         "fari_expires_idx": {
           "name": "fari_expires_idx",
-          "columns": [
-            "expiresAt"
-          ],
+          "columns": ["expiresAt"],
           "isUnique": false
         }
       },
@@ -1145,12 +1066,8 @@
           "name": "forward_auth_redirect_intents_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "forward_auth_redirect_intents",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1215,30 +1132,22 @@
       "indexes": {
         "fas_token_hash_unique": {
           "name": "fas_token_hash_unique",
-          "columns": [
-            "tokenHash"
-          ],
+          "columns": ["tokenHash"],
           "isUnique": true
         },
         "fas_user_idx": {
           "name": "fas_user_idx",
-          "columns": [
-            "userId"
-          ],
+          "columns": ["userId"],
           "isUnique": false
         },
         "fas_proxy_host_idx": {
           "name": "fas_proxy_host_idx",
-          "columns": [
-            "proxyHostId"
-          ],
+          "columns": ["proxyHostId"],
           "isUnique": false
         },
         "fas_expires_idx": {
           "name": "fas_expires_idx",
-          "columns": [
-            "expiresAt"
-          ],
+          "columns": ["expiresAt"],
           "isUnique": false
         }
       },
@@ -1247,12 +1156,8 @@
           "name": "forward_auth_sessions_userId_users_id_fk",
           "tableFrom": "forward_auth_sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1260,12 +1165,8 @@
           "name": "forward_auth_sessions_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "forward_auth_sessions",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1331,33 +1232,22 @@
       "indexes": {
         "group_grants_group_idx": {
           "name": "group_grants_group_idx",
-          "columns": [
-            "groupId"
-          ],
+          "columns": ["groupId"],
           "isUnique": false
         },
         "group_grants_proxy_host_unique": {
           "name": "group_grants_proxy_host_unique",
-          "columns": [
-            "groupId",
-            "proxyHostId"
-          ],
+          "columns": ["groupId", "proxyHostId"],
           "isUnique": true
         },
         "group_grants_l4_host_unique": {
           "name": "group_grants_l4_host_unique",
-          "columns": [
-            "groupId",
-            "l4ProxyHostId"
-          ],
+          "columns": ["groupId", "l4ProxyHostId"],
           "isUnique": true
         },
         "group_grants_agent_unique": {
           "name": "group_grants_agent_unique",
-          "columns": [
-            "groupId",
-            "agentId"
-          ],
+          "columns": ["groupId", "agentId"],
           "isUnique": true
         }
       },
@@ -1366,12 +1256,8 @@
           "name": "group_grants_groupId_groups_id_fk",
           "tableFrom": "group_grants",
           "tableTo": "groups",
-          "columnsFrom": [
-            "groupId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["groupId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1379,12 +1265,8 @@
           "name": "group_grants_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "group_grants",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1392,12 +1274,8 @@
           "name": "group_grants_l4ProxyHostId_l4_proxy_hosts_id_fk",
           "tableFrom": "group_grants",
           "tableTo": "l4_proxy_hosts",
-          "columnsFrom": [
-            "l4ProxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["l4ProxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1405,12 +1283,8 @@
           "name": "group_grants_agentId_agents_id_fk",
           "tableFrom": "group_grants",
           "tableTo": "agents",
-          "columnsFrom": [
-            "agentId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agentId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1468,16 +1342,12 @@
       "indexes": {
         "group_idp_mappings_group_idx": {
           "name": "group_idp_mappings_group_idx",
-          "columns": [
-            "groupId"
-          ],
+          "columns": ["groupId"],
           "isUnique": false
         },
         "group_idp_mappings_key_idx": {
           "name": "group_idp_mappings_key_idx",
-          "columns": [
-            "externalKey"
-          ],
+          "columns": ["externalKey"],
           "isUnique": false
         }
       },
@@ -1486,12 +1356,8 @@
           "name": "group_idp_mappings_groupId_groups_id_fk",
           "tableFrom": "group_idp_mappings",
           "tableTo": "groups",
-          "columnsFrom": [
-            "groupId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["groupId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1499,12 +1365,8 @@
           "name": "group_idp_mappings_providerId_oauth_providers_id_fk",
           "tableFrom": "group_idp_mappings",
           "tableTo": "oauth_providers",
-          "columnsFrom": [
-            "providerId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["providerId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1548,17 +1410,12 @@
       "indexes": {
         "group_members_unique": {
           "name": "group_members_unique",
-          "columns": [
-            "groupId",
-            "userId"
-          ],
+          "columns": ["groupId", "userId"],
           "isUnique": true
         },
         "group_members_user_idx": {
           "name": "group_members_user_idx",
-          "columns": [
-            "userId"
-          ],
+          "columns": ["userId"],
           "isUnique": false
         }
       },
@@ -1567,12 +1424,8 @@
           "name": "group_members_groupId_groups_id_fk",
           "tableFrom": "group_members",
           "tableTo": "groups",
-          "columnsFrom": [
-            "groupId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["groupId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1580,12 +1433,8 @@
           "name": "group_members_userId_users_id_fk",
           "tableFrom": "group_members",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1651,9 +1500,7 @@
       "indexes": {
         "groups_name_unique": {
           "name": "groups_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -1662,12 +1509,8 @@
           "name": "groups_createdBy_users_id_fk",
           "tableFrom": "groups",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1767,16 +1610,12 @@
       "indexes": {
         "issued_client_certificates_ca_idx": {
           "name": "issued_client_certificates_ca_idx",
-          "columns": [
-            "caCertificateId"
-          ],
+          "columns": ["caCertificateId"],
           "isUnique": false
         },
         "issued_client_certificates_revoked_at_idx": {
           "name": "issued_client_certificates_revoked_at_idx",
-          "columns": [
-            "revokedAt"
-          ],
+          "columns": ["revokedAt"],
           "isUnique": false
         }
       },
@@ -1785,12 +1624,8 @@
           "name": "issued_client_certificates_caCertificateId_ca_certificates_id_fk",
           "tableFrom": "issued_client_certificates",
           "tableTo": "ca_certificates",
-          "columnsFrom": [
-            "caCertificateId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["caCertificateId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1798,12 +1633,8 @@
           "name": "issued_client_certificates_createdBy_users_id_fk",
           "tableFrom": "issued_client_certificates",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1847,17 +1678,12 @@
       "indexes": {
         "l4_proxy_host_agents_unique": {
           "name": "l4_proxy_host_agents_unique",
-          "columns": [
-            "l4ProxyHostId",
-            "agentId"
-          ],
+          "columns": ["l4ProxyHostId", "agentId"],
           "isUnique": true
         },
         "l4_proxy_host_agents_agent_idx": {
           "name": "l4_proxy_host_agents_agent_idx",
-          "columns": [
-            "agentId"
-          ],
+          "columns": ["agentId"],
           "isUnique": false
         }
       },
@@ -1866,12 +1692,8 @@
           "name": "l4_proxy_host_agents_l4ProxyHostId_l4_proxy_hosts_id_fk",
           "tableFrom": "l4_proxy_host_agents",
           "tableTo": "l4_proxy_hosts",
-          "columnsFrom": [
-            "l4ProxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["l4ProxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1879,12 +1701,8 @@
           "name": "l4_proxy_host_agents_agentId_agents_id_fk",
           "tableFrom": "l4_proxy_host_agents",
           "tableTo": "agents",
-          "columnsFrom": [
-            "agentId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agentId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2019,12 +1837,8 @@
           "name": "l4_proxy_hosts_ownerUserId_users_id_fk",
           "tableFrom": "l4_proxy_hosts",
           "tableTo": "users",
-          "columnsFrom": [
-            "ownerUserId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ownerUserId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2121,17 +1935,12 @@
       "indexes": {
         "mtls_access_rules_proxy_host_idx": {
           "name": "mtls_access_rules_proxy_host_idx",
-          "columns": [
-            "proxyHostId"
-          ],
+          "columns": ["proxyHostId"],
           "isUnique": false
         },
         "mtls_access_rules_host_path_unique": {
           "name": "mtls_access_rules_host_path_unique",
-          "columns": [
-            "proxyHostId",
-            "pathPattern"
-          ],
+          "columns": ["proxyHostId", "pathPattern"],
           "isUnique": true
         }
       },
@@ -2140,12 +1949,8 @@
           "name": "mtls_access_rules_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "mtls_access_rules",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2153,12 +1958,8 @@
           "name": "mtls_access_rules_createdBy_users_id_fk",
           "tableFrom": "mtls_access_rules",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2202,17 +2003,12 @@
       "indexes": {
         "mtls_cert_role_unique": {
           "name": "mtls_cert_role_unique",
-          "columns": [
-            "issuedClientCertificateId",
-            "mtlsRoleId"
-          ],
+          "columns": ["issuedClientCertificateId", "mtlsRoleId"],
           "isUnique": true
         },
         "mtls_certificate_roles_role_idx": {
           "name": "mtls_certificate_roles_role_idx",
-          "columns": [
-            "mtlsRoleId"
-          ],
+          "columns": ["mtlsRoleId"],
           "isUnique": false
         }
       },
@@ -2221,12 +2017,8 @@
           "name": "mtls_certificate_roles_issuedClientCertificateId_issued_client_certificates_id_fk",
           "tableFrom": "mtls_certificate_roles",
           "tableTo": "issued_client_certificates",
-          "columnsFrom": [
-            "issuedClientCertificateId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["issuedClientCertificateId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2234,12 +2026,8 @@
           "name": "mtls_certificate_roles_mtlsRoleId_mtls_roles_id_fk",
           "tableFrom": "mtls_certificate_roles",
           "tableTo": "mtls_roles",
-          "columnsFrom": [
-            "mtlsRoleId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["mtlsRoleId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2297,9 +2085,7 @@
       "indexes": {
         "mtls_roles_name_unique": {
           "name": "mtls_roles_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -2308,12 +2094,8 @@
           "name": "mtls_roles_createdBy_users_id_fk",
           "tableFrom": "mtls_roles",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2506,9 +2288,7 @@
       "indexes": {
         "oauth_providers_name_unique": {
           "name": "oauth_providers_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -2566,9 +2346,7 @@
       "indexes": {
         "oauth_state_unique": {
           "name": "oauth_state_unique",
-          "columns": [
-            "state"
-          ],
+          "columns": ["state"],
           "isUnique": true
         }
       },
@@ -2626,10 +2404,7 @@
       "indexes": {
         "pending_oauth_user_provider_unique": {
           "name": "pending_oauth_user_provider_unique",
-          "columns": [
-            "userId",
-            "provider"
-          ],
+          "columns": ["userId", "provider"],
           "isUnique": true
         }
       },
@@ -2638,12 +2413,8 @@
           "name": "pending_oauth_links_userId_users_id_fk",
           "tableFrom": "pending_oauth_links",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2687,17 +2458,12 @@
       "indexes": {
         "proxy_host_agents_unique": {
           "name": "proxy_host_agents_unique",
-          "columns": [
-            "proxyHostId",
-            "agentId"
-          ],
+          "columns": ["proxyHostId", "agentId"],
           "isUnique": true
         },
         "proxy_host_agents_agent_idx": {
           "name": "proxy_host_agents_agent_idx",
-          "columns": [
-            "agentId"
-          ],
+          "columns": ["agentId"],
           "isUnique": false
         }
       },
@@ -2706,12 +2472,8 @@
           "name": "proxy_host_agents_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "proxy_host_agents",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2719,12 +2481,8 @@
           "name": "proxy_host_agents_agentId_agents_id_fk",
           "tableFrom": "proxy_host_agents",
           "tableTo": "agents",
-          "columnsFrom": [
-            "agentId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agentId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2876,12 +2634,8 @@
           "name": "proxy_hosts_certificateId_certificates_id_fk",
           "tableFrom": "proxy_hosts",
           "tableTo": "certificates",
-          "columnsFrom": [
-            "certificateId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["certificateId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2889,12 +2643,8 @@
           "name": "proxy_hosts_accessListId_access_lists_id_fk",
           "tableFrom": "proxy_hosts",
           "tableTo": "access_lists",
-          "columnsFrom": [
-            "accessListId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accessListId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2902,12 +2652,8 @@
           "name": "proxy_hosts_ownerUserId_users_id_fk",
           "tableFrom": "proxy_hosts",
           "tableTo": "users",
-          "columnsFrom": [
-            "ownerUserId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ownerUserId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2993,24 +2739,17 @@
       "indexes": {
         "sessions_token_unique": {
           "name": "sessions_token_unique",
-          "columns": [
-            "token"
-          ],
+          "columns": ["token"],
           "isUnique": true
         },
         "sessions_user_idx": {
           "name": "sessions_user_idx",
-          "columns": [
-            "userId"
-          ],
+          "columns": ["userId"],
           "isUnique": false
         },
         "sessions_oidc_session_idx": {
           "name": "sessions_oidc_session_idx",
-          "columns": [
-            "oidcProviderId",
-            "oidcSid"
-          ],
+          "columns": ["oidcProviderId", "oidcSid"],
           "isUnique": false
         }
       },
@@ -3019,12 +2758,8 @@
           "name": "sessions_userId_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3137,12 +2872,8 @@
           "name": "settings_revisions_appliedBy_users_id_fk",
           "tableFrom": "settings_revisions",
           "tableTo": "users",
-          "columnsFrom": [
-            "appliedBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["appliedBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3186,10 +2917,7 @@
       "indexes": {
         "settings_staged_user_key_idx": {
           "name": "settings_staged_user_key_idx",
-          "columns": [
-            "userId",
-            "key"
-          ],
+          "columns": ["userId", "key"],
           "isUnique": true
         }
       },
@@ -3198,12 +2926,8 @@
           "name": "settings_staged_userId_users_id_fk",
           "tableFrom": "settings_staged",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3327,9 +3051,7 @@
       "indexes": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
@@ -3446,9 +3168,7 @@
       "indexes": {
         "waf_presets_name_unique": {
           "name": "waf_presets_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -3457,12 +3177,8 @@
           "name": "waf_presets_createdBy_users_id_fk",
           "tableFrom": "waf_presets",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }

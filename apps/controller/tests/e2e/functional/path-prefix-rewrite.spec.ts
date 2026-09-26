@@ -3,7 +3,7 @@
  * reflects the request line, so /users must arrive as /api/users. Domain: func-rewrite.test
  */
 import { test, expect } from '@playwright/test';
-import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { httpGet, turnOffForceHttps, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-rewrite.test';
@@ -24,7 +24,7 @@ test.describe
       // Fill in the path prefix rewrite field
       await page.getByLabel('Path Prefix Rewrite').fill('/api');
 
-      await injectFormFields(page, { sslForcedPresent: 'on' });
+      await turnOffForceHttps(page);
       await page.getByRole('button', { name: /^create$/i }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
       await expect(

@@ -4,7 +4,7 @@
  * Domain: func-redirects-adv.test
  */
 import { test, expect } from '@playwright/test';
-import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { httpGet, injectFormFields, turnOffForceHttps, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-redirects-adv.test';
@@ -35,8 +35,9 @@ test.describe
       await page.getByLabel(/^domains/i).fill(DOMAIN);
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('echo-server:8080');
 
+      await turnOffForceHttps(page);
+
       await injectFormFields(page, {
-        sslForcedPresent: 'on',
         redirectsJson: JSON.stringify([
           // ── full absolute URL destinations ──────────────────────────────────
           // Exact path → full URL on a completely different host (301)

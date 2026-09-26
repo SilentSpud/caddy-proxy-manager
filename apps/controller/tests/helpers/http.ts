@@ -5,7 +5,7 @@
 import http from 'node:http';
 import net from 'node:net';
 import crypto from 'node:crypto';
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 export interface HttpResponse {
   status: number;
@@ -213,6 +213,14 @@ export function wsHandshake(
 }
 
 /** Inject hidden form fields into #create-host-form before submitting. */
+/** Turns off Force HTTPS in the open host dialog, so the spec can talk plain HTTP to the host. */
+export async function turnOffForceHttps(page: Page): Promise<void> {
+  const toggle = page.getByRole('dialog').getByRole('switch', { name: 'Force HTTPS' });
+  await toggle.scrollIntoViewIfNeeded();
+  if (await toggle.isChecked()) await toggle.click();
+  await expect(toggle).not.toBeChecked();
+}
+
 export async function injectFormFields(page: Page, fields: Record<string, string>): Promise<void> {
   await page.evaluate((f) => {
     const form = document.getElementById('create-host-form');

@@ -4,7 +4,7 @@
  */
 import { expect, type Download, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { injectFormFields } from './http';
+import { injectFormFields, turnOffForceHttps } from './http';
 
 export interface ProxyHostConfig {
   name: string;
@@ -146,10 +146,9 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
     }
   }
 
-  // Inject hidden fields:
-  //  sslForcedPresent=on  → tells the action the field was in the form
-  //  (sslForced absent)   → parseCheckbox(null) = false → no HTTPS redirect
-  const extraFields: Record<string, string> = { sslForcedPresent: 'on' };
+  // The specs talk plain HTTP to the host, so no redirect to HTTPS.
+  await turnOffForceHttps(page);
+  const extraFields: Record<string, string> = {};
 
   if (config.enableWaf) {
     Object.assign(extraFields, {

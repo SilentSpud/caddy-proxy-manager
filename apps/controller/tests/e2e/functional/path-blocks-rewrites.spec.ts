@@ -4,7 +4,7 @@
  * re-match the block, since subroute routes run sequentially. Domain: func-path-rules.test
  */
 import { test, expect } from '@playwright/test';
-import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { httpGet, injectFormFields, turnOffForceHttps, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-path-rules.test';
@@ -23,8 +23,9 @@ test.describe
       // rewritten URI is what the upstream received.
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('whoami-server:80');
 
+      await turnOffForceHttps(page);
+
       await injectFormFields(page, {
-        sslForcedPresent: 'on',
         pathBlocksJson: JSON.stringify([
           { path: '/dns-query', status: 403, body: 'Forbidden' },
           { path: '/admin/*', status: 404 },
@@ -102,8 +103,9 @@ test.describe
       await page.getByLabel(/^domains/i).fill(ALLOW_DOMAIN);
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('whoami-server:80');
 
+      await turnOffForceHttps(page);
+
       await injectFormFields(page, {
-        sslForcedPresent: 'on',
         pathAllowsJson: JSON.stringify([{ path: '/secret' }, { path: '/public/*' }]),
         pathBlocksJson: JSON.stringify([{ path: '/*', status: 403, body: 'Blocked' }]),
       });
