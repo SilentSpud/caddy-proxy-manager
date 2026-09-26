@@ -830,6 +830,41 @@ const spec = {
         },
       },
     },
+    "/api/v1/backup": {
+      post: {
+        tags: ["Backup"],
+        summary: "Download a backup of the whole configuration",
+        description:
+          "Every secret the database holds is decrypted into the file, and the file is encrypted with the passphrase sent. Restoring is done from Settings > Backup, which asks for a recent sign-in.",
+        operationId: "createBackup",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  passphrase: { type: "string", minLength: 12 },
+                  auditLog: { type: "boolean", description: "Include the audit log" },
+                  settingsHistory: { type: "boolean", description: "Include the settings history" },
+                },
+                required: ["passphrase"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "The backup file",
+            content: {
+              "application/octet-stream": { schema: { type: "string", format: "binary" } },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
     "/api/v1/access-lists/{id}/ip-rules": {
       get: {
         tags: ["Access Lists"],

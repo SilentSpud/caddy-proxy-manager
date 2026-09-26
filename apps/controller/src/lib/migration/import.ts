@@ -59,7 +59,7 @@ type Reference = {
   required: boolean;
 };
 
-type Described = {
+export type Described = {
   key: string;
   /** Read for its shape only; rows are written to the active backend's table of the same key. */
   table: PgTable;
@@ -70,7 +70,7 @@ type Described = {
   serialColumn: string | null;
 };
 
-function describeTables(): Described[] {
+export function describeTables(): Described[] {
   const described: Described[] = [];
 
   for (const [key, value] of Object.entries(schema)) {
@@ -116,7 +116,7 @@ function describeTables(): Described[] {
  * A self-reference is ignored rather than treated as a cycle - a table pointing at itself only
  * constrains row order within it, which the source database already satisfied.
  */
-function inFkOrder(tables: Described[]): Described[] {
+export function inFkOrder(tables: Described[]): Described[] {
   const byName = new Map(tables.map((table) => [table.name, table]));
   const ordered: Described[] = [];
   const state = new Map<string, "visiting" | "done">();
@@ -357,7 +357,7 @@ export async function importLegacyDatabase(
  * `setval` with a third argument of false would set "next value is this"; the default true means
  * "this was the last value used", which is what a copied table needs.
  */
-async function resyncSequence(table: string, column: string): Promise<void> {
+export async function resyncSequence(table: string, column: string): Promise<void> {
   await db.execute(
     sql`SELECT setval(
           pg_get_serial_sequence(${table}, ${column}),

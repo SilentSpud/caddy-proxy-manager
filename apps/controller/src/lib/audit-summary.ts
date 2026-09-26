@@ -374,6 +374,18 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^User changed their password$/,
   },
   {
+    entityType: "backup",
+    action: "backup_created",
+    message: "backupCreated",
+    pattern: /^Downloaded a configuration backup$/,
+  },
+  {
+    entityType: "backup",
+    action: "backup_restored",
+    message: "backupRestored",
+    pattern: /^Restored the configuration from a backup$/,
+  },
+  {
     entityType: "session",
     action: "view_as_started",
     message: "viewAsStarted",
