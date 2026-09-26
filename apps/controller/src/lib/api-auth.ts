@@ -26,6 +26,8 @@ export type ApiAuthResult = {
   userId: number;
   role: string;
   authMethod: "bearer" | "session";
+  /** A session viewing as some groups; a token never is. */
+  viewAsGroupIds?: number[];
 };
 
 export async function authenticateApiRequest(request: NextRequest): Promise<ApiAuthResult> {
@@ -70,6 +72,7 @@ export async function authenticateApiRequest(request: NextRequest): Promise<ApiA
     userId: Number(session.user.id),
     role,
     authMethod: "session",
+    viewAsGroupIds: session.viewAs?.groupIds,
   };
 }
 

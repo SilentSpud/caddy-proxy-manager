@@ -44,6 +44,24 @@ Groups are lists of users doing two jobs:
   <GroupAccessDemo client:visible />
 </Demo>
 
+
+## Viewing as a role
+
+To check what a delegated operator can actually reach, an administrator can view the dashboard as
+one: **Users → View as a role** (the eye beside the heading), or **View as an operator in this
+group** on a group. Pick operator, user or viewer, and for an operator, the groups to be in.
+
+- **Nobody is impersonated.** CPM grants to roles and groups, not to people, so that is what it
+  previews. The view lives on the administrator's own session, and anything done while viewing is
+  done - and recorded in the audit log - as them.
+- **It can only narrow.** Pages, menus and every permission check follow the chosen role and
+  groups, over the REST and GraphQL APIs with the same session too. It can't be used to gain
+  anything.
+- **A banner says so on every page**, with **Return to my view**. The view also ends by itself
+  after an hour.
+- **Two things wait until you return:** creating an API token, which would carry your real role,
+  and signing in to a host behind CPM's forward auth.
+
 ## Signing in
 
 The sign-in screen asks for the username on its own, then the password. The dashboard's `/login`

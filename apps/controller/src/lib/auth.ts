@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getAuth } from "./auth-server";
 import { domainError } from "./domain-error";
 import { getUserById } from "./models/user";
+import { type ViewAs, readViewAs } from "./view-as";
 
 export type Session = {
   user: {
@@ -15,6 +16,12 @@ export type Session = {
     hasPassword?: boolean;
     twoFactorEnabled?: boolean;
   };
+  /**
+   * Set while an administrator is viewing as another role. `user.role` is then that role, which is
+   * what every permission check reads; `realRole` is what the account actually is.
+   */
+  viewAs?: ViewAs;
+  realRole?: string;
 };
 
 /**
@@ -60,12 +67,15 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
     return null;
   }
 
+  const viewAs = readViewAs(betterAuthSession.session, currentUser.role);
+
   return {
+    ...(viewAs && { viewAs, realRole: currentUser.role }),
     user: {
       id: String(currentUser.id),
       email: currentUser.email,
       name: currentUser.name,
-      role: currentUser.role,
+      role: viewAs?.role ?? currentUser.role,
       provider: currentUser.provider || baUser.provider,
       image: currentUser.avatarUrl ?? (baUser.avatarUrl as string | null | undefined) ?? null,
       hasPassword: Boolean(currentUser.passwordHash),

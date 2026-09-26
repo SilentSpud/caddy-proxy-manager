@@ -325,6 +325,8 @@
       "passwordChanged": "User changed their password",
       "passwordRemoved": "User removed their password; signs in with {providers}",
       "passwordSet": "User set a password",
+      "viewAsStarted": "Started viewing the dashboard as {role}",
+      "viewAsStopped": "Stopped viewing the dashboard as {role}",
       "twoFactorEnabled": "User turned on two-factor sign-in",
       "twoFactorDisabled": "User turned off two-factor sign-in",
       "twoFactorBackupCodes": "User replaced their backup codes",
@@ -363,7 +365,8 @@
       "secondFactorRequired": "Enter the code from your authenticator app, or a backup code.",
       "secondFactorExpired": "That sign-in took too long or had too many wrong codes. Enter your password again.",
       "secondFactorLocked": "Too many wrong codes. Two-factor sign-in for this account is locked for a few minutes.",
-      "invalidSecondFactor": "That code is not valid."
+      "invalidSecondFactor": "That code is not valid.",
+      "viewAsForbidden": "You are viewing the dashboard as another role. Return to your own view to sign in to this application."
     },
     "authenticationRequired": "Authentication Required",
     "authorizeFailed": "Failed to authorize access.",
@@ -758,6 +761,11 @@
     "proxyHostDomainsRequired": "At least one domain must be specified",
     "proxyHostNotFound": "Proxy host not found",
     "twoFactorRequired": "Turn on two-factor sign-in before doing anything else. It is required for administrators.",
+    "viewAsStartFailed": "Could not switch views",
+    "viewAsRoleInvalid": "View as an operator, a user or a viewer",
+    "viewAsGroupMissing": "One of those groups no longer exists",
+    "viewAsForbidden": "Not while viewing as another role. Return to your own view first.",
+    "viewAsAlreadyActive": "Already viewing as another role. Return to your own view first.",
     "hostDescriptionTooLong": "Notes can be at most {max} characters",
     "rawCaddyConfigAdminOnly": "Only an administrator can change a host's custom Caddyfile, pre-handlers or reverse proxy JSON",
     "upstreamTargetAdminOnly": "Only an administrator can point an upstream at Caddy's admin port, a unix socket or a placeholder",
@@ -946,6 +954,8 @@
     "agentNotReported": "Connected, but has not reported yet."
   },
   "groups": {
+    "viewAsGroup": "View as an operator in this group",
+    "viewAsGroupNamed": "View as an operator in {name}",
     "access": "Access",
     "addMember": "Add member",
     "agents": "Agents",
@@ -1187,6 +1197,11 @@
     "networkError": "Network error"
   },
   "nav": {
+    "viewAsBannerTitle": "Viewing as {role}",
+    "viewAsBannerTitleGroups": "Viewing as {role} in {groups}",
+    "viewAsBannerDescription": "Pages, menus and actions follow that role's permissions. Anything you change is still recorded as you. This view ends on its own after an hour.",
+    "viewAsReturn": "Return to my view",
+    "viewAsRoles": { "operator": "an operator", "user": "a user", "viewer": "a viewer" },
     "accessLists": "Access Lists",
     "agents": "Agents",
     "analytics": "Analytics",
@@ -3431,6 +3446,18 @@
     "searchPlaceholder": "Search…"
   },
   "users": {
+    "viewAs": {
+      "open": "View as a role",
+      "title": "View the dashboard as",
+      "description": "See the pages, menus and actions a role gets, without signing in as anyone. Your own account doesn't change, and anything you do is still recorded as you. It ends after an hour, or when you return to your own view.",
+      "role": "Role",
+      "roles": { "operator": "Operator", "user": "User", "viewer": "Viewer" },
+      "groups": "In these groups",
+      "groupsHelp": "An operator can only reach what their groups were granted. Pick none to see an operator with no grants.",
+      "noGroups": "There are no groups yet, so an operator here would have no grants.",
+      "start": "View as",
+      "errorTitle": "Could not switch views"
+    },
     "twoFactor": "Two-factor sign-in",
     "twoFactorOn": "On",
     "twoFactorOff": "Off",

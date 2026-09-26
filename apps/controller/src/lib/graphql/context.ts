@@ -63,7 +63,7 @@ export function createContext(
   const access = () => {
     accessPromise ??= (async () => {
       const result = await viewer();
-      return await accessFor(result.userId, result.role);
+      return await accessFor(result.userId, result.role, result.viewAsGroupIds);
     })();
     return accessPromise;
   };

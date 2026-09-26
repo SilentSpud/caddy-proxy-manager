@@ -1,6 +1,8 @@
 "use client";
 
 import { type ReactNode, useCallback, useRef, useState } from "react";
+import { stopViewAsAction } from "./view-as/actions";
+import { Button } from "@astryxdesign/core/Button";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -142,6 +144,7 @@ export default function DashboardLayoutClient({
   updateAvailable,
   stagedKeys,
   morePins,
+  viewAs = null,
   children,
 }: {
   user: User;
@@ -157,6 +160,8 @@ export default function DashboardLayoutClient({
   stagedKeys: readonly string[];
   /** The pages this user keeps in the mobile More drawer, or null if they never customized it. */
   morePins: readonly DestinationId[] | null;
+  /** An administrator previewing the dashboard as another role; see lib/view-as.ts. */
+  viewAs?: { role: string; groupNames: string[] } | null;
   children: ReactNode;
 }) {
   const t = useTranslations("nav");
@@ -223,7 +228,36 @@ export default function DashboardLayoutClient({
   const content = <div className="cpm-mobile-content">{children}</div>;
   // The demo banner is not dismissable: a visitor who forgets they are in a demo will wonder why
   // their site is down. The SQLite one is, for a while - see src/lib/sqlite-notice.ts.
-  const banner = demoMode ? (
+  // First: it changes what every page shows, and the way back has to be on all of them.
+  const banner = viewAs ? (
+    <Banner
+      status="warning"
+      container="section"
+      title={
+        viewAs.groupNames.length > 0
+          ? t("viewAsBannerTitleGroups", {
+              role: t(`viewAsRoles.${viewAs.role as "operator" | "user" | "viewer"}`),
+              groups: viewAs.groupNames.join(", "),
+            })
+          : t("viewAsBannerTitle", {
+              role: t(`viewAsRoles.${viewAs.role as "operator" | "user" | "viewer"}`),
+            })
+      }
+      description={t("viewAsBannerDescription")}
+      endContent={
+        <Button
+          variant="secondary"
+          size="sm"
+          label={t("viewAsReturn")}
+          onClick={async () => {
+            await stopViewAsAction();
+            // A full load, for the same reason starting one is: the whole shell changes.
+            window.location.reload();
+          }}
+        />
+      }
+    />
+  ) : demoMode ? (
     <Banner
       status="info"
       container="section"

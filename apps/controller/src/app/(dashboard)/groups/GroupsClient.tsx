@@ -10,7 +10,9 @@
  * gets a tab of its own instead of hiding behind a dialog with nothing on the page to say so.
  */
 import { useEffect, useMemo, useState } from "react";
+import { startViewAsAction } from "../view-as/actions";
 import {
+  Eye,
   Globe,
   Network,
   Pencil,
@@ -329,6 +331,7 @@ function GroupDetail({
   const [addOpen, setAddOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [viewAsError, setViewAsError] = useState<string | null>(null);
   const counts = grantCounts(access);
   const isIdp = group.source === "oidc";
 
@@ -388,6 +391,21 @@ function GroupDetail({
           <IconButton
             variant="ghost"
             size="sm"
+            label={t("viewAsGroupNamed", { name: group.name })}
+            tooltip={t("viewAsGroup")}
+            icon={<Eye />}
+            onClick={async () => {
+              const result = await startViewAsAction("operator", [group.id]);
+              if (result.status === "error") {
+                setViewAsError(result.message ?? null);
+                return;
+              }
+              window.location.assign("/");
+            }}
+          />
+          <IconButton
+            variant="ghost"
+            size="sm"
             label={t("deleteGroupNamed", { name: group.name })}
             tooltip={t("deleteGroup")}
             icon={<Trash2 />}
@@ -395,6 +413,8 @@ function GroupDetail({
           />
         </HStack>
       </HStack>
+
+      {viewAsError && <Banner status="error" title={t("viewAsGroup")} description={viewAsError} />}
 
       {isIdp && (
         <Banner status="info" title={t("idpManaged")} description={t("idpMembershipHelp")} />

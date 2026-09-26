@@ -292,6 +292,12 @@ async function createAuth(baseURL: string): Promise<any> {
       modelName: "sessions",
       expiresIn: 7 * 24 * 60 * 60,
       cookieCache: { enabled: false },
+      // "View as" (lib/view-as.ts). Declared so getSession returns them; only the app writes them.
+      additionalFields: {
+        viewAsRole: { type: "string", required: false, input: false },
+        viewAsGroupIds: { type: "string", required: false, input: false },
+        viewAsExpiresAt: { type: "string", required: false, input: false },
+      },
     },
     account: {
       modelName: "accounts",

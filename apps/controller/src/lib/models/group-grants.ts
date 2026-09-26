@@ -144,7 +144,11 @@ export async function grantsForUser(userId: number): Promise<EffectiveGrants> {
     .select({ groupId: groupMembers.groupId })
     .from(groupMembers)
     .where(eq(groupMembers.userId, userId));
-  const groupIds = memberships.map((row) => row.groupId);
+  return await grantsForGroups(memberships.map((row) => row.groupId));
+}
+
+/** What membership of exactly these groups grants. */
+export async function grantsForGroups(groupIds: number[]): Promise<EffectiveGrants> {
   if (groupIds.length === 0) return emptyGrants();
 
   const rows = await db.select().from(groupGrants).where(inArray(groupGrants.groupId, groupIds));

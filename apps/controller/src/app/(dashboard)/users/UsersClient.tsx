@@ -9,7 +9,17 @@
  * they belong to. Creating and editing happen in dialogs, so the list never reflows under a form.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, Pencil, Plus, Trash2, UserCog, Users as UsersIcon } from "lucide-react";
+import { ViewAsDialog } from "@/components/users/ViewAsDialog";
+import {
+  Ban,
+  CheckCircle2,
+  Eye,
+  Pencil,
+  Plus,
+  Trash2,
+  UserCog,
+  Users as UsersIcon,
+} from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -117,6 +127,7 @@ function isExternal(user: UserEntry) {
 }
 
 export default function UsersClient({ users, groups = [], localUsersEnabled = true }: Props) {
+  const [viewAsOpen, setViewAsOpen] = useState(false);
   const t = useTranslations("users");
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<number | null>(users[0]?.id ?? null);
@@ -176,6 +187,14 @@ export default function UsersClient({ users, groups = [], localUsersEnabled = tr
       <div className="cpm-list-header cpm-list-header-inset">
         <HStack justify="between" vAlign="center" gap={2}>
           <Heading level={1}>{t("users")}</Heading>
+          <IconButton
+            variant="secondary"
+            size="lg"
+            icon={<Eye />}
+            label={t("viewAs.open")}
+            tooltip={t("viewAs.open")}
+            onClick={() => setViewAsOpen(true)}
+          />
           {localUsersEnabled && (
             <Button
               variant="primary"
@@ -258,6 +277,11 @@ export default function UsersClient({ users, groups = [], localUsersEnabled = tr
       detail={
         <VStack gap={4}>
           {error && <Banner status="error" title={t("errorTitle")} description={error} />}
+          <ViewAsDialog
+            open={viewAsOpen}
+            onClose={() => setViewAsOpen(false)}
+            groups={groups.map(({ id, name }) => ({ id, name }))}
+          />
           {selected ? (
             <UserDetail
               // Remounted per user, so an open dialog or a half-typed field never carries across.

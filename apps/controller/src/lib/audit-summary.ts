@@ -374,6 +374,18 @@ export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
     pattern: /^User changed their password$/,
   },
   {
+    entityType: "session",
+    action: "view_as_started",
+    message: "viewAsStarted",
+    pattern: /^Started viewing the dashboard as (?<role>\S+)$/,
+  },
+  {
+    entityType: "session",
+    action: "view_as_stopped",
+    message: "viewAsStopped",
+    pattern: /^Stopped viewing the dashboard as (?<role>\S+)$/,
+  },
+  {
     entityType: "user",
     action: "two_factor_enabled",
     message: "twoFactorEnabled",

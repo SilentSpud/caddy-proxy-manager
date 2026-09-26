@@ -24,6 +24,7 @@ import {
   type EffectiveGrants,
   type GrantCapability,
   emptyGrants,
+  grantsForGroups,
   grantsForUser,
 } from "./models/group-grants";
 
@@ -64,7 +65,7 @@ function bucket(access: Access, kind: ResourceKind): Map<number, GrantCapability
  * and a query per request for a value nothing reads is a query per request for nothing.
  */
 export async function resolveAccess(session: Session): Promise<Access> {
-  return await accessFor(Number(session.user.id), session.user.role);
+  return await accessFor(Number(session.user.id), session.user.role, session.viewAs?.groupIds);
 }
 
 /**
@@ -75,16 +76,20 @@ export async function resolveAccess(session: Session): Promise<Access> {
  * inventing fields nothing reads, so the identity-shaped part of the question lives here and
  * `resolveAccess` is the session-shaped wrapper over it.
  */
-export async function accessFor(userId: number, role: string): Promise<Access> {
+export async function accessFor(
+  userId: number,
+  role: string,
+  /** An admin viewing as these groups: their grants, not the ones the admin's memberships carry. */
+  viewAsGroupIds?: number[],
+): Promise<Access> {
   const isOperator = role === "operator";
+  const grants = !isOperator
+    ? emptyGrants()
+    : viewAsGroupIds
+      ? await grantsForGroups(viewAsGroupIds)
+      : await grantsForUser(userId);
 
-  return {
-    userId,
-    role,
-    isAdmin: role === "admin",
-    isOperator,
-    grants: isOperator ? await grantsForUser(userId) : emptyGrants(),
-  };
+  return { userId, role, isAdmin: role === "admin", isOperator, grants };
 }
 
 /** Whether this viewer may see the resource at all. A manage grant implies view. */

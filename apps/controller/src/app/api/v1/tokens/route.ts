@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireApiUser, apiErrorResponse } from "@/src/lib/api-auth";
+import { domainErrorMessage } from "@/src/lib/domain-error";
 import { createApiToken, listApiTokens, listAllApiTokens } from "@/src/lib/models/api-tokens";
 
 export async function GET(request: NextRequest) {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, authMethod } = await requireApiUser(request);
+    const { userId, authMethod, viewAsGroupIds } = await requireApiUser(request);
 
     // Credential creation requires an interactive, cookie-authenticated session.
     // Otherwise a stolen (possibly short-lived) bearer token could mint a new,
@@ -24,6 +25,10 @@ export async function POST(request: NextRequest) {
         { error: "API tokens can only be created from an authenticated session" },
         { status: 403 },
       );
+    }
+    // A token carries the account's real role, not the one being previewed.
+    if (viewAsGroupIds !== undefined) {
+      return NextResponse.json({ error: domainErrorMessage("viewAsForbidden") }, { status: 403 });
     }
 
     const body = await request.json();

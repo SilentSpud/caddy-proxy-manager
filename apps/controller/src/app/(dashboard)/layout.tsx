@@ -14,10 +14,24 @@ import { ModuleGateProvider } from "@/components/caddy-modules/ModuleGate";
 import { requiresLegacyPasswordChange } from "@/src/lib/services/legacy-password";
 import { redirect } from "next/navigation";
 import DashboardLayoutClient from "./DashboardLayoutClient";
+import { inArray } from "drizzle-orm";
+import db from "@/src/lib/db";
+import { groups } from "@/src/lib/db/schema";
 import { stagedKeys } from "@/src/lib/settings/staged-view";
 import { getMoreDrawerPins } from "@/src/lib/models/nav-preferences";
 import { getTableDensity } from "@/src/lib/models/table-density";
 import { TableDensityProvider } from "@/components/ui/TableDensity";
+
+/** Names for the banner, in the order the ids were chosen. */
+async function groupNames(ids: number[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({ id: groups.id, name: groups.name })
+    .from(groups)
+    .where(inArray(groups.id, ids));
+  const byId = new Map(rows.map((row) => [row.id, row.name]));
+  return ids.map((id) => byId.get(id)).filter((name): name is string => Boolean(name));
+}
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await requireUser();
@@ -76,6 +90,11 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           updateAvailable={updates.updateAvailable}
           stagedKeys={staged}
           morePins={morePins}
+          viewAs={
+            session.viewAs
+              ? { role: session.viewAs.role, groupNames: await groupNames(session.viewAs.groupIds) }
+              : null
+          }
         >
           {children}
         </DashboardLayoutClient>
