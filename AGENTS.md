@@ -51,8 +51,13 @@ them. Three things make that work, and all three live in `apps/site/astro.config
   to the viewport - `demo.css` repeats only the `cpm-desktop-only`/`cpm-mobile-only` rules.
 
 A component that imports a server action or the database cannot be demoed - the import would pull
-the db into the browser bundle. That rules out the page clients under `(dashboard)` that import
+the db into the browser bundle, unless `astro.config.mjs` points that action module at a shim, as it
+does for the setup screens and the host editors. That rules out the page clients under `(dashboard)` that import
 `./actions`; `AuditLogClient` is demoed because it does not.
+
+The site has two test suites, both run by `site.yml`. `bun run --filter @cpm/site test` holds the
+data a demo copies from the controller to the original; `test:e2e` (from `apps/site`, after a
+build) opens every page and fails if a demo does not hydrate or throws while it does.
 
 ## The agent connects inwards
 
