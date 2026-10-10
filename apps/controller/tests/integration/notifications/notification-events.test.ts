@@ -277,11 +277,11 @@ describe('background jobs', () => {
   it('tells about a CRS plugin switched off, and a release once', async () => {
     await reportCrsPluginDisabled({ id: 4, name: 'wordpress', version: 'v1.1.0' });
     await reportCrsPluginDisabled({ id: 4, name: 'wordpress', version: 'v1.1.0' });
-    await reportReleaseAvailable('4.0.0', '3.9.0');
-    await reportReleaseAvailable('4.0.0', '3.9.0');
+    await reportReleaseAvailable('5.0.0', '4.0.0');
+    await reportReleaseAvailable('5.0.0', '4.0.0');
     const [message] = await flush();
     expect(message.subject).toBe('Caddy Proxy Manager: 2 notifications');
     expect(message.text).toContain('the CRS plugin wordpress v1.1.0, so it was switched off');
-    expect(message.text).toContain('Release 4.0.0 is available. This instance runs 3.9.0.');
+    expect(message.text).toContain('Release 5.0.0 is available. This instance runs 4.0.0.');
   });
 });
