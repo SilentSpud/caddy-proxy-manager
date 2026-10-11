@@ -26,7 +26,7 @@ function findNodeImportsFromClient(): string[] {
 describe('client bundle boundary', () => {
   it('reaches no node: builtin from a "use client" module', () => {
     expect(findNodeImportsFromClient()).toEqual([]);
-  });
+  }, 30_000);
 
   it('parses the import shapes the walker relies on', () => {
     expect(

@@ -151,8 +151,11 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
 
   await injectFormFields(page, extraFields);
 
-  await page.getByRole('button', { name: /^create$/i }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: /^review$/i }).click();
+  const create = page.getByRole('button', { name: /^create$/i });
+  await expect(create).toBeEnabled({ timeout: 30_000 });
+  await create.click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 15_000 });
   await expect(page.getByRole('table').getByText(config.name, { exact: true })).toBeVisible({
     timeout: 10_000,
   });

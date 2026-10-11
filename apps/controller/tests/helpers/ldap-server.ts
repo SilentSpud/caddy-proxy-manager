@@ -136,25 +136,34 @@ export async function startLdapServer(): Promise<TestLdapServer | null> {
     const ldapsUrl = `ldaps://localhost:${await mappedPort(container, 636)}`;
 
     // The image runs slapd once to bootstrap, then restarts it with TLS: a bind can succeed
-    // against the first and be cut off by the restart. Ready is a verified LDAPS bind.
+    // against the first and be cut off by the restart. LDAPS must stay ready before seeding.
     const deadline = Date.now() + READY_TIMEOUT_MS;
     const caPem = certificateAuthorityPem;
     let lastError: unknown = null;
+    let readySince: number | null = null;
     for (;;) {
-      const client = new Client({
+      const ldapsClient = new Client({
         url: ldapsUrl,
         connectTimeout: 2_000,
         timeout: 2_000,
         tlsOptions: { ca: [caPem] },
       });
+      let ldapsReady = false;
       try {
-        await client.bind(LDAP_ADMIN_DN, LDAP_ADMIN_PASSWORD);
-        await client.unbind();
-        break;
+        await ldapsClient.bind(LDAP_ADMIN_DN, LDAP_ADMIN_PASSWORD);
+        ldapsReady = true;
       } catch (error) {
         lastError = error;
-        await client.unbind().catch(() => {});
       }
+      await ldapsClient.unbind().catch(() => {});
+
+      if (ldapsReady) {
+        readySince ??= Date.now();
+        if (Date.now() - readySince >= 2_000) break;
+      } else {
+        readySince = null;
+      }
+
       if (Date.now() > deadline) throw new Error(`${IMAGE} was not ready in time: ${lastError}`);
       await Bun.sleep(500);
     }

@@ -8,7 +8,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "typecheck": "astro sync && tsc --noEmit -p tsconfig.typecheck.json",
+    "typecheck": "astro sync && bun check --tsconfig-override tsconfig.typecheck.json",
     "test": "bun test ./tests/unit",
     "test:e2e": "playwright test"
   },

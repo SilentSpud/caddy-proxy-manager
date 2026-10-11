@@ -10,7 +10,7 @@
     "build": "vite build && bun scripts/inject-runtime-guard.mjs",
     "build:binary": "bun build --compile --target=${BUN_COMPILE_TARGET:-bun} --outfile dist/standalone/cpm-server scripts/standalone-entry.ts",
     "start": "vinext start",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "test": "bun scripts/with-test-db.ts bun test --parallel tests/unit tests/integration",

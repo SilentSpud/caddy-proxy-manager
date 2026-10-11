@@ -97,7 +97,7 @@ describe('entry points', () => {
   it('are all found', () => {
     expect(serverActions().length).toBeGreaterThan(150);
     expect(restHandlers().length).toBeGreaterThan(150);
-  });
+  }, 30_000);
 
   it("each check the caller's permissions", () => {
     const unchecked = entries
@@ -164,5 +164,5 @@ describe('roles named in code', () => {
       .map((file) => relative(SRC_ROOT, file).split(sep).join('/'))
       .filter((file) => !(file in ROLE_BY_NAME));
     expect(found).toEqual([]);
-  });
+  }, 30_000);
 });

@@ -8,7 +8,7 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "build:binary": "bun build --compile --target=${BUN_COMPILE_TARGET:-bun} --outfile dist/cpm-agent src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "test": "bun test --parallel tests"
   },
   "dependencies": {

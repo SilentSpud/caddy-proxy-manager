@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PROXY_HOSTS_NEWEST_FIRST } from '../helpers/proxy-api';
+import { createProxyHost } from '../helpers/proxy-api';
 import { waitForHydration } from '../helpers/hydration';
 
 test.describe('Audit log', () => {
@@ -18,22 +18,11 @@ test.describe('Audit log', () => {
   });
 
   test('creating a proxy host creates audit log entry', async ({ page }) => {
-    await page.goto(PROXY_HOSTS_NEWEST_FIRST);
-    await waitForHydration(page);
-    await page.getByRole('button', { name: 'New', exact: true }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-
-    await page.getByLabel('Name').fill('Audit Test Host');
-    await page.getByLabel(/^domains/i).fill('audit-test.local');
-    await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:8888');
-
-    await page.getByRole('button', { name: /^create$/i }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('Audit Test Host', { exact: true })).toBeVisible(
-      {
-        timeout: 10000,
-      },
-    );
+    await createProxyHost(page, {
+      name: 'Audit Test Host',
+      domain: 'audit-test.local',
+      upstream: 'localhost:8888',
+    });
 
     await page.goto('/audit-log');
     await expect(page.locator('body')).toBeVisible();
@@ -56,15 +45,11 @@ test.describe('Audit log', () => {
   });
 
   test("shows a host change's before and after, unified or side by side", async ({ page }) => {
-    await page.goto(PROXY_HOSTS_NEWEST_FIRST);
-    await waitForHydration(page);
-    await page.getByRole('button', { name: 'New', exact: true }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await page.getByLabel('Name').fill('Audit Diff Host');
-    await page.getByLabel(/^domains/i).fill('audit-diff.local');
-    await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:8889');
-    await page.getByRole('button', { name: /^create$/i }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+    await createProxyHost(page, {
+      name: 'Audit Diff Host',
+      domain: 'audit-diff.local',
+      upstream: 'localhost:8889',
+    });
 
     await page.goto('/audit-log?search=Audit%20Diff%20Host');
     await waitForHydration(page);

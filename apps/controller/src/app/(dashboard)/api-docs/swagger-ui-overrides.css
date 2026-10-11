@@ -128,12 +128,12 @@
   padding: 1rem 0;
 }
 
+.swagger-ui .version,
 .swagger-ui .opblock .opblock-summary-method,
 .swagger-ui .opblock-summary .opblock-summary-method,
 .swagger-ui .info .title span.version,
-.swagger-ui .info .title small pre.version,
 .swagger-ui .info .title small .version,
-.swagger-ui .version,
+.swagger-ui .info .title small pre.version,
 .swagger-ui .info .title span.version-stamp,
 .swagger-ui .btn.authorize span,
 .swagger-ui .btn.execute {
