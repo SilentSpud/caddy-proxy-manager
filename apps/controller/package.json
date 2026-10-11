@@ -35,7 +35,7 @@
     "@clickhouse/client": "^1.24.0",
     "@cpm/shared": "workspace:*",
     "@xmldom/xmldom": "^0.9.12",
-    "apexcharts": "^7.8.0",
+    "apexcharts": "^8.0.0",
     "better-auth": "^1.7.7",
     "country-flag-icons": "^1.6.20",
     "dayjs": "^1.11.23",

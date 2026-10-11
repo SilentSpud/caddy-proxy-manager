@@ -28,7 +28,8 @@ vi.mock('@/src/lib/auth', () => ({
 
 import messages from '../../../messages/en.json';
 import * as actions from '@/src/app/(dashboard)/settings/actions';
-import { setSetting } from '@/src/lib/settings';
+import { getCaddyBuildSettings, saveCaddyBuildSettings, setSetting } from '@/src/lib/settings';
+import { CROWDSEC_MODULE_ID } from '@/src/lib/caddy/image-build/modules';
 import { domainErrorMessage } from '@/src/lib/errors/domain-error';
 import { decryptSecret, isEncryptedSecret } from '@/src/lib/secrets';
 import { invalidateSettingsCache } from '@/src/lib/settings/resolve';
@@ -807,6 +808,32 @@ describe('who may stage', () => {
 });
 
 describe('applying the change set', () => {
+  it('adds CrowdSec to the Caddy build when enabled settings are applied', async () => {
+    await saveCaddyBuildSettings({
+      modules: { 'caddy-l4': false },
+      customModules: [{ modulePath: 'github.com/example/custom', enabled: true }],
+    });
+    await actions.updateCrowdSecSettingsAction(
+      null,
+      form({
+        crowdsecEnabled: 'on',
+        crowdsecMode: 'external',
+        crowdsecApiUrl: 'http://crowdsec:8080',
+        crowdsecApiKey: 'bouncer-key',
+      }),
+    );
+
+    expect((await getCaddyBuildSettings())?.modules[CROWDSEC_MODULE_ID]).toBeUndefined();
+    await actions.applyStagedSettingsAction();
+
+    const buildSettings = await getCaddyBuildSettings();
+    expect(buildSettings?.modules[CROWDSEC_MODULE_ID]).toBe(true);
+    expect(buildSettings?.modules['caddy-l4']).toBe(false);
+    expect(buildSettings?.customModules).toEqual([
+      { modulePath: 'github.com/example/custom', enabled: true },
+    ]);
+  });
+
   it('commits every staged key, reloads Caddy once and records the revision', async () => {
     await actions.updateCompressionSettingsAction(null, form({ enabled: 'on' }));
     await actions.updateHttpProtocolsSettingsAction(null, form({ http2: 'on', http3: 'on' }));

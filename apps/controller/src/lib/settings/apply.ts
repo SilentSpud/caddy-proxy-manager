@@ -103,6 +103,11 @@ async function commitSettings(
   invalidateSettingsCache();
 
   const keys = staged.map((entry) => entry.key);
+  let crowdsecEnabled = false;
+  if (keys.includes("crowdsec")) {
+    const { ensureCrowdSecModule } = await import("../caddy/image-build");
+    crowdsecEnabled = await ensureCrowdSecModule();
+  }
   const fallback = domainError("applyCaddyConfigFailed");
   let failure: Error | null = null;
   try {
@@ -115,6 +120,10 @@ async function commitSettings(
   if (keys.includes("crowdsec")) {
     const { applyManagedServices } = await import("../agent/managed-services");
     await applyManagedServices();
+  }
+  if (crowdsecEnabled) {
+    const { pushDesiredState } = await import("../agent/desired-state");
+    await pushDesiredState();
   }
   // Agents decide whether they may build Caddy from their desired state.
   if (keys.includes("config:offline_mode")) {

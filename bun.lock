@@ -36,7 +36,7 @@
         "@clickhouse/client": "^1.24.0",
         "@cpm/shared": "workspace:*",
         "@xmldom/xmldom": "^0.9.12",
-        "apexcharts": "^7.8.0",
+        "apexcharts": "^8.0.0",
         "better-auth": "^1.7.7",
         "country-flag-icons": "^1.6.20",
         "dayjs": "^1.11.23",
@@ -103,7 +103,7 @@
         "@astryxdesign/theme-neutral": "^0.6.6",
         "@catppuccin/starlight": "^2.1.0",
         "@cpm/controller": "workspace:*",
-        "apexcharts": "^7.8.0",
+        "apexcharts": "^8.0.0",
         "astro": "^7.3.7",
         "lucide-react": "^1.52.0",
         "react": "^19.3.0",
@@ -1005,7 +1005,7 @@
 
     "apex-commons": ["apex-commons@0.8.1", "", {}, "sha512-F7fqJVh0smeTu1d86uuRSNNZvaM/l11GNQMbu6oAiSvuXp+K8KCufg0oZTy2VQBEEipRLAdFqkHnphlVpTG0Gw=="],
 
-    "apexcharts": ["apexcharts@7.8.0", "", { "dependencies": { "apex-commons": "^0.8.0" } }, "sha512-UxzR7IDXs3HDaOoxTsdn7L2dw9TdYp347uiU7WvjKuzCQqODmO7l63rxMmLwtbYrZPd+0Vd7v5VINzJgPyqmIw=="],
+    "apexcharts": ["apexcharts@8.0.0", "", { "dependencies": { "apex-commons": "^0.8.0" } }, "sha512-VA9l6lVKWNzwvnG1mh94SwnBJ+t0m+AlEKpL4wwIBFyn69j9zEyBKdOlQvtk4q1BWyP0SUJtVvgq9Dj8mvYLOw=="],
 
     "apg-lite": ["apg-lite@1.0.5", "", {}, "sha512-SlI+nLMQDzCZfS39ihzjGp3JNBQfJXyMi6cg9tkLOCPVErgFsUIAEdO9IezR7kbP5Xd0ozcPNQBkf9TO5cHgWw=="],
 

@@ -217,7 +217,24 @@ export async function register() {
       console.error("Failed to move suppressed WAF rules into exclusions:", error);
     }
 
+    let crowdsecEnabled = false;
+    try {
+      const { ensureCrowdSecModule } = await import("./lib/caddy/image-build");
+      crowdsecEnabled = await ensureCrowdSecModule();
+    } catch (error) {
+      console.error("Failed to ensure the Caddy CrowdSec module:", error);
+    }
+
     await releaseStartupLock();
+
+    if (crowdsecEnabled) {
+      try {
+        const { pushDesiredState } = await import("./lib/agent/desired-state");
+        await pushDesiredState();
+      } catch (error) {
+        console.error("Failed to request a Caddy build with the CrowdSec module:", error);
+      }
+    }
 
     const { applyCaddyConfig } = await import("./lib/caddy");
     try {

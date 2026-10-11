@@ -135,7 +135,8 @@ port and module overrides. Then check:
 - **A `docker-compose.override.yml` that interpolates variables** into `caddy` or `clickhouse`.
   The agent's Compose sees only the agent's environment now, so forward each one
   under `agent.environment` in the override, as `MY_VAR: ${MY_VAR:-}`.
-- **`.env` stays `0600`.** If you loosened it so the agent could read it, tighten it again.
+- **`.env` stays `0600`.** The agent runs Compose with `--env-file /dev/null`, so it does not load
+  `.env`; only explicitly forwarded variables reach managed services.
 - **Analytics already on.** The ClickHouse container keeps the old network until recreated; switch
   analytics off and on again under Settings so the agent recreates it with the stored credentials.
 - **An `acme-ca` volume from an earlier release** keeps its old `0777` mode. Tighten it with

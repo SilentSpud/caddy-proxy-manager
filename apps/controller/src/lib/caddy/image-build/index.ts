@@ -8,6 +8,7 @@ import crypto from "node:crypto";
 import { type CaddyBuildState, type CaddyBuildStatus, SHIPPED_CADDY_MODULES } from "@cpm/shared";
 import {
   CADDY_MODULES,
+  CROWDSEC_MODULE_ID,
   PREVIOUS_MODULE_PATHS,
   type CaddyCustomModule,
   type CaddyFeatureId,
@@ -20,7 +21,12 @@ import {
   validateCustomModule,
 } from "./modules";
 import { domainError } from "../../errors/domain-error";
-import { type CaddyBuildSettings, getCaddyBuildSettings } from "../../settings";
+import {
+  type CaddyBuildSettings,
+  getCaddyBuildSettings,
+  getCrowdSecSettings,
+  saveCaddyBuildSettings,
+} from "../../settings";
 
 import {
   caddyBuildAgents,
@@ -30,7 +36,11 @@ import {
   requestCaddyImageLoad,
   tryGetAgentStatus,
 } from "../../agent/client";
-import { getAgentBuildSettings } from "../../models/agents";
+import {
+  getAgentBuildSettings,
+  getAllAgentBuildSettings,
+  setAgentBuildSettings,
+} from "../../models/agents";
 
 export type { CaddyBuildState, CaddyBuildStatus };
 
@@ -54,6 +64,34 @@ export function resolveEnabledModuleIds(settings: CaddyBuildSettings | null): st
   return CADDY_MODULES.filter((m) => overrides[m.id] ?? m.defaultEnabled !== false).map(
     (m) => m.id,
   );
+}
+
+/** Keep the build selection aligned with CrowdSec's global switch. */
+export async function ensureCrowdSecModule(): Promise<boolean> {
+  const [crowdsec, settings, agentSettings] = await Promise.all([
+    getCrowdSecSettings(),
+    getCaddyBuildSettings(),
+    getAllAgentBuildSettings(),
+  ]);
+  if (!crowdsec.enabled) return false;
+
+  if (!resolveEnabledModuleIds(settings).includes(CROWDSEC_MODULE_ID)) {
+    await saveCaddyBuildSettings({
+      modules: { ...(settings?.modules ?? {}), [CROWDSEC_MODULE_ID]: true },
+      customModules: settings?.customModules ?? [],
+    });
+  }
+
+  await Promise.all(
+    Array.from(agentSettings, async ([agentRowId, agentBuild]) => {
+      if (resolveEnabledModuleIds(agentBuild).includes(CROWDSEC_MODULE_ID)) return;
+      await setAgentBuildSettings(agentRowId, {
+        modules: { ...agentBuild.modules, [CROWDSEC_MODULE_ID]: true },
+        customModules: agentBuild.customModules,
+      });
+    }),
+  );
+  return true;
 }
 
 export function resolveCustomModules(settings: CaddyBuildSettings | null): CaddyCustomModule[] {
